@@ -19,7 +19,8 @@ const CIN7_KEY = process.env.CIN7_KEY || '';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const AIS_API_KEY = process.env.AIS_API_KEY || '';
 const CIN7_REQUEST_SPACING_MS = 1500;
-const CIN7_MIN_REFRESH_INTERVAL_MS = 8 * 60 * 60 * 1000;
+const CIN7_REFRESH_INTERVAL_MS = 4 * 60 * 60 * 1000;
+const CIN7_MIN_REFRESH_INTERVAL_MS = CIN7_REFRESH_INTERVAL_MS;
 const CIN7_RATE_LIMIT_BACKOFF_MS = 60 * 60 * 1000;
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.createHash('sha256').update(`${APP_PASSWORD}|ll-demand-planner-session-v1`).digest('hex');
@@ -192,28 +193,9 @@ let dataCache = {
 };
 const CACHE_SNAPSHOT_PATH = path.join(__dirname, 'data', 'cache-snapshot.json');
 const CACHE_SNAPSHOT_BACKUP_PATH = path.join(__dirname, 'data', 'cache-snapshot.last-good.json');
-const PO_SNAPSHOT_PATH = path.join(__dirname, 'data', 'po-snapshot.json');
-const PO_SNAPSHOT_BACKUP_PATH = path.join(__dirname, 'data', 'po-snapshot.last-good.json');
 const SNAPSHOT_PUSH_STATE_PATH = path.join(__dirname, 'data', 'snapshot-push-state.json');
 let cacheSnapshotPushInFlight = false;
-
-function loadPoMirrorSnapshot() {
-  for (const snapPath of [PO_SNAPSHOT_PATH, PO_SNAPSHOT_BACKUP_PATH]) {
-    try {
-      const snap = JSON.parse(fs.readFileSync(snapPath, 'utf8'));
-      const pos = Array.isArray(snap.cin7POs) ? mergeCin7POsByReference(snap.cin7POs) : [];
-      if (pos.length > 0) {
-        return {
-          pos,
-          lastRefresh: snap.lastPoRefresh || snap.lastRefresh || snap.cin7MirrorExportedAt || null,
-          source: snap.cin7Source || 'po-mirror-snapshot',
-          exportedAt: snap.cin7MirrorExportedAt || null
-        };
-      }
-    } catch (_) {}
-  }
-  return null;
-}
+const CIN7_DATA_SOURCE = 'live-cin7-api-cache';
 
 function getStoreKeysForCk(ckId, primaryStore) {
   const keys = new Set([primaryStore]);
@@ -474,9 +456,11 @@ function loadSnapshotPushState() {
 }
 
 function maybePushCacheSnapshotToGit(reason = 'cin7-refresh') {
-  const today = new Date().toISOString().slice(0, 10);
+  const now = Date.now();
   const state = loadSnapshotPushState();
-  if (state.cacheLastSuccessDate === today || cacheSnapshotPushInFlight) return;
+  // Every successful scheduled CIN7 refresh should persist a repo cache, but avoid
+  // duplicate commits when a manual refresh and scheduled refresh happen close together.
+  if (cacheSnapshotPushInFlight || (state.cacheLastSuccessAtMs && now - state.cacheLastSuccessAtMs < 30 * 60 * 1000)) return;
   cacheSnapshotPushInFlight = true;
   const command = [
     'git add data/cache-snapshot.json data/cache-snapshot.last-good.json data/po-eta-history.json data/po-eta-history.last-good.json',
@@ -492,7 +476,7 @@ function maybePushCacheSnapshotToGit(reason = 'cin7-refresh') {
       if (error.code !== 0) console.error('Cache snapshot git push failed:', error.message);
       return;
     }
-    saveSnapshotPushState({ ...state, cacheLastSuccessDate: today, cacheLastReason: reason, cachePushedAt: new Date().toISOString() });
+    saveSnapshotPushState({ ...state, cacheLastSuccessAtMs: Date.now(), cacheLastReason: reason, cachePushedAt: new Date().toISOString() });
     console.log('Cache snapshot pushed to GitHub');
   });
 }
@@ -600,7 +584,7 @@ let cin7LastRequestAt = 0;
 let cin7BackoffUntil = 0;
 let cin7RecoveryTimer = null;
 let refreshPromise = null;
-const DAILY_CIN7_REFRESH_UTC_HOUR = 8; // 4pm UTC+8
+const CIN7_REFRESH_ANCHOR_UTC_HOUR = 0; // every 4h from midnight UTC
 
 async function throttleCin7Request() {
   const waitMs = Math.max(0, cin7LastRequestAt + CIN7_REQUEST_SPACING_MS - Date.now());
@@ -652,25 +636,29 @@ function markCin7Backoff(reason, retryAfterSeconds) {
   scheduleCin7Recovery(reason);
 }
 
-function msUntilNextDailyRefresh(hourUtc) {
+function msUntilNextFourHourlyRefresh(anchorHourUtc = CIN7_REFRESH_ANCHOR_UTC_HOUR) {
   const now = new Date();
   const next = new Date(now);
-  next.setUTCHours(hourUtc, 0, 0, 0);
-  if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
+  next.setUTCMinutes(0, 0, 0);
+  const currentHour = next.getUTCHours();
+  const hoursSinceAnchor = ((currentHour - anchorHourUtc) % 4 + 4) % 4;
+  const addHours = hoursSinceAnchor === 0 && next > now ? 0 : 4 - hoursSinceAnchor;
+  next.setUTCHours(currentHour + addHours, 0, 0, 0);
+  if (next <= now) next.setUTCHours(next.getUTCHours() + 4, 0, 0, 0);
   return next.getTime() - now.getTime();
 }
 
-function scheduleDailyCin7Refresh() {
-  const delayMs = msUntilNextDailyRefresh(DAILY_CIN7_REFRESH_UTC_HOUR);
-  console.log(`Next daily CIN7 refresh scheduled in ${Math.ceil(delayMs / 60000)} min (08:00 UTC / 16:00 UTC+8)`);
+function scheduleFourHourlyCin7Refresh() {
+  const delayMs = msUntilNextFourHourlyRefresh();
+  console.log(`Next scheduled CIN7 refresh in ${Math.ceil(delayMs / 60000)} min (every 4h UTC)`);
   const timer = setTimeout(async () => {
     try {
-      console.log('Running daily scheduled CIN7 refresh (08:00 UTC / 16:00 UTC+8)...');
+      console.log('Running scheduled CIN7 refresh (every 4h)...');
       await refreshAllData(true);
     } catch (e) {
-      console.error('Daily scheduled CIN7 refresh failed:', e.message);
+      console.error('Scheduled CIN7 refresh failed:', e.message);
     } finally {
-      scheduleDailyCin7Refresh();
+      scheduleFourHourlyCin7Refresh();
     }
   }, delayMs);
   if (typeof timer.unref === 'function') timer.unref();
@@ -2343,9 +2331,8 @@ function scorePO(po) {
 }
 
 app.get('/api/all-pos', requireAuth, (req, res) => {
-  const poSnapshot = loadPoMirrorSnapshot();
-  if (!poSnapshot) reloadSnapshotIfNewer();
-  const sourcePos = poSnapshot?.pos || dataCache.cin7POs || [];
+  reloadSnapshotIfNewer();
+  const sourcePos = dataCache.cin7POs || [];
   const pos = sourcePos.map(po => {
     const destination = inferDestination(po);
     const landed = estimateLandedCost(po, destination);
@@ -2382,7 +2369,7 @@ app.get('/api/all-pos', requireAuth, (req, res) => {
       items: po.items || {}
     };
   });
-  res.json({ pos, lastRefresh: poSnapshot?.lastRefresh || dataCache.lastRefresh, poSource: poSnapshot?.source || 'planner-cache', poSnapshotExportedAt: poSnapshot?.exportedAt || null, fx: { USDAUD: fxRate.USDAUD, lastFetch: fxRate.lastFetch } });
+  res.json({ pos, lastRefresh: dataCache.lastPoRefresh || dataCache.lastRefresh, poSource: CIN7_DATA_SOURCE, poSnapshotExportedAt: null, fx: { USDAUD: fxRate.USDAUD, lastFetch: fxRate.lastFetch } });
 });
 
 app.get('/api/ck/:id', requireAuth, (req, res) => {
@@ -2782,7 +2769,7 @@ app.get('/api/health', (req, res) => {
   reloadSnapshotIfNewer();
   const cin7Count = Object.keys(dataCache.cin7Products).length;
   const poCount = dataCache.cin7POs.length;
-  res.json({ ok: cin7Count > 0, cin7: cin7Count, pos: poCount, lastRefresh: dataCache.lastRefresh, lastCin7Refresh: dataCache.lastCin7Refresh, lastPoRefresh: dataCache.lastPoRefresh, lastShopifyRefresh: dataCache.lastShopifyRefresh, error: dataCache.error || null, uptime: Math.round(process.uptime()) });
+  res.json({ ok: cin7Count > 0, cin7: cin7Count, pos: poCount, cin7Source: CIN7_DATA_SOURCE, nextScheduledRefreshEveryHours: 4, cacheFallback: true, lastRefresh: dataCache.lastRefresh, lastCin7Refresh: dataCache.lastCin7Refresh, lastPoRefresh: dataCache.lastPoRefresh, lastShopifyRefresh: dataCache.lastShopifyRefresh, error: dataCache.error || null, uptime: Math.round(process.uptime()) });
 });
 
 // Main app shell is public; all data APIs remain protected by requireAuth.
@@ -2794,7 +2781,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.listen(PORT, () => {
   console.log(`Demand Planner running on port ${PORT}`);
   refreshAllData(true); // Initial fetch, forced so deploy/restart gets the latest possible CIN7 data
-  scheduleDailyCin7Refresh(); // Daily at 08:00 UTC / 16:00 UTC+8
+  scheduleFourHourlyCin7Refresh(); // Every 4 hours; manual refresh remains available via the UI button
 
   // Keep-alive: ping self every 10 min to prevent Render free tier spin-down
   setInterval(() => {
