@@ -192,9 +192,28 @@ let dataCache = {
 };
 const CACHE_SNAPSHOT_PATH = path.join(__dirname, 'data', 'cache-snapshot.json');
 const CACHE_SNAPSHOT_BACKUP_PATH = path.join(__dirname, 'data', 'cache-snapshot.last-good.json');
+const PO_SNAPSHOT_PATH = path.join(__dirname, 'data', 'po-snapshot.json');
+const PO_SNAPSHOT_BACKUP_PATH = path.join(__dirname, 'data', 'po-snapshot.last-good.json');
 const SNAPSHOT_PUSH_STATE_PATH = path.join(__dirname, 'data', 'snapshot-push-state.json');
 let cacheSnapshotPushInFlight = false;
-const CIN7_DATA_SOURCE = 'live-cin7-api';
+
+function loadPoMirrorSnapshot() {
+  for (const snapPath of [PO_SNAPSHOT_PATH, PO_SNAPSHOT_BACKUP_PATH]) {
+    try {
+      const snap = JSON.parse(fs.readFileSync(snapPath, 'utf8'));
+      const pos = Array.isArray(snap.cin7POs) ? mergeCin7POsByReference(snap.cin7POs) : [];
+      if (pos.length > 0) {
+        return {
+          pos,
+          lastRefresh: snap.lastPoRefresh || snap.lastRefresh || snap.cin7MirrorExportedAt || null,
+          source: snap.cin7Source || 'po-mirror-snapshot',
+          exportedAt: snap.cin7MirrorExportedAt || null
+        };
+      }
+    } catch (_) {}
+  }
+  return null;
+}
 
 function getStoreKeysForCk(ckId, primaryStore) {
   const keys = new Set([primaryStore]);
@@ -2324,8 +2343,9 @@ function scorePO(po) {
 }
 
 app.get('/api/all-pos', requireAuth, (req, res) => {
-  reloadSnapshotIfNewer();
-  const sourcePos = dataCache.cin7POs || [];
+  const poSnapshot = loadPoMirrorSnapshot();
+  if (!poSnapshot) reloadSnapshotIfNewer();
+  const sourcePos = poSnapshot?.pos || dataCache.cin7POs || [];
   const pos = sourcePos.map(po => {
     const destination = inferDestination(po);
     const landed = estimateLandedCost(po, destination);
@@ -2361,7 +2381,7 @@ app.get('/api/all-pos', requireAuth, (req, res) => {
       items: po.items || {}
     };
   });
-  res.json({ pos, lastRefresh: dataCache.lastPoRefresh || dataCache.lastRefresh, poSource: CIN7_DATA_SOURCE, poSnapshotExportedAt: null, fx: { USDAUD: fxRate.USDAUD, lastFetch: fxRate.lastFetch } });
+  res.json({ pos, lastRefresh: poSnapshot?.lastRefresh || dataCache.lastRefresh, poSource: poSnapshot?.source || 'planner-cache', poSnapshotExportedAt: poSnapshot?.exportedAt || null, fx: { USDAUD: fxRate.USDAUD, lastFetch: fxRate.lastFetch } });
 });
 
 app.get('/api/ck/:id', requireAuth, (req, res) => {
@@ -2761,7 +2781,7 @@ app.get('/api/health', (req, res) => {
   reloadSnapshotIfNewer();
   const cin7Count = Object.keys(dataCache.cin7Products).length;
   const poCount = dataCache.cin7POs.length;
-  res.json({ ok: cin7Count > 0, cin7: cin7Count, pos: poCount, cin7Source: CIN7_DATA_SOURCE, lastRefresh: dataCache.lastRefresh, lastCin7Refresh: dataCache.lastCin7Refresh, lastPoRefresh: dataCache.lastPoRefresh, lastShopifyRefresh: dataCache.lastShopifyRefresh, error: dataCache.error || null, uptime: Math.round(process.uptime()) });
+  res.json({ ok: cin7Count > 0, cin7: cin7Count, pos: poCount, lastRefresh: dataCache.lastRefresh, lastCin7Refresh: dataCache.lastCin7Refresh, lastPoRefresh: dataCache.lastPoRefresh, lastShopifyRefresh: dataCache.lastShopifyRefresh, error: dataCache.error || null, uptime: Math.round(process.uptime()) });
 });
 
 // Main app shell is public; all data APIs remain protected by requireAuth.
