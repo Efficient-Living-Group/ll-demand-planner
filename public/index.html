@@ -190,7 +190,8 @@ th[data-tip]{position:relative;cursor:help}th[data-tip]:after{content:' ⓘ';fon
         <h1 style="font-size:20px;font-weight:700">📋 Purchase Orders</h1>
         <p style="font-size:12px;color:var(--text-dim);margin-top:4px">All POs across every Category Killer</p>
       </div>
-      <div style="display:flex;gap:8px;align-items:center">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+        <button onclick="collapseAllPORows()" style="padding:8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--bg-card);color:var(--blue);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">Collapse all</button>
         <button id="poCurrencyBtn" onclick="_poCurrency=_poCurrency==='AUD'?'USD':'AUD';this.textContent=_poCurrency;renderPurchaseOrders(_allPOsCache)" style="padding:8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--blue);color:#fff;font-size:12px;font-weight:700;cursor:pointer;min-width:50px">AUD</button>
         <select id="poDestFilter" onchange="_poDestination=this.value;renderPurchaseOrders(_allPOsCache)" style="padding:8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:12px;outline:none;cursor:pointer">
           <option value="all">All Destinations</option>
@@ -854,6 +855,7 @@ async function loadAllPOs() {
 function cleanPoRef(ref){return(ref||'').replace(/-cover$/i,'')}
 function uniquePoCount(pos){return new Set((pos||[]).map(po=>cleanPoRef(po.reference)).filter(Boolean)).size}
 function poProductName(po, sku){return (po.itemNames && po.itemNames[sku]) || (DATA.names && DATA.names[sku]) || sku}
+function collapseAllPORows(){document.querySelectorAll('#poList .po-items.open').forEach(row=>row.classList.remove('open'))}
 function poSortArrow(key){return _poSort.key===key ? (_poSort.dir==='asc'?' ▲':' ▼') : ''}
 function setPoSort(key){if(_poSort.key===key){_poSort.dir=_poSort.dir==='asc'?'desc':'asc'}else{_poSort={key,dir:'asc'}}renderPurchaseOrders(_allPOsCache)}
 function poSortableHeader(label,key,align='left'){return `<button onclick="setPoSort('${key}')" style="all:unset;cursor:pointer;display:block;width:100%;text-align:${align};font-weight:800;color:var(--text-dim);white-space:nowrap" title="Sort by ${label}">${label}<span style="font-size:9px;color:var(--blue)">${poSortArrow(key)}</span></button>`}
