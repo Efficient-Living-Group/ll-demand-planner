@@ -2295,7 +2295,8 @@ function estimateLandedCost(po, destination) {
 
 // PO Data Quality Score
 function scorePO(po) {
-  const isInTransitOrReceived = po.stage === 'Received' || (po.etd && po.estimatedArrivalDate && new Date(po.etd) <= new Date() && (po.stage !== 'Draft' && po.stage !== 'Confirmed'));
+  const crd = po.crd || po.etd;
+  const isInTransitOrReceived = po.stage === 'Received' || (crd && po.estimatedArrivalDate && new Date(crd) <= new Date() && hasContainerNumber(po) && (po.stage !== 'Draft' && po.stage !== 'Confirmed'));
   const isReceived = po.stage === 'Received';
 
   let score = 0;
@@ -2308,7 +2309,7 @@ function scorePO(po) {
   addCheck('Created By', 5, !!po.createdBy);
   addCheck('ETA', 20, !!(po.estimatedArrivalDate || po.arrival));
   addCheck('Original ETA', 15, !!(po.customFields?.orders_1000));
-  addCheck('ETD', 15, !!po.etd);
+  addCheck('CRD', 15, !!(po.crd || po.etd));
   addCheck('Port', 10, !!po.port);
 
   // Tracking code: only if in transit or received
@@ -2344,6 +2345,7 @@ app.get('/api/all-pos', requireAuth, (req, res) => {
       company: po.company || '',
       arrival: po.arrival || null,
       etd: po.etd || null,
+      crd: po.crd || po.etd || null,
       estimatedArrivalDate: po.estimatedArrivalDate || null,
       customFields: po.customFields || {},
       trackingCode: po.trackingCode || '',
@@ -2514,6 +2516,15 @@ let aisWs = null;
 let aisReconnectTimer = null;
 let aisSubscribedVessels = [];
 
+function extractContainerNumber(trackingCode) {
+  const match = String(trackingCode || '').toUpperCase().match(/\b[A-Z]{4}\d{6,7}\b/);
+  return match ? match[0] : '';
+}
+
+function hasContainerNumber(po) {
+  return !!extractContainerNumber(po?.trackingCode);
+}
+
 function extractVesselNames() {
   // Extract vessel names from PO tracking codes (format: "CONTAINER / VESSEL" or "CONTAINER/VESSEL")
   const vessels = new Set();
@@ -2634,10 +2645,10 @@ function buildShipmentData() {
     const origin = getSupplierOrigin(po.company || '');
     const dest = getDestination(po);
 
-    // ETD = estimatedDeliveryDate (departure from origin)
-    let etd = null;
-    if (po.etd) {
-      etd = new Date(po.etd);
+    // CRD = cargo ready date. Stored in the legacy `etd` field from Cin7 estimatedDeliveryDate.
+    let crd = null;
+    if (po.crd || po.etd) {
+      crd = new Date(po.crd || po.etd);
     }
 
     // Original ETA = customFields.orders_1000 (set when PO created)
@@ -2670,7 +2681,7 @@ function buildShipmentData() {
       receivedDate = new Date(po.fullyReceivedDate);
     }
 
-    // ETD already parsed above from estimatedDeliveryDate
+    const hasContainer = hasContainerNumber(po);
 
     // Calculate progress (0-1) and status - unified with PO tab logic
     let progress = 0;
@@ -2680,25 +2691,25 @@ function buildShipmentData() {
     if (receivedDate || po.stage === 'Received') {
       progress = 1;
       status = 'arrived';
-    } else if (etd && etd <= now) {
-      // ETD has passed - shipped. Determine if still in transit or overdue.
+    } else if (crd && crd <= now && hasContainer) {
+      // CRD has passed and a container number is recorded - shipped. Determine if still in transit or overdue.
       if (eta && eta <= now) {
         // ETA passed but not received - overdue, still show as in_transit on tracker
         progress = 1;
         status = 'in_transit';
-      } else if (etd && eta) {
-        // Normal in transit: progress based on ETD-ETA window
-        const totalDays = (eta - etd) / (24 * 60 * 60 * 1000);
-        const elapsedDays = (now - etd) / (24 * 60 * 60 * 1000);
+      } else if (crd && eta) {
+        // Normal in transit: progress based on CRD-ETA window
+        const totalDays = (eta - crd) / (24 * 60 * 60 * 1000);
+        const elapsedDays = (now - crd) / (24 * 60 * 60 * 1000);
         progress = totalDays > 0 ? Math.min(1, elapsedDays / totalDays) : 0.5;
         status = 'in_transit';
       } else {
-        // ETD passed but no ETA - still in transit, unknown progress
+        // CRD passed with container number but no ETA - still in transit, unknown progress
         progress = 0.5;
         status = 'in_transit';
       }
     }
-    // else: ETD not set or in future - still in production (default)
+    // else: CRD not set/in future, or no container number yet - still in production (default)
 
     // Count items
     const totalUnits = Object.values(po.items || {}).reduce((a, b) => a + b, 0);
@@ -2714,7 +2725,8 @@ function buildShipmentData() {
       stage: po.stage || '',
       origin,
       destination: dest,
-      etd: etd ? etd.toISOString() : null,
+      etd: crd ? crd.toISOString() : null,
+      crd: crd ? crd.toISOString() : null,
       eta: eta ? eta.toISOString() : null,
       originalEta: originalEta ? originalEta.toISOString() : null,
       revisedEta: revisedEta ? revisedEta.toISOString() : null,

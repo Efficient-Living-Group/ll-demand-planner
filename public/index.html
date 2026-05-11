@@ -973,11 +973,17 @@ function showPoEtaHistory(idx) {
   document.body.appendChild(overlay);
 }
 
+function poContainerNumber(po) {
+  const match = String(po.trackingCode || '').toUpperCase().match(/\b[A-Z]{4}\d{6,7}\b/);
+  return match ? match[0] : '';
+}
+function poHasContainerNumber(po) { return !!poContainerNumber(po); }
+function poCrdDate(po) { return parsePoDate(po.crd || po.etd); }
 function poHasShipped(po) {
   if (po.stage === 'Received') return false;
   const now = new Date();
-  const etd = po.etd ? new Date(po.etd) : null;
-  return !!(etd && etd <= now);
+  const crd = poCrdDate(po);
+  return !!(crd && crd <= now && poHasContainerNumber(po));
 }
 function poIsInTransit(po) {
   return poHasShipped(po);
@@ -1024,7 +1030,7 @@ function renderPurchaseOrders(allPOs) {
     if (key === 'quality') return po.quality?.pct || 0;
     if (key === 'supplier') return po.company || '';
     if (key === 'destination') return po.deliveryCountry || '';
-    if (key === 'etd') return poDateValue(po.etd);
+    if (key === 'etd') return poDateValue(po.crd || po.etd);
     if (key === 'eta') return poDateValue(po.estimatedArrivalDate || po.arrival);
     if (key === 'originalEta') return poDateValue(po.customFields?.orders_1000);
     if (key === 'received') return poDateValue(po.fullyReceivedDate);
@@ -1109,7 +1115,7 @@ function renderPurchaseOrders(allPOs) {
     ${poSortableHeader('Quality','quality','center')}
     ${poSortableHeader('Supplier','supplier')}
     ${poSortableHeader('Dest','destination')}
-    ${poSortableHeader('ETD','etd')}
+    ${poSortableHeader('CRD','etd')}
     ${poSortableHeader('ETA','eta')}
     ${poSortableHeader('Original ETA','originalEta')}
     ${poSortableHeader('ATA','received')}
@@ -1123,7 +1129,7 @@ function renderPurchaseOrders(allPOs) {
   container.innerHTML = header + pos.map((po, i) => {
     const items = Object.entries(po.items || {}).map(([sku, qty]) => ({ sku, qty, name: poProductName(po, sku) })).sort((a,b) => a.sku.localeCompare(b.sku));
     const eta = po.arrival ? fmt(po.arrival) : '—';
-    const etd = po.etd ? fmt(po.etd) : '—';
+    const crd = poCrdDate(po) ? fmt(po.crd || po.etd) : '—';
     const originalEta = po.customFields?.orders_1000 || '—';
     const actualReceived = po.fullyReceivedDate ? fmt(po.fullyReceivedDate) : '—';
     const etaAtaComparison = etaAtaComparisonBadge(po);
@@ -1141,7 +1147,7 @@ function renderPurchaseOrders(allPOs) {
         <span style="text-align:center">${qualityBadge(po)}</span>
         <span style="color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${po.company || ''}</span>
         <span style="font-size:10px;color:var(--text-dim)">${po.deliveryCountry || ''}</span>
-        <span style="color:var(--text-dim)" title="ETD (Departure)">🚢 ${etd}</span>
+        <span style="color:var(--text-dim)" title="CRD (Cargo Ready Date). In Transit only starts after CRD and when a container number exists.">🏭 ${crd}</span>
         <span style="${etaStyle}" title="ETA (Updated Arrival)${etaDelay ? ' — ' + etaDelay.title : ''}">📅 ${eta}${delayBadge}</span>
         <span style="color:${(!hasAta && etaDelay) ? '#991B1B' : 'var(--text-dim)'};font-size:10px;font-weight:${(!hasAta && etaDelay) ? '700' : '400'}" title="Original ETA">📌 ${originalEta}${poEtaHistoryBadge(po, i)}</span>
         <span style="color:${hasAta ? '#166534' : 'var(--text-dim)'};font-size:10px;font-weight:${hasAta ? '800' : '400'}" title="Actual Received Date">✅ ${actualReceived}</span>
