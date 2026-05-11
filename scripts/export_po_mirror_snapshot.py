@@ -207,7 +207,8 @@ def build_purchase_orders(cur):
           po.currency_code,
           po.tracking_code,
           po.raw_payload,
-          coalesce(jsonb_object_agg(pol.sku, pol.qty) filter (where pol.sku is not null and coalesce(pol.qty,0) > 0), '{}'::jsonb) as items
+          coalesce(jsonb_object_agg(pol.sku, pol.qty) filter (where pol.sku is not null and coalesce(pol.qty,0) > 0), '{}'::jsonb) as items,
+          coalesce(jsonb_object_agg(pol.sku, coalesce(pol.description, pol.raw_payload->>'name', pol.sku)) filter (where pol.sku is not null and coalesce(pol.qty,0) > 0), '{}'::jsonb) as item_names
         from cin7_core.purchase_orders po
         left join cin7_core.purchase_order_lines pol on pol.purchase_order_id = po.purchase_order_id
         where not coalesce(po.is_void, false)
@@ -219,6 +220,7 @@ def build_purchase_orders(cur):
     for row in cur.fetchall():
         raw = row.get("raw_payload") or {}
         items = {sku: to_float(qty) for sku, qty in (row.get("items") or {}).items() if sku and to_float(qty) > 0}
+        item_names = {sku: str(name or sku) for sku, name in (row.get("item_names") or {}).items() if sku}
         if not items:
             continue
         custom_fields = raw.get("customFields") or {}
@@ -247,6 +249,7 @@ def build_purchase_orders(cur):
                 "invoiceDate": raw.get("invoiceDate"),
                 "supplierInvoiceReference": raw.get("supplierInvoiceReference") or "",
                 "items": items,
+                "itemNames": item_names,
             }
         )
     return rows

@@ -2378,6 +2378,7 @@ app.get('/api/all-pos', requireAuth, (req, res) => {
       freightTotal: po.freightTotal || 0,
       quality,
       etaHistory: getPoEtaHistoryRecord(po),
+      itemNames: po.itemNames || {},
       items: po.items || {}
     };
   });

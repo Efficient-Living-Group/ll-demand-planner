@@ -799,7 +799,7 @@ function exportCSV(){let rows=[['SKU','Size','Net SOH','Vel/wk','Incoming','Wks 
 
 let chatOpen=false,chatHistory=[];
 function toggleChat(){chatOpen=!chatOpen;document.getElementById('chatPanel').classList.toggle('open',chatOpen);document.getElementById('chatToggle').textContent=chatOpen?'✕':'💬'}
-function escapeHtml(t){return String(t ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function escapeHtml(t){return String(t ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 async function sendChat(){const i=document.getElementById('chatInput'),m=i.value.trim();if(!m)return;i.value='';const ms=document.getElementById('chatMessages');
 ms.innerHTML+=`<div class="chat-msg user">${escapeHtml(m)}</div><div class="chat-msg bot" id="typing"><span style="opacity:0.6">Thinking...</span></div>`;ms.scrollTop=ms.scrollHeight;chatHistory.push({role:'user',text:m});
 try{const r=await fetch('/api/chat',{method:'POST',headers:H(),body:JSON.stringify({message:m,history:chatHistory.slice(-10),ckId:currentCK})});const d=await r.json();document.getElementById('typing')?.remove();
@@ -825,6 +825,7 @@ let _poFilter = 'all';
 let _poDestination = 'all';
 let _poCurrency = 'AUD';
 let _poFxRate = 1.45; // USD→AUD fallback
+let _poSort = { key: 'eta', dir: 'asc' };
 function setPoFilter(f, btn) {
   _poFilter = f;
   document.querySelectorAll('#poFilterBtns .filter-btn').forEach(b => b.classList.remove('active'));
@@ -852,6 +853,25 @@ async function loadAllPOs() {
 
 function cleanPoRef(ref){return(ref||'').replace(/-cover$/i,'')}
 function uniquePoCount(pos){return new Set((pos||[]).map(po=>cleanPoRef(po.reference)).filter(Boolean)).size}
+function poProductName(po, sku){return (po.itemNames && po.itemNames[sku]) || (DATA.names && DATA.names[sku]) || sku}
+function poSortArrow(key){return _poSort.key===key ? (_poSort.dir==='asc'?' ▲':' ▼') : ''}
+function setPoSort(key){if(_poSort.key===key){_poSort.dir=_poSort.dir==='asc'?'desc':'asc'}else{_poSort={key,dir:'asc'}}renderPurchaseOrders(_allPOsCache)}
+function poSortableHeader(label,key,align='left'){return `<button onclick="setPoSort('${key}')" style="all:unset;cursor:pointer;display:block;width:100%;text-align:${align};font-weight:800;color:var(--text-dim);white-space:nowrap" title="Sort by ${label}">${label}<span style="font-size:9px;color:var(--blue)">${poSortArrow(key)}</span></button>`}
+function sortPoItemRows(th,key){
+  const table=th.closest('table'); if(!table) return;
+  const tbody=table.querySelector('tbody'); if(!tbody) return;
+  const dir=th.dataset.dir==='asc'?'desc':'asc';
+  table.querySelectorAll('th[data-sort]').forEach(h=>{if(h!==th)h.dataset.dir=''});
+  th.dataset.dir=dir;
+  const rows=[...tbody.querySelectorAll('tr')];
+  rows.sort((a,b)=>{
+    const av=a.dataset[key]||''; const bv=b.dataset[key]||'';
+    const an=Number(av); const bn=Number(bv);
+    const cmp=(!Number.isNaN(an)&&!Number.isNaN(bn)) ? an-bn : String(av).localeCompare(String(bv),undefined,{numeric:true,sensitivity:'base'});
+    return dir==='asc'?cmp:-cmp;
+  });
+  rows.forEach(r=>tbody.appendChild(r));
+}
 function poCin7Url(po) {
   const orderId = po.id || po.orderId || po.purchaseOrderId;
   if (orderId) return `https://go.cin7.com/Cloud/TransactionEntry/TransactionEntry.aspx?idCustomerAppsLink=1243307&OrderId=${encodeURIComponent(orderId)}`;
@@ -992,18 +1012,35 @@ function renderPurchaseOrders(allPOs) {
       return false;
     });
   }
-  // Sort: open first (by ETA asc), then received (by date desc)
+  const totalItems = po => Object.values(po.items || {}).reduce((t, q) => t + Number(q || 0), 0);
+  const skuCount = po => Object.keys(po.items || {}).length;
+  const poDateValue = v => { const d = parsePoDate(v); return d ? d.getTime() : 8640000000000000; };
+  const poSortValue = po => {
+    const key = _poSort.key;
+    if (key === 'reference') return cleanPoRef(po.reference || '');
+    if (key === 'stage') return po.stage === 'Received' ? 'zz_received' : (poIsOverdue(po) ? 'aa_overdue' : (poIsInTransit(po) ? 'bb_transit' : 'cc_open'));
+    if (key === 'quality') return po.quality?.pct || 0;
+    if (key === 'supplier') return po.company || '';
+    if (key === 'destination') return po.deliveryCountry || '';
+    if (key === 'etd') return poDateValue(po.etd);
+    if (key === 'eta') return poDateValue(po.estimatedArrivalDate || po.arrival);
+    if (key === 'originalEta') return poDateValue(po.customFields?.orders_1000);
+    if (key === 'received') return poDateValue(po.fullyReceivedDate);
+    if (key === 'comparison') { const original = parseOriginalEta(po), ata = parsePoDate(po.fullyReceivedDate); return original && ata ? ata - original : 0; }
+    if (key === 'total') return Number(po.total || 0);
+    if (key === 'freight') return Number(po.freight || 0);
+    if (key === 'tariff') return Number(po.tariffRate || 0);
+    if (key === 'items') return totalItems(po);
+    return '';
+  };
   pos.sort((a, b) => {
-    if (_poFilter === 'received') return (b.arrival || '').localeCompare(a.arrival || '');
-    const aDate = a.arrival ? new Date(a.arrival) : new Date('2099-01-01');
-    const bDate = b.arrival ? new Date(b.arrival) : new Date('2099-01-01');
-    return aDate - bDate;
+    const av = poSortValue(a), bv = poSortValue(b);
+    const cmp = (typeof av === 'number' && typeof bv === 'number') ? av - bv : String(av).localeCompare(String(bv), undefined, {numeric:true, sensitivity:'base'});
+    return _poSort.dir === 'asc' ? cmp : -cmp;
   });
   const container = document.getElementById('poList');
   if (!pos.length) { container.innerHTML = '<p style="color:var(--text-dim);text-align:center;padding:40px">No purchase orders found</p>'; return; }
   const fmt = d => { if (!d) return '—'; try { return new Date(d).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}); } catch(e) { return d; } };
-  const totalItems = po => Object.values(po.items || {}).reduce((t, q) => t + q, 0);
-  const skuCount = po => Object.keys(po.items || {}).length;
   const stageBadge = po => {
     if (po.stage === 'Received') return '<span class="badge healthy">RECEIVED</span>';
     if (poIsOverdue(po)) return '<span class="badge" style="background:#FEE2E2;color:#991B1B">⚠️ OVERDUE</span>';
@@ -1063,8 +1100,26 @@ function renderPurchaseOrders(allPOs) {
     <div class="card" style="border-left:3px solid ${avgQuality>=90?'#5BAB31':avgQuality>=70?'#D4930D':avgQuality>=50?'#EA580C':'#991B1B'}"><div class="label">${qIcon} Data Quality</div><div class="value">${avgQuality}%</div><div class="sub">${activePOsWithScore.length} active POs${criticalPOs > 0 ? ' · <span style="color:#991B1B;font-weight:600">' + criticalPOs + ' critical</span>' : ''}</div></div>
   `;
   window._poRendered = pos;
-  container.innerHTML = pos.map((po, i) => {
-    const items = Object.entries(po.items || {}).sort(([a],[b]) => a.localeCompare(b));
+  const poGridCols = 'minmax(100px,1.2fr) 85px 55px minmax(120px,2fr) minmax(80px,1fr) minmax(90px,1fr) minmax(100px,1.2fr) minmax(90px,1fr) minmax(100px,1fr) minmax(80px,0.95fr) minmax(75px,0.9fr) minmax(75px,0.9fr) 60px minmax(75px,0.9fr) 24px';
+  const header = `<div style="position:sticky;top:0;z-index:5;display:grid;grid-template-columns:${poGridCols};align-items:center;padding:8px 18px;margin-bottom:6px;border:1px solid var(--border);border-radius:10px;background:#F6F8F4;font-size:10px;gap:6px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
+    ${poSortableHeader('PO','reference')}
+    ${poSortableHeader('Status','stage','center')}
+    ${poSortableHeader('Quality','quality','center')}
+    ${poSortableHeader('Supplier','supplier')}
+    ${poSortableHeader('Dest','destination')}
+    ${poSortableHeader('ETD','etd')}
+    ${poSortableHeader('ETA','eta')}
+    ${poSortableHeader('Original ETA','originalEta')}
+    ${poSortableHeader('ATA','received')}
+    ${poSortableHeader('ETA vs ATA','comparison','center')}
+    ${poSortableHeader('Product','total','right')}
+    ${poSortableHeader('Freight','freight','right')}
+    ${poSortableHeader('Tariff','tariff','right')}
+    ${poSortableHeader('SKUs / Units','items','right')}
+    <span></span>
+  </div>`;
+  container.innerHTML = header + pos.map((po, i) => {
+    const items = Object.entries(po.items || {}).map(([sku, qty]) => ({ sku, qty, name: poProductName(po, sku) })).sort((a,b) => a.sku.localeCompare(b.sku));
     const eta = po.arrival ? fmt(po.arrival) : '—';
     const etd = po.etd ? fmt(po.etd) : '—';
     const originalEta = po.customFields?.orders_1000 || '—';
@@ -1075,7 +1130,7 @@ function renderPurchaseOrders(allPOs) {
     const etaStyle = etaDelay ? 'color:#991B1B;background:#FEE2E2;border-radius:8px;padding:3px 6px;font-weight:800' : 'color:var(--text);font-weight:600';
     const delayBadge = etaDelay ? ` <span class="badge" style="background:#DC2626;color:#fff;font-size:9px;margin-left:4px" title="${etaDelay.title}">DELAYED +${etaDelay.diff}d</span>` : '';
     return `<div style="${delayCardStyle};border-radius:12px;margin-bottom:8px;overflow:hidden" title="${etaDelay ? etaDelay.title : ''}">
-      <div onclick="this.parentElement.querySelector('.po-items').classList.toggle('open')" style="display:grid;grid-template-columns:minmax(100px,1.2fr) 85px 55px minmax(120px,2fr) minmax(80px,1fr) minmax(90px,1fr) minmax(100px,1.2fr) minmax(90px,1fr) minmax(100px,1fr) minmax(80px,0.95fr) minmax(75px,0.9fr) minmax(75px,0.9fr) 60px minmax(75px,0.9fr) 24px;align-items:center;padding:12px 18px;cursor:pointer;user-select:none;font-size:11px;gap:6px">
+      <div onclick="this.parentElement.querySelector('.po-items').classList.toggle('open')" style="display:grid;grid-template-columns:${poGridCols};align-items:center;padding:12px 18px;cursor:pointer;user-select:none;font-size:11px;gap:6px">
         <span style="font-family:monospace;font-weight:700;font-size:12px;color:var(--blue);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:5px" title="${po.id ? 'Cin7 Order ID ' + po.id : 'Open PO in Cin7'}"><span style="overflow:hidden;text-overflow:ellipsis">${cleanPoRef(po.reference)}</span><a href="${poCin7Url(po)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" style="font-family:system-ui;text-decoration:none;color:#2563EB;font-size:12px;line-height:1" title="Open PO in Cin7">↗</a></span>
         <span style="text-align:center">${stageBadge(po)}</span>
         <span style="text-align:center">${qualityBadge(po)}</span>
@@ -1095,15 +1150,17 @@ function renderPurchaseOrders(allPOs) {
       <div class="po-items" style="max-height:0;overflow:hidden;transition:max-height 0.3s ease">
         <table style="width:100%;font-size:11px;border-collapse:collapse">
           <thead><tr style="background:var(--bg-body)">
-            <th style="text-align:left;padding:8px 18px;color:var(--text-dim);font-weight:600">SKU</th>
-            <th style="text-align:right;padding:8px 18px;color:var(--text-dim);font-weight:600">Qty</th>
+            <th data-sort="sku" onclick="sortPoItemRows(this,'sku')" style="text-align:left;padding:8px 18px;color:var(--text-dim);font-weight:600;cursor:pointer">SKU ↕</th>
+            <th data-sort="name" onclick="sortPoItemRows(this,'name')" style="text-align:left;padding:8px 18px;color:var(--text-dim);font-weight:600;cursor:pointer">Product Name ↕</th>
+            <th data-sort="qty" onclick="sortPoItemRows(this,'qty')" style="text-align:right;padding:8px 18px;color:var(--text-dim);font-weight:600;cursor:pointer">Qty ↕</th>
           </tr></thead>
-          <tbody>${items.map(([sku, qty]) => `<tr style="border-top:1px solid var(--border)">
-            <td style="padding:6px 18px;font-family:monospace;font-size:10px">${sku}</td>
+          <tbody>${items.map(({sku, qty, name}) => `<tr style="border-top:1px solid var(--border)" data-sku="${escapeHtml(sku)}" data-name="${escapeHtml(name)}" data-qty="${Number(qty || 0)}">
+            <td style="padding:6px 18px;font-family:monospace;font-size:10px">${escapeHtml(sku)}</td>
+            <td style="padding:6px 18px;color:var(--text);font-size:11px">${escapeHtml(name)}</td>
             <td style="padding:6px 18px;text-align:right;font-weight:600">${qty}</td>
           </tr>`).join('')}</tbody>
           <tfoot><tr style="border-top:2px solid var(--border);font-weight:700">
-            <td style="padding:8px 18px">Total</td>
+            <td style="padding:8px 18px" colspan="2">Total</td>
             <td style="padding:8px 18px;text-align:right">${totalItems(po)}</td>
           </tr></tfoot>
         </table>
