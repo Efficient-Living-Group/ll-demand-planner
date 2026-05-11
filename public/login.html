@@ -41,8 +41,10 @@ async function login(e) {
     });
     const data = await res.json();
     if (data.ok) {
-      sessionStorage.setItem('session', data.session);
-      window.location.href = '/?session=' + data.session;
+      const expiresAt = data.expiresAt || (Date.now() + 30*24*60*60*1000);
+      localStorage.setItem('dpSession', JSON.stringify({token: data.session, expiresAt}));
+      sessionStorage.setItem('session', data.session); // temporary backward compatibility for already-open tabs
+      window.location.href = '/';
     } else {
       document.getElementById('err').style.display = 'block';
     }

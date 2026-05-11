@@ -131,13 +131,28 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   </div>
 </div>
 <script>
-const SESSION=new URLSearchParams(window.location.search).get('session')||sessionStorage.getItem('session');
+const SESSION_TTL_MS=30*24*60*60*1000;
+function saveSessionToken(token,expiresAt=Date.now()+SESSION_TTL_MS){
+  localStorage.setItem('dpSession',JSON.stringify({token,expiresAt}));
+  sessionStorage.setItem('session',token); // temporary backward compatibility for already-open tabs
+}
+function getSessionToken(){
+  const query=new URLSearchParams(window.location.search).get('session');
+  if(query){saveSessionToken(query);return query;}
+  try{
+    const raw=localStorage.getItem('dpSession');
+    if(raw){const s=JSON.parse(raw);if(s.token&&Number(s.expiresAt)>Date.now())return s.token;}
+  }catch(e){}
+  localStorage.removeItem('dpSession');
+  const legacy=sessionStorage.getItem('session');
+  if(legacy){saveSessionToken(legacy);return legacy;}
+  return '';
+}
+const SESSION=getSessionToken();
 if(!SESSION)window.location.href='/login';
-sessionStorage.setItem('session',SESSION);
 if(window.location.search)history.replaceState({},'','/tracker');
 const H=()=>({'Content-Type':'application/json','X-Session':SESSION});
-// Back link needs session as query param since GET / requires auth
-document.getElementById('backToDashboard').href='/?session='+encodeURIComponent(SESSION);
+document.getElementById('backToDashboard').href='/';
 
 // Init map
 const map=L.map('map',{center:[20,180],zoom:2,zoomControl:true,attributionControl:false,worldCopyJump:false,maxBounds:[[-85,-30],[85,400]],maxBoundsViscosity:1.0});

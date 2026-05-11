@@ -235,12 +235,31 @@ function toggle(id) {
   }
 }
 
+const SESSION_TTL_MS=30*24*60*60*1000;
+function saveSessionToken(token,expiresAt=Date.now()+SESSION_TTL_MS){
+  localStorage.setItem('dpSession',JSON.stringify({token,expiresAt}));
+  sessionStorage.setItem('session',token); // temporary backward compatibility for already-open tabs
+}
+function getSessionToken(){
+  const query=new URLSearchParams(window.location.search).get('session');
+  if(query){saveSessionToken(query);return query;}
+  try{
+    const raw=localStorage.getItem('dpSession');
+    if(raw){const s=JSON.parse(raw);if(s.token&&Number(s.expiresAt)>Date.now())return s.token;}
+  }catch(e){}
+  localStorage.removeItem('dpSession');
+  const legacy=sessionStorage.getItem('session');
+  if(legacy){saveSessionToken(legacy);return legacy;}
+  return '';
+}
+const SESSION=getSessionToken();
+if(window.location.search)history.replaceState({},'','/incoming-pos');
+
 async function load() {
   try {
-    const params = new URLSearchParams(window.location.search);
-    const session = params.get('session') || '';
-    const r = await fetch('/api/incoming-pos?session=' + encodeURIComponent(session));
-    if (r.status === 401) { window.location.href = '/'; return; }
+    if (!SESSION) { window.location.href = '/login'; return; }
+    const r = await fetch('/api/incoming-pos', {headers:{'X-Session':SESSION}});
+    if (r.status === 401) { localStorage.removeItem('dpSession'); window.location.href = '/login'; return; }
     DATA = await r.json();
     
     // Populate filters

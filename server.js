@@ -21,6 +21,8 @@ const AIS_API_KEY = process.env.AIS_API_KEY || '';
 const CIN7_REQUEST_SPACING_MS = 1500;
 const CIN7_MIN_REFRESH_INTERVAL_MS = 8 * 60 * 60 * 1000;
 const CIN7_RATE_LIMIT_BACKOFF_MS = 60 * 60 * 1000;
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const SESSION_SECRET = process.env.SESSION_SECRET || crypto.createHash('sha256').update(`${APP_PASSWORD}|ll-demand-planner-session-v1`).digest('hex');
 const LL_AU_BRANCH_IDS = [3, 60976];
 const LL_NZ_BRANCH_IDS = [48391];
 
@@ -125,17 +127,43 @@ function explodeCocoonRadiantCombo(comboSku) {
 }
 
 // ===== SESSION STORE =====
-const sessions = new Map();
+// Sessions are stateless signed tokens so users stay signed in across Render restarts/deploys.
+// The browser stores the token with a 30-day localStorage expiry.
+const sessions = new Map(); // legacy in-memory sessions kept for older open tabs until restart
+function base64Url(input) {
+  return Buffer.from(input).toString('base64url');
+}
+function signSessionPayload(payload) {
+  return crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('base64url');
+}
 function createSession() {
-  const id = crypto.randomBytes(24).toString('hex');
-  sessions.set(id, { created: Date.now(), valid: true });
-  return id;
+  const now = Date.now();
+  const payload = base64Url(JSON.stringify({ iat: now, exp: now + SESSION_TTL_MS, nonce: crypto.randomBytes(12).toString('hex') }));
+  return `${payload}.${signSessionPayload(payload)}`;
 }
 function validSession(id) {
+  if (!id || typeof id !== 'string') return false;
+
+  // Legacy support for old in-memory 24h sessions.
   const s = sessions.get(id);
-  if (!s || !s.valid) return false;
-  if (Date.now() - s.created > 24 * 60 * 60 * 1000) { sessions.delete(id); return false; }
-  return true;
+  if (s?.valid) {
+    if (Date.now() - s.created > 24 * 60 * 60 * 1000) { sessions.delete(id); return false; }
+    return true;
+  }
+
+  const parts = id.split('.');
+  if (parts.length !== 2) return false;
+  const [payload, signature] = parts;
+  const expected = signSessionPayload(payload);
+  const sig = Buffer.from(signature);
+  const exp = Buffer.from(expected);
+  if (sig.length !== exp.length || !crypto.timingSafeEqual(sig, exp)) return false;
+  try {
+    const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    return Number(data.exp || 0) > Date.now();
+  } catch (_) {
+    return false;
+  }
 }
 
 // ===== AUTH MIDDLEWARE =====
@@ -2145,7 +2173,7 @@ function buildCKData(ckId) {
 app.post('/api/login', (req, res) => {
   if (req.body.password === APP_PASSWORD) {
     const session = createSession();
-    res.json({ ok: true, session });
+    res.json({ ok: true, session, expiresAt: Date.now() + SESSION_TTL_MS });
   } else {
     res.json({ ok: false });
   }
@@ -2736,9 +2764,10 @@ app.get('/api/health', (req, res) => {
   res.json({ ok: cin7Count > 0, cin7: cin7Count, pos: poCount, cin7Source: CIN7_DATA_SOURCE, lastRefresh: dataCache.lastRefresh, lastCin7Refresh: dataCache.lastCin7Refresh, lastPoRefresh: dataCache.lastPoRefresh, lastShopifyRefresh: dataCache.lastShopifyRefresh, error: dataCache.error || null, uptime: Math.round(process.uptime()) });
 });
 
-// Main app
-app.get('/', requireAuth, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-app.use(requireAuth, express.static(path.join(__dirname, 'public')));
+// Main app shell is public; all data APIs remain protected by requireAuth.
+// This lets the browser reuse a 30-day localStorage token after direct visits, restarts, or deploys.
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // ===== START =====
 app.listen(PORT, () => {
@@ -2961,6 +2990,6 @@ app.get('/api/incoming-pos', requireAuth, (req, res) => {
 });
 
 // Serve incoming-pos page
-app.get('/incoming-pos', requireAuth, (req, res) => {
+app.get('/incoming-pos', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'incoming-pos.html'));
 });

@@ -218,12 +218,28 @@ th[data-tip]{position:relative;cursor:help}th[data-tip]:after{content:' ⓘ';fon
   <div class="chat-input"><input type="text" id="chatInput" placeholder="Ask about stock..." onkeydown="if(event.key==='Enter')sendChat()"><button onclick="sendChat()">Send</button></div>
 </div>
 <script>
-const SESSION=new URLSearchParams(window.location.search).get('session')||sessionStorage.getItem('session');
+const SESSION_TTL_MS=30*24*60*60*1000;
+function saveSessionToken(token,expiresAt=Date.now()+SESSION_TTL_MS){
+  localStorage.setItem('dpSession',JSON.stringify({token,expiresAt}));
+  sessionStorage.setItem('session',token); // temporary backward compatibility for already-open tabs
+}
+function getSessionToken(){
+  const query=new URLSearchParams(window.location.search).get('session');
+  if(query){saveSessionToken(query);return query;}
+  try{
+    const raw=localStorage.getItem('dpSession');
+    if(raw){const s=JSON.parse(raw);if(s.token&&Number(s.expiresAt)>Date.now())return s.token;}
+  }catch(e){}
+  localStorage.removeItem('dpSession');
+  const legacy=sessionStorage.getItem('session');
+  if(legacy){saveSessionToken(legacy);return legacy;}
+  return '';
+}
+const SESSION=getSessionToken();
 if(!SESSION){window.location.href='/login';}
-else{sessionStorage.setItem('session',SESSION);if(window.location.search)history.replaceState({},'','/');
-  // Append session to tracker link so back-nav works even without sessionStorage
-  const tl=document.getElementById('trackerLink');if(tl)tl.href='/tracker?session='+encodeURIComponent(SESSION);
-  const il=document.getElementById('incomingLink');if(il)il.href='/incoming-pos?session='+encodeURIComponent(SESSION);}
+else{if(window.location.search)history.replaceState({},'','/');
+  const tl=document.getElementById('trackerLink');if(tl)tl.href='/tracker';
+  const il=document.getElementById('incomingLink');if(il)il.href='/incoming-pos';}
 const H=()=>({'Content-Type':'application/json','X-Session':SESSION});
 let DATA={cin7:{},shopify:{},velocity:{},pos:[],allPos:[],names:{},sizes:{},cbmMap:{},suppliers:{},landedCosts:{}},currentCK=null,charts={},dashFilter={size:'All'},heatmapSortMode='sku';
 let brandOpenState={};
