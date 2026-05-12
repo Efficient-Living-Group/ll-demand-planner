@@ -1,5 +1,6 @@
 const express = require('express');
 const https = require('https');
+const http = require('http');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
@@ -22,6 +23,7 @@ const CIN7_REQUEST_SPACING_MS = 1500;
 const CIN7_REFRESH_INTERVAL_MS = 4 * 60 * 60 * 1000;
 const CIN7_MIN_REFRESH_INTERVAL_MS = CIN7_REFRESH_INTERVAL_MS;
 const CIN7_RATE_LIMIT_BACKOFF_MS = 60 * 60 * 1000;
+const ENABLE_RENDER_CIN7_SCHEDULER = process.env.ENABLE_RENDER_CIN7_SCHEDULER === 'true';
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.createHash('sha256').update(`${APP_PASSWORD}|ll-demand-planner-session-v1`).digest('hex');
 const LL_AU_BRANCH_IDS = [3, 60976];
@@ -2781,7 +2783,7 @@ app.get('/api/health', (req, res) => {
   reloadSnapshotIfNewer();
   const cin7Count = Object.keys(dataCache.cin7Products).length;
   const poCount = dataCache.cin7POs.length;
-  res.json({ ok: cin7Count > 0, cin7: cin7Count, pos: poCount, cin7Source: CIN7_DATA_SOURCE, nextScheduledRefreshEveryHours: 4, cacheFallback: true, lastRefresh: dataCache.lastRefresh, lastCin7Refresh: dataCache.lastCin7Refresh, lastPoRefresh: dataCache.lastPoRefresh, lastShopifyRefresh: dataCache.lastShopifyRefresh, error: dataCache.error || null, uptime: Math.round(process.uptime()) });
+  res.json({ ok: cin7Count > 0, cin7: cin7Count, pos: poCount, cin7Source: CIN7_DATA_SOURCE, nextScheduledRefreshEveryHours: ENABLE_RENDER_CIN7_SCHEDULER ? 4 : null, externalCacheRefreshEveryHours: 4, cacheFallback: true, lastRefresh: dataCache.lastRefresh, lastCin7Refresh: dataCache.lastCin7Refresh, lastPoRefresh: dataCache.lastPoRefresh, lastShopifyRefresh: dataCache.lastShopifyRefresh, error: dataCache.error || null, uptime: Math.round(process.uptime()) });
 });
 
 // Main app shell is public; all data APIs remain protected by requireAuth.
@@ -2792,15 +2794,26 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ===== START =====
 app.listen(PORT, () => {
   console.log(`Demand Planner running on port ${PORT}`);
-  refreshAllData(true); // Initial fetch, forced so deploy/restart gets the latest possible CIN7 data
-  scheduleFourHourlyCin7Refresh(); // Every 4 hours; manual refresh remains available via the UI button
+  console.log(`Startup cache: ${Object.keys(dataCache.cin7Products || {}).length} CIN7 SKUs, ${(dataCache.cin7POs || []).length} POs`);
 
-  // Keep-alive: ping self every 10 min to prevent Render free tier spin-down
+  // Render restarts and deploys must not force live CIN7 pulls. The durable
+  // OpenClaw cron refreshes the repo cache every 4 hours; this app reloads that
+  // cache from disk and only hits CIN7 for explicit manual refreshes, unless the
+  // Render scheduler is deliberately enabled via env.
+  if (ENABLE_RENDER_CIN7_SCHEDULER) {
+    scheduleFourHourlyCin7Refresh();
+  } else {
+    console.log('Render CIN7 scheduler disabled; using durable external cache refresh');
+  }
+
+  // Keep-alive: ping local health with the correct protocol. Using https against
+  // an http:// URL throws ERR_INVALID_PROTOCOL and crashes the process.
   setInterval(() => {
-    const url = `http://localhost:${PORT}/api/health`;
-    https.get(url, () => {}).on('error', () => {});
-    // Also use http since it's localhost
-    require('http').get(url, () => {}).on('error', () => {});
+    const req = http.get({ hostname: '127.0.0.1', port: PORT, path: '/api/health' }, res => {
+      res.resume();
+    });
+    req.on('error', () => {});
+    req.setTimeout(5000, () => req.destroy());
   }, 10 * 60 * 1000);
 });
 
