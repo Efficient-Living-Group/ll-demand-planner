@@ -2351,6 +2351,7 @@ app.get('/api/all-pos', requireAuth, (req, res) => {
       estimatedArrivalDate: po.estimatedArrivalDate || null,
       customFields: po.customFields || {},
       trackingCode: po.trackingCode || '',
+      containerNumber: extractContainerNumber(po.trackingCode),
       fullyReceivedDate: po.fullyReceivedDate || null,
       total: po.total || 0,
       currencyCode: po.currencyCode || 'USD',

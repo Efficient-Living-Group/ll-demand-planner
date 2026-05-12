@@ -1016,6 +1016,7 @@ function renderPurchaseOrders(allPOs) {
     pos = pos.filter(po => {
       if (cleanPoRef(po.reference || '').toLowerCase().includes(search)) return true;
       if ((po.company || '').toLowerCase().includes(search)) return true;
+      if ((po.containerNumber || po.trackingCode || '').toLowerCase().includes(search)) return true;
       if (Object.keys(po.items || {}).some(sku => sku.toLowerCase().includes(search))) return true;
       return false;
     });
@@ -1029,6 +1030,7 @@ function renderPurchaseOrders(allPOs) {
     if (key === 'stage') return po.stage === 'Received' ? 'zz_received' : (poIsOverdue(po) ? 'aa_overdue' : (poIsInTransit(po) ? 'bb_transit' : 'cc_open'));
     if (key === 'quality') return po.quality?.pct || 0;
     if (key === 'supplier') return po.company || '';
+    if (key === 'container') return po.containerNumber || po.trackingCode || '';
     if (key === 'destination') return po.deliveryCountry || '';
     if (key === 'etd') return poDateValue(po.crd || po.etd);
     if (key === 'eta') return poDateValue(po.estimatedArrivalDate || po.arrival);
@@ -1108,12 +1110,13 @@ function renderPurchaseOrders(allPOs) {
     <div class="card" style="border-left:3px solid ${avgQuality>=90?'#5BAB31':avgQuality>=70?'#D4930D':avgQuality>=50?'#EA580C':'#991B1B'}"><div class="label">${qIcon} Data Quality</div><div class="value">${avgQuality}%</div><div class="sub">${activePOsWithScore.length} active POs${criticalPOs > 0 ? ' · <span style="color:#991B1B;font-weight:600">' + criticalPOs + ' critical</span>' : ''}</div></div>
   `;
   window._poRendered = pos;
-  const poGridCols = 'minmax(100px,1.2fr) 85px 55px minmax(120px,2fr) minmax(80px,1fr) minmax(90px,1fr) minmax(100px,1.2fr) minmax(90px,1fr) minmax(100px,1fr) minmax(80px,0.95fr) minmax(75px,0.9fr) minmax(75px,0.9fr) 60px minmax(75px,0.9fr) 24px';
+  const poGridCols = 'minmax(100px,1.2fr) 85px 55px minmax(120px,2fr) minmax(110px,1.1fr) minmax(80px,1fr) minmax(90px,1fr) minmax(100px,1.2fr) minmax(90px,1fr) minmax(100px,1fr) minmax(80px,0.95fr) minmax(75px,0.9fr) minmax(75px,0.9fr) 60px minmax(75px,0.9fr) 24px';
   const header = `<div style="position:sticky;top:0;z-index:5;display:grid;grid-template-columns:${poGridCols};align-items:center;padding:8px 18px;margin-bottom:6px;border:1px solid var(--border);border-radius:10px;background:#F6F8F4;font-size:10px;gap:6px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
     ${poSortableHeader('PO','reference')}
     ${poSortableHeader('Status','stage','center')}
     ${poSortableHeader('Quality','quality','center')}
     ${poSortableHeader('Supplier','supplier')}
+    ${poSortableHeader('Container','container')}
     ${poSortableHeader('Dest','destination')}
     ${poSortableHeader('CRD','etd')}
     ${poSortableHeader('ETA','eta')}
@@ -1135,6 +1138,8 @@ function renderPurchaseOrders(allPOs) {
     const etaAtaComparison = etaAtaComparisonBadge(po);
     const etaDelay = poEtaDelayInfo(po);
     const hasAta = !!po.fullyReceivedDate;
+    const containerNumber = po.containerNumber || '';
+    const containerTitle = po.trackingCode ? 'Tracking code: ' + po.trackingCode : 'No container number recorded';
     const delayCardStyle = hasAta
       ? 'border:2px solid #5BAB31;background:#F0FDF4;box-shadow:0 0 0 1px rgba(91,171,49,0.10)'
       : (etaDelay ? 'border:2px solid #DC2626;background:#FEF2F2;box-shadow:0 0 0 1px rgba(220,38,38,0.08)' : 'border:1px solid var(--border);background:var(--bg-card)');
@@ -1146,6 +1151,7 @@ function renderPurchaseOrders(allPOs) {
         <span style="text-align:center">${stageBadge(po)}</span>
         <span style="text-align:center">${qualityBadge(po)}</span>
         <span style="color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${po.company || ''}</span>
+        <span style="font-family:monospace;font-size:10px;color:${containerNumber ? 'var(--text)' : 'var(--text-dim)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(containerTitle)}">${escapeHtml(containerNumber || '—')}</span>
         <span style="font-size:10px;color:var(--text-dim)">${po.deliveryCountry || ''}</span>
         <span style="color:var(--text-dim)" title="CRD (Cargo Ready Date). In Transit only starts after CRD and when a container number exists.">🏭 ${crd}</span>
         <span style="${etaStyle}" title="ETA (Updated Arrival)${etaDelay ? ' — ' + etaDelay.title : ''}">📅 ${eta}${delayBadge}</span>
