@@ -218,6 +218,19 @@ function skuMatchesDef(sku, def) {
   return true;
 }
 
+function ckCategoryForSku(sku) {
+  const s = String(sku || '').toUpperCase().trim();
+  if (!s) return 'Uncategorised';
+  for (const [id, def] of Object.entries(CK_DEFS)) {
+    if (skuMatchesDef(s, def)) return def.name;
+  }
+  return 'Uncategorised';
+}
+
+function ckCategoriesForPoItems(items) {
+  return Object.fromEntries(Object.keys(items || {}).map(sku => [sku, ckCategoryForSku(sku)]));
+}
+
 function isCaseGoodsSku(sku) {
   const s = String(sku || '').toUpperCase();
   if (!s) return false;
@@ -2371,6 +2384,7 @@ app.get('/api/all-pos', requireAuth, (req, res) => {
       quality,
       etaHistory: getPoEtaHistoryRecord(po),
       itemNames: po.itemNames || {},
+      itemCategories: ckCategoriesForPoItems(po.items || {}),
       items: po.items || {}
     };
   });

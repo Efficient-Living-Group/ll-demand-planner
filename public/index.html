@@ -191,10 +191,14 @@ th[data-tip]{position:relative;cursor:help}th[data-tip]:after{content:' ⓘ';fon
         <p style="font-size:12px;color:var(--text-dim);margin-top:4px">All POs across every Category Killer</p>
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+        <button onclick="expandAllPORows()" style="padding:8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--bg-card);color:var(--blue);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">Expand all</button>
         <button onclick="collapseAllPORows()" style="padding:8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--bg-card);color:var(--blue);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">Collapse all</button>
         <button id="poCurrencyBtn" onclick="_poCurrency=_poCurrency==='AUD'?'USD':'AUD';this.textContent=_poCurrency;renderPurchaseOrders(_allPOsCache)" style="padding:8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--blue);color:#fff;font-size:12px;font-weight:700;cursor:pointer;min-width:50px">AUD</button>
         <select id="poDestFilter" onchange="_poDestination=this.value;renderPurchaseOrders(_allPOsCache)" style="padding:8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:12px;outline:none;cursor:pointer">
           <option value="all">All Destinations</option>
+        </select>
+        <select id="poEtaMonthFilter" onchange="_poEtaMonth=this.value;renderPurchaseOrders(_allPOsCache)" style="padding:8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:12px;outline:none;cursor:pointer">
+          <option value="all">All ETA Months</option>
         </select>
         <input type="text" id="poSearch" placeholder="Search PO ref, supplier, SKU..." oninput="renderPurchaseOrders(_allPOsCache)" style="padding:8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:12px;width:240px;outline:none">
       </div>
@@ -824,6 +828,7 @@ function hideAllPOs() {
 let _allPOsCache = [];
 let _poFilter = 'all';
 let _poDestination = 'all';
+let _poEtaMonth = 'all';
 let _poCurrency = 'AUD';
 let _poFxRate = 1.45; // USD→AUD fallback
 let _poSort = { key: 'eta', dir: 'asc' };
@@ -848,6 +853,7 @@ async function loadAllPOs() {
     const dd = document.getElementById('poDestFilter');
     const prev = dd.value;
     dd.innerHTML = '<option value="all">All Destinations</option>' + dests.map(d => `<option value="${d}"${d===prev?' selected':''}>${d}</option>`).join('');
+    populatePoEtaMonthDropdown(_allPOsCache);
     renderPurchaseOrders(_allPOsCache);
   } catch(e) { console.error('PO load error:', e); container.innerHTML = '<p style="color:var(--alert);text-align:center;padding:40px">Failed to load POs — try refreshing</p>'; }
 }
@@ -855,7 +861,9 @@ async function loadAllPOs() {
 function cleanPoRef(ref){return(ref||'').replace(/-cover$/i,'')}
 function uniquePoCount(pos){return new Set((pos||[]).map(po=>cleanPoRef(po.reference)).filter(Boolean)).size}
 function poProductName(po, sku){return (po.itemNames && po.itemNames[sku]) || (DATA.names && DATA.names[sku]) || sku}
+function poItemCategory(po, sku){return (po.itemCategories && po.itemCategories[sku]) || 'Uncategorised'}
 function collapseAllPORows(){document.querySelectorAll('#poList .po-items.open').forEach(row=>row.classList.remove('open'))}
+function expandAllPORows(){document.querySelectorAll('#poList .po-items').forEach(row=>row.classList.add('open'))}
 function poSortArrow(key){return _poSort.key===key ? (_poSort.dir==='asc'?' ▲':' ▼') : ''}
 function setPoSort(key){if(_poSort.key===key){_poSort.dir=_poSort.dir==='asc'?'desc':'asc'}else{_poSort={key,dir:'asc'}}renderPurchaseOrders(_allPOsCache)}
 function poSortableHeader(label,key,align='left'){return `<button onclick="setPoSort('${key}')" style="all:unset;cursor:pointer;display:block;width:100%;text-align:${align};font-weight:800;color:var(--text-dim);white-space:nowrap" title="Sort by ${label}">${label}<span style="font-size:9px;color:var(--blue)">${poSortArrow(key)}</span></button>`}
@@ -889,6 +897,29 @@ function parsePoDate(raw) {
 }
 function parseOriginalEta(po) {
   return parsePoDate(po.customFields?.orders_1000);
+}
+function poEtaMonthValue(po) {
+  const d = parsePoDate(po?.estimatedArrivalDate || po?.arrival);
+  if (!d) return 'none';
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+function poEtaMonthLabel(value) {
+  if (value === 'none') return 'No ETA';
+  const [year, month] = String(value).split('-').map(Number);
+  if (!year || !month) return value;
+  return new Date(year, month - 1, 1).toLocaleDateString('en-AU', {month:'short', year:'numeric'});
+}
+function populatePoEtaMonthDropdown(pos) {
+  const dd = document.getElementById('poEtaMonthFilter');
+  if (!dd) return;
+  const prev = _poEtaMonth || dd.value || 'all';
+  const months = [...new Set((pos || []).map(poEtaMonthValue))].filter(Boolean).sort((a,b) => {
+    if (a === 'none') return 1;
+    if (b === 'none') return -1;
+    return a.localeCompare(b);
+  });
+  dd.innerHTML = '<option value="all">All ETA Months</option>' + months.map(m => `<option value="${m}"${m===prev?' selected':''}>${poEtaMonthLabel(m)}</option>`).join('');
+  if (!months.includes(prev) && prev !== 'all') _poEtaMonth = 'all';
 }
 function etaAtaComparisonBadge(po) {
   const original = parseOriginalEta(po);
@@ -1012,12 +1043,16 @@ function renderPurchaseOrders(allPOs) {
   if (_poDestination && _poDestination !== 'all') {
     pos = pos.filter(po => (po.deliveryCountry || '') === _poDestination);
   }
+  if (_poEtaMonth && _poEtaMonth !== 'all') {
+    pos = pos.filter(po => poEtaMonthValue(po) === _poEtaMonth);
+  }
   if (search) {
     pos = pos.filter(po => {
       if (cleanPoRef(po.reference || '').toLowerCase().includes(search)) return true;
       if ((po.company || '').toLowerCase().includes(search)) return true;
       if ((po.containerNumber || po.trackingCode || '').toLowerCase().includes(search)) return true;
       if (Object.keys(po.items || {}).some(sku => sku.toLowerCase().includes(search))) return true;
+      if (Object.keys(po.items || {}).some(sku => poItemCategory(po, sku).toLowerCase().includes(search))) return true;
       return false;
     });
   }
@@ -1130,7 +1165,7 @@ function renderPurchaseOrders(allPOs) {
     <span></span>
   </div>`;
   container.innerHTML = header + pos.map((po, i) => {
-    const items = Object.entries(po.items || {}).map(([sku, qty]) => ({ sku, qty, name: poProductName(po, sku) })).sort((a,b) => a.sku.localeCompare(b.sku));
+    const items = Object.entries(po.items || {}).map(([sku, qty]) => ({ sku, qty, name: poProductName(po, sku), category: poItemCategory(po, sku) })).sort((a,b) => a.sku.localeCompare(b.sku));
     const eta = po.arrival ? fmt(po.arrival) : '—';
     const crd = poCrdDate(po) ? fmt(po.crd || po.etd) : '—';
     const originalEta = po.customFields?.orders_1000 || '—';
@@ -1169,15 +1204,17 @@ function renderPurchaseOrders(allPOs) {
           <thead><tr style="background:var(--bg-body)">
             <th data-sort="sku" onclick="sortPoItemRows(this,'sku')" style="text-align:left;padding:8px 18px;color:var(--text-dim);font-weight:600;cursor:pointer">SKU ↕</th>
             <th data-sort="name" onclick="sortPoItemRows(this,'name')" style="text-align:left;padding:8px 18px;color:var(--text-dim);font-weight:600;cursor:pointer">Product Name ↕</th>
+            <th data-sort="category" onclick="sortPoItemRows(this,'category')" style="text-align:left;padding:8px 18px;color:var(--text-dim);font-weight:600;cursor:pointer">CK Category ↕</th>
             <th data-sort="qty" onclick="sortPoItemRows(this,'qty')" style="text-align:right;padding:8px 18px;color:var(--text-dim);font-weight:600;cursor:pointer">Qty ↕</th>
           </tr></thead>
-          <tbody>${items.map(({sku, qty, name}) => `<tr style="border-top:1px solid var(--border)" data-sku="${escapeHtml(sku)}" data-name="${escapeHtml(name)}" data-qty="${Number(qty || 0)}">
+          <tbody>${items.map(({sku, qty, name, category}) => `<tr style="border-top:1px solid var(--border)" data-sku="${escapeHtml(sku)}" data-name="${escapeHtml(name)}" data-category="${escapeHtml(category)}" data-qty="${Number(qty || 0)}">
             <td style="padding:6px 18px;font-family:monospace;font-size:10px">${escapeHtml(sku)}</td>
             <td style="padding:6px 18px;color:var(--text);font-size:11px">${escapeHtml(name)}</td>
+            <td style="padding:6px 18px;color:var(--blue);font-size:10px;font-weight:700">${escapeHtml(category)}</td>
             <td style="padding:6px 18px;text-align:right;font-weight:600">${qty}</td>
           </tr>`).join('')}</tbody>
           <tfoot><tr style="border-top:2px solid var(--border);font-weight:700">
-            <td style="padding:8px 18px" colspan="2">Total</td>
+            <td style="padding:8px 18px" colspan="3">Total</td>
             <td style="padding:8px 18px;text-align:right">${totalItems(po)}</td>
           </tr></tfoot>
         </table>
