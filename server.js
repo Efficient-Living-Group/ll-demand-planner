@@ -2394,7 +2394,9 @@ app.post('/api/refresh', requireAuth, async (req, res) => {
     return res.json({ ok: false, error: `Please wait ${waitMin} min before refreshing again`, lastRefresh: dataCache.lastRefresh });
   }
   _lastManualRefresh = now;
-  await refreshAllData(true);
+  // Manual refresh should update Shopify/open demand and reuse the durable CIN7
+  // cache when it is already fresh, instead of burning the Cin7 key on every click.
+  await refreshAllData(false);
   res.json({ ok: true, lastRefresh: dataCache.lastRefresh });
 });
 
