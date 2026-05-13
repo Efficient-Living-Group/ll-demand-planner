@@ -13,7 +13,7 @@
 body.sidebar-collapsed .sidebar{overflow:hidden;opacity:0}
 .sidebar-main{flex:1;min-height:0;overflow-y:auto}
 .sidebar-tools{flex-shrink:0;border-top:1px solid rgba(255,255,255,0.12);background:rgba(0,0,0,0.06);padding-bottom:8px}
-.sidebar-brand{padding:16px 16px 15px;border-bottom:1px solid rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:flex-start;gap:8px;min-height:64px}.sidebar-brand h2{font-size:14px;font-weight:700}.sidebar-brand small{display:block;font-size:11px;color:#A8C5C8;margin-top:2px}
+.sidebar-brand{padding:16px 16px 15px;border-bottom:1px solid rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:64px}.sidebar-brand h2{font-size:14px;font-weight:700}.sidebar-brand small{display:block;font-size:11px;color:#A8C5C8;margin-top:2px}.sidebar-close{display:none;width:34px;height:34px;border:1px solid rgba(255,255,255,0.18);border-radius:10px;background:rgba(255,255,255,0.10);color:#fff;font-size:18px;cursor:pointer;flex-shrink:0}
 .sidebar-label{padding:14px 16px 8px;font-size:10px;font-weight:600;color:#A8C5C8;text-transform:uppercase;letter-spacing:0.5px}
 .sidebar-brand-group{margin:0;padding:8px 8px 0;border-top:1px solid rgba(255,255,255,0.08)}
 .sidebar-brand-group:first-child{border-top:none;padding-top:4px}
@@ -44,7 +44,7 @@ body.sidebar-collapsed .sidebar{overflow:hidden;opacity:0}
 .tabs{display:flex;gap:0;background:var(--bg-secondary);padding:0 var(--content-pad);border-bottom:1px solid var(--border);overflow-x:auto}
 .tab{padding:10px 20px;cursor:pointer;font-size:13px;font-weight:500;color:#A8C5C8;border-bottom:3px solid transparent;transition:all 0.2s}
 .tab:hover{color:#FFF;background:rgba(255,255,255,0.1)}.tab.active{color:#FFF;border-bottom-color:#FFF}
-.container{max-width:none;width:100%;margin:0 auto;padding:20px var(--content-pad);min-width:0}.view{display:none}.view.active{display:block}.po-items.open{max-height:2000px!important}
+.container{max-width:none;width:100%;margin:0 auto;padding:20px var(--content-pad);min-width:0}.view{display:none}.view.active{display:block}.po-items.open{max-height:2000px!important}#allPOsView{flex:1;width:100%;min-width:0;overflow-x:hidden}.po-page{padding:24px 32px;min-width:0}.po-page-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:16px;min-width:0}.po-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;min-width:0}.po-grid-header,.po-row{min-width:0}.po-row>span{min-width:0}.mobile-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:199}
 .loading{text-align:center;padding:60px;color:var(--text-dim)}.loading .spinner{display:inline-block;width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin 0.8s linear infinite;margin-bottom:12px}
 @keyframes spin{to{transform:rotate(360deg)}}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px}
@@ -87,23 +87,18 @@ th[data-tip]{position:relative;cursor:help}th[data-tip]:after{content:' ⓘ';fon
 .drilldown .close{background:none;border:none;font-size:16px;cursor:pointer;color:var(--text-dim)}
 .modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:500;align-items:center;justify-content:center}.modal-overlay.open{display:flex}.modal{background:#fff;border-radius:16px;max-width:700px;width:90%;max-height:80vh;overflow-y:auto;padding:32px;box-shadow:0 8px 40px rgba(0,0,0,0.2)}.modal h2{font-size:18px;margin-bottom:16px;color:var(--blue)}.modal h3{font-size:14px;margin:16px 0 8px;color:var(--blue)}.modal p{font-size:13px;line-height:1.7;color:var(--text);margin-bottom:12px}.modal .formula{background:#f6f8f4;border-left:3px solid var(--blue);padding:12px 16px;margin:12px 0;font-family:monospace;font-size:12px}.modal table{width:100%;border-collapse:collapse;margin:12px 0;font-size:12px}.modal td,.modal th{padding:6px 10px;border:1px solid var(--border);text-align:left}.modal th{background:var(--bg-primary)}.modal .close-btn{float:right;background:none;border:none;font-size:20px;cursor:pointer}.pos{color:var(--green)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
-@media(max-width:1200px){:root{--content-pad:14px}.header h1{font-size:18px}.tab{padding:10px 14px}.cards{grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}}
+@media(max-width:1500px){:root{--content-pad:14px}.header h1{font-size:18px}.tab{padding:10px 14px}.cards{grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}.po-page{padding:20px 18px}.po-page-header{align-items:flex-start}.po-toolbar{justify-content:flex-start}.po-grid-header{display:none!important}.po-row{grid-template-columns:repeat(2,minmax(0,1fr))!important;align-items:stretch!important;padding:10px 14px!important;gap:0 14px!important}.po-row>span{display:flex!important;justify-content:space-between;align-items:flex-start;gap:10px;padding:7px 0;border-bottom:1px solid rgba(221,227,213,0.7);white-space:normal!important;overflow:visible!important;text-overflow:clip!important;overflow-wrap:anywhere}.po-row>span::before{content:attr(data-label);font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-dim);font-weight:800;flex:0 0 76px;text-align:left}.po-row>span:last-child{border-bottom:none}.po-row>span:last-child::before{content:''}.po-items{overflow-x:auto}.po-items table{min-width:700px}}
 @media(min-width:901px){.desktop-sidebar-toggle{display:flex}}
 @media(max-width:900px){
-  .sidebar{transform:translateX(-100%);transition:transform 0.3s;position:fixed;z-index:200;box-shadow:4px 0 20px rgba(0,0,0,0.3)}
-  .sidebar.open{transform:translateX(0)}
-  .main{margin-left:0}
-  .mobile-menu{display:flex !important}
-  .desktop-sidebar-toggle{display:none !important}
-  .mobile-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:199}
-  .mobile-overlay.open{display:block}
-}
+  :root{--content-pad:12px}.sidebar{width:min(86vw,320px);transform:translateX(-100%);transition:transform 0.3s;position:fixed;z-index:200;box-shadow:4px 0 20px rgba(0,0,0,0.3);opacity:1!important}.sidebar.open{transform:translateX(0)}body.sidebar-collapsed .sidebar{opacity:1}.sidebar-close{display:flex;align-items:center;justify-content:center}.main,#allPOsView{margin-left:0!important}.main{width:100%}.mobile-menu{display:flex !important}.desktop-sidebar-toggle{display:none !important}.mobile-overlay.open{display:block}.header{align-items:flex-start}.header h1{font-size:16px;line-height:1.25}.header>div:first-child{align-items:flex-start!important}.header>div:last-child{max-width:42%;overflow:hidden}.tabs{padding:0;scrollbar-width:none}.tab{padding:10px 12px;white-space:nowrap}.container{padding:14px 10px}.cards{grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}.card{padding:14px}.card .value{font-size:22px}.chart-container{padding:14px}.table-wrap{max-height:none}.chat-panel{left:10px;right:10px;bottom:76px;width:auto;height:min(70vh,520px)}.chat-toggle{right:16px;bottom:16px}.po-page{padding:14px 10px}.po-page-header{flex-direction:column;align-items:stretch!important;margin-bottom:14px}.po-toolbar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}.po-toolbar button,.po-toolbar select,.po-toolbar input{width:100%!important;min-width:0}.po-toolbar #poSearch{grid-column:1/-1}.po-filter-btns{display:flex!important;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:14px!important}.po-filter-btns .filter-btn{white-space:nowrap;flex-shrink:0}.po-row{grid-template-columns:1fr!important}.po-row>span::before{flex-basis:86px}.po-items{overflow-x:auto}.modal{width:94%;padding:20px}.drilldown{max-height:none;overflow-x:auto}}
+@media(max-width:520px){.header{flex-direction:column}.header>div:last-child{max-width:100%;text-align:left!important}.po-toolbar{grid-template-columns:1fr}.po-row{font-size:10px!important}.po-row>span{font-size:11px}.po-row>span::before{flex-basis:90px}.po-items table{min-width:620px}.heatmap-table td.sku-name{position:static}.cards{grid-template-columns:1fr 1fr}}
+@media(max-width:380px){.cards{grid-template-columns:1fr}.po-row>span{flex-direction:column;gap:3px}.po-row>span::before{flex-basis:auto}}
 </style>
 </head>
 <body>
 <nav class="sidebar" id="sidebar">
   <div class="sidebar-main">
-    <div class="sidebar-brand"><div><h2>Lifely</h2><small>Demand Planner</small></div></div>
+    <div class="sidebar-brand"><div><h2>Lifely</h2><small>Demand Planner</small></div><button class="sidebar-close" onclick="closeMobileMenu()" aria-label="Close menu">×</button></div>
     <div class="sidebar-label">Category Killers</div>
     <div id="sidebarNav"></div>
   </div>
@@ -117,8 +112,8 @@ th[data-tip]{position:relative;cursor:help}th[data-tip]:after{content:' ⓘ';fon
     <div class="sidebar-link-block"><a href="https://docs.google.com/spreadsheets/d/1X4aa4h_SQR0W1ffgFcJqvS92MCpM0ONLoxG-n6WjbSE" target="_blank" style="font-size:12px;border-color:rgba(255,255,255,0.1)">📊 Data Sources</a></div>
   </div>
 </nav>
+<div class="mobile-overlay" id="mobileOverlay" onclick="closeMobileMenu()"></div>
 <div class="main">
-  <div class="mobile-overlay" id="mobileOverlay" onclick="toggleMobileMenu()"></div>
 <div class="header" id="mainHeader">
   <div style="display:flex;align-items:center;min-width:0">
     <button class="mobile-menu" onclick="toggleMobileMenu()">☰</button>
@@ -184,13 +179,14 @@ th[data-tip]{position:relative;cursor:help}th[data-tip]:after{content:' ⓘ';fon
   </div>
 </div>
 <div id="allPOsView" style="display:none;margin-left:var(--sidebar-w);min-height:100vh;background:var(--bg-primary);transition:margin-left .2s ease">
-  <div style="padding:24px 32px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-      <div>
-        <h1 style="font-size:20px;font-weight:700">📋 Purchase Orders</h1>
-        <p style="font-size:12px;color:var(--text-dim);margin-top:4px">All POs across every Category Killer</p>
+  <div class="po-page">
+    <div class="po-page-header">
+      <div style="display:flex;align-items:flex-start;gap:10px;min-width:0">
+        <button class="mobile-menu" onclick="toggleMobileMenu()" style="background:var(--blue);color:#fff;margin-right:0" aria-label="Open menu">☰</button>
+        <div><h1 style="font-size:20px;font-weight:700">📋 Purchase Orders</h1>
+        <p style="font-size:12px;color:var(--text-dim);margin-top:4px">All POs across every Category Killer</p></div>
       </div>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+      <div class="po-toolbar">
         <button onclick="expandAllPORows()" style="padding:8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--bg-card);color:var(--blue);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">Expand all</button>
         <button onclick="collapseAllPORows()" style="padding:8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--bg-card);color:var(--blue);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">Collapse all</button>
         <button id="poCurrencyBtn" onclick="_poCurrency=_poCurrency==='AUD'?'USD':'AUD';this.textContent=_poCurrency;renderPurchaseOrders(_allPOsCache)" style="padding:8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--blue);color:#fff;font-size:12px;font-weight:700;cursor:pointer;min-width:50px">AUD</button>
@@ -203,7 +199,7 @@ th[data-tip]{position:relative;cursor:help}th[data-tip]:after{content:' ⓘ';fon
         <input type="text" id="poSearch" placeholder="Search PO ref, supplier, SKU..." oninput="renderPurchaseOrders(_allPOsCache)" style="padding:8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:12px;width:240px;outline:none">
       </div>
     </div>
-    <div style="display:flex;gap:6px;margin-bottom:20px" id="poFilterBtns">
+    <div class="po-filter-btns" style="display:flex;gap:6px;margin-bottom:20px" id="poFilterBtns">
       <button class="filter-btn active" onclick="setPoFilter('all',this)">All</button>
       <button class="filter-btn" onclick="setPoFilter('active',this)">📦 Active</button>
       <button class="filter-btn" onclick="setPoFilter('production',this)">🏭 In Production</button>
@@ -812,6 +808,7 @@ ms.innerHTML+=`<div class="chat-msg bot">${d.reply||'Error'}</div>`;chatHistory.
 async function manualRefresh(){document.getElementById('refreshBtn').textContent='⏳...';try{await fetch('/api/refresh',{method:'POST',headers:H()});if(currentCK)await selectCK(currentCK);loadSidebar()}catch(e){}document.getElementById('refreshBtn').textContent='🔄 Refresh'}
 // Forecast Accuracy (WMAPE)
 async function showAllPOs() {
+  closeMobileMenu();
   document.querySelector('.main').style.display = 'none';
   document.getElementById('allPOsView').style.display = 'block';
   document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
@@ -1146,7 +1143,7 @@ function renderPurchaseOrders(allPOs) {
   `;
   window._poRendered = pos;
   const poGridCols = 'minmax(100px,1.2fr) 85px 55px minmax(120px,2fr) minmax(110px,1.1fr) minmax(80px,1fr) minmax(90px,1fr) minmax(100px,1.2fr) minmax(90px,1fr) minmax(100px,1fr) minmax(80px,0.95fr) minmax(75px,0.9fr) minmax(75px,0.9fr) 60px minmax(75px,0.9fr) 24px';
-  const header = `<div style="position:sticky;top:0;z-index:5;display:grid;grid-template-columns:${poGridCols};align-items:center;padding:8px 18px;margin-bottom:6px;border:1px solid var(--border);border-radius:10px;background:#F6F8F4;font-size:10px;gap:6px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
+  const header = `<div class="po-grid-header" style="position:sticky;top:0;z-index:5;display:grid;grid-template-columns:${poGridCols};align-items:center;padding:8px 18px;margin-bottom:6px;border:1px solid var(--border);border-radius:10px;background:#F6F8F4;font-size:10px;gap:6px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
     ${poSortableHeader('PO','reference')}
     ${poSortableHeader('Status','stage','center')}
     ${poSortableHeader('Quality','quality','center')}
@@ -1181,23 +1178,23 @@ function renderPurchaseOrders(allPOs) {
     const etaStyle = hasAta ? 'color:#166534;background:#DCFCE7;border-radius:8px;padding:3px 6px;font-weight:800' : (etaDelay ? 'color:#991B1B;background:#FEE2E2;border-radius:8px;padding:3px 6px;font-weight:800' : 'color:var(--text);font-weight:600');
     const delayBadge = (!hasAta && etaDelay) ? ` <span class="badge" style="background:#DC2626;color:#fff;font-size:9px;margin-left:4px" title="${etaDelay.title}">DELAYED +${etaDelay.diff}d</span>` : '';
     return `<div style="${delayCardStyle};border-radius:12px;margin-bottom:8px;overflow:hidden" title="${hasAta ? 'ATA recorded — row marked received' : (etaDelay ? etaDelay.title : '')}">
-      <div onclick="this.parentElement.querySelector('.po-items').classList.toggle('open')" style="display:grid;grid-template-columns:${poGridCols};align-items:center;padding:12px 18px;cursor:pointer;user-select:none;font-size:11px;gap:6px">
-        <span style="font-family:monospace;font-weight:700;font-size:12px;color:var(--blue);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:5px" title="${po.id ? 'Cin7 Order ID ' + po.id : 'Open PO in Cin7'}"><span style="overflow:hidden;text-overflow:ellipsis">${cleanPoRef(po.reference)}</span><a href="${poCin7Url(po)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" style="font-family:system-ui;text-decoration:none;color:#2563EB;font-size:12px;line-height:1" title="Open PO in Cin7">↗</a></span>
-        <span style="text-align:center">${stageBadge(po)}</span>
-        <span style="text-align:center">${qualityBadge(po)}</span>
-        <span style="color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${po.company || ''}</span>
-        <span style="font-family:monospace;font-size:10px;color:${containerNumber ? 'var(--text)' : 'var(--text-dim)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(containerTitle)}">${escapeHtml(containerNumber || '—')}</span>
-        <span style="font-size:10px;color:var(--text-dim)">${po.deliveryCountry || ''}</span>
-        <span style="color:var(--text-dim)" title="CRD (Cargo Ready Date). In Transit only starts after CRD and when a container number exists.">🏭 ${crd}</span>
-        <span style="${etaStyle}" title="ETA (Updated Arrival)${etaDelay ? ' — ' + etaDelay.title : ''}">📅 ${eta}${delayBadge}</span>
-        <span style="color:${(!hasAta && etaDelay) ? '#991B1B' : 'var(--text-dim)'};font-size:10px;font-weight:${(!hasAta && etaDelay) ? '700' : '400'}" title="Original ETA">📌 ${originalEta}${poEtaHistoryBadge(po, i)}</span>
-        <span style="color:${hasAta ? '#166534' : 'var(--text-dim)'};font-size:10px;font-weight:${hasAta ? '800' : '400'}" title="Actual Received Date">✅ ${actualReceived}</span>
-        <span style="text-align:center" title="Original ETA vs ATA (actual arrival)">${etaAtaComparison}</span>
-        <span style="font-weight:700;color:var(--text);text-align:right">${po.total ? fmtVal(cx(po.total, 'AUD')) : '—'}</span>
-        <span style="text-align:right;color:var(--text-dim);white-space:nowrap" title="Freight${po.isEstFreight ? ' (estimated)' : ''}${po.tariffRate ? ' + ' + (po.tariffRate*100) + '% tariff' : ''}">🚛 ${po.freight ? (po.isEstFreight ? '<span style="font-size:8px;padding:1px 3px;border-radius:3px;background:#FEF3C7;color:#92400E">est</span> ' : '') + fmtVal(cx(po.freight, po.freightCurrency || 'USD')) : '—'}</span>
-        <span style="text-align:right;color:var(--text-dim);white-space:nowrap" title="${po.tariffNote || ''}">${po.tariffRate ? (po.tariffRate*100) + '%' : '0%'}</span>
-        <span style="color:var(--text-dim);text-align:right;white-space:nowrap">${skuCount(po)} SKUs · ${totalItems(po)}</span>
-        <span style="font-size:14px;text-align:center;transition:transform 0.2s">▼</span>
+      <div class="po-row" onclick="this.parentElement.querySelector('.po-items').classList.toggle('open')" style="display:grid;grid-template-columns:${poGridCols};align-items:center;padding:12px 18px;cursor:pointer;user-select:none;font-size:11px;gap:6px">
+        <span data-label="PO" style="font-family:monospace;font-weight:700;font-size:12px;color:var(--blue);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:5px" title="${po.id ? 'Cin7 Order ID ' + po.id : 'Open PO in Cin7'}"><span style="overflow:hidden;text-overflow:ellipsis">${cleanPoRef(po.reference)}</span><a href="${poCin7Url(po)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" style="font-family:system-ui;text-decoration:none;color:#2563EB;font-size:12px;line-height:1" title="Open PO in Cin7">↗</a></span>
+        <span data-label="Status" style="text-align:center">${stageBadge(po)}</span>
+        <span data-label="Quality" style="text-align:center">${qualityBadge(po)}</span>
+        <span data-label="Supplier" style="color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${po.company || ''}</span>
+        <span data-label="Container" style="font-family:monospace;font-size:10px;color:${containerNumber ? 'var(--text)' : 'var(--text-dim)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(containerTitle)}">${escapeHtml(containerNumber || '—')}</span>
+        <span data-label="Dest" style="font-size:10px;color:var(--text-dim)">${po.deliveryCountry || ''}</span>
+        <span data-label="CRD" style="color:var(--text-dim)" title="CRD (Cargo Ready Date). In Transit only starts after CRD and when a container number exists.">🏭 ${crd}</span>
+        <span data-label="ETA" style="${etaStyle}" title="ETA (Updated Arrival)${etaDelay ? ' — ' + etaDelay.title : ''}">📅 ${eta}${delayBadge}</span>
+        <span data-label="Original" style="color:${(!hasAta && etaDelay) ? '#991B1B' : 'var(--text-dim)'};font-size:10px;font-weight:${(!hasAta && etaDelay) ? '700' : '400'}" title="Original ETA">📌 ${originalEta}${poEtaHistoryBadge(po, i)}</span>
+        <span data-label="ATA" style="color:${hasAta ? '#166534' : 'var(--text-dim)'};font-size:10px;font-weight:${hasAta ? '800' : '400'}" title="Actual Received Date">✅ ${actualReceived}</span>
+        <span data-label="ETA vs ATA" style="text-align:center" title="Original ETA vs ATA (actual arrival)">${etaAtaComparison}</span>
+        <span data-label="Product" style="font-weight:700;color:var(--text);text-align:right">${po.total ? fmtVal(cx(po.total, 'AUD')) : '—'}</span>
+        <span data-label="Freight" style="text-align:right;color:var(--text-dim);white-space:nowrap" title="Freight${po.isEstFreight ? ' (estimated)' : ''}${po.tariffRate ? ' + ' + (po.tariffRate*100) + '% tariff' : ''}">🚛 ${po.freight ? (po.isEstFreight ? '<span style="font-size:8px;padding:1px 3px;border-radius:3px;background:#FEF3C7;color:#92400E">est</span> ' : '') + fmtVal(cx(po.freight, po.freightCurrency || 'USD')) : '—'}</span>
+        <span data-label="Tariff" style="text-align:right;color:var(--text-dim);white-space:nowrap" title="${po.tariffNote || ''}">${po.tariffRate ? (po.tariffRate*100) + '%' : '0%'}</span>
+        <span data-label="SKUs" style="color:var(--text-dim);text-align:right;white-space:nowrap">${skuCount(po)} SKUs · ${totalItems(po)}</span>
+        <span data-label="" style="font-size:14px;text-align:center;transition:transform 0.2s">▼</span>
       </div>
       <div class="po-items" style="max-height:0;overflow:hidden;transition:max-height 0.3s ease">
         <table style="width:100%;font-size:11px;border-collapse:collapse">
@@ -1542,16 +1539,21 @@ function toggleDesktopSidebar(){
   localStorage.setItem('dpSidebarCollapsed', next?'1':'0');
   applyDesktopSidebarState();
 }
+function closeMobileMenu(){
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('mobileOverlay').classList.remove('open');
+}
 function toggleMobileMenu(){
-  document.getElementById('sidebar').classList.toggle('open');
-  document.getElementById('mobileOverlay').classList.toggle('open');
+  const sidebar=document.getElementById('sidebar');
+  const willOpen=!sidebar.classList.contains('open');
+  sidebar.classList.toggle('open', willOpen);
+  document.getElementById('mobileOverlay').classList.toggle('open', willOpen);
 }
 applyDesktopSidebarState();
 // Close mobile menu when CK is selected
 const origSelectCK = selectCK;
 selectCK = async function(ckId) {
-  document.getElementById('sidebar').classList.remove('open');
-  document.getElementById('mobileOverlay').classList.remove('open');
+  closeMobileMenu();
   return origSelectCK(ckId);
 };
 // Sticky header fix: clone thead on vertical scroll
