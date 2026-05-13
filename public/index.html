@@ -1360,11 +1360,14 @@ function toggleInboundDrilldown() {
     const items = po.items || {};
     for (const [sku, qty] of Object.entries(items)) {
       if (skus.includes(sku) || Object.keys(DATA.cin7).includes(sku) || Object.keys(DATA.velocity).includes(sku)) {
+        const etaRaw = po.arrival || po.estimatedArrivalDate || po.customFields?.orders_1000 || null;
+        const etaDate = parsePoDate(etaRaw);
         rows.push({
           po: cleanPoRef(po.reference) || '?',
           sku,
           qty,
-          eta: po.arrival ? new Date(po.arrival).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}) : (po.customFields?.orders_1000 || 'No ETA'),
+          eta: etaDate ? etaDate.toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}) : 'No ETA',
+          etaTime: etaDate ? etaDate.getTime() : 8640000000000000,
           supplier: (po.company || 'Unknown').substring(0, 30),
           status: po.stage || 'In Transit',
           container: po.trackingCode || '—'
@@ -1373,9 +1376,9 @@ function toggleInboundDrilldown() {
     }
   });
   
-  rows.sort((a, b) => a.sku.localeCompare(b.sku));
+  rows.sort((a, b) => a.etaTime - b.etaTime || a.po.localeCompare(b.po, undefined, {numeric:true}) || a.sku.localeCompare(b.sku));
   window._incomingRows = rows;
-  window._incomingSortCol = 'sku';
+  window._incomingSortCol = 'eta';
   window._incomingSortAsc = true;
   
   renderIncomingTable();
@@ -1392,8 +1395,12 @@ function renderIncomingTable() {
   const sorted = [...rows].sort((a, b) => {
     let va = a[col], vb = b[col];
     if (col === 'qty') return asc ? va - vb : vb - va;
-    if (col === 'eta') { va = va || '9999'; vb = vb || '9999'; }
-    return asc ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
+    if (col === 'eta') {
+      const cmp = (a.etaTime || 8640000000000000) - (b.etaTime || 8640000000000000);
+      if (cmp !== 0) return asc ? cmp : -cmp;
+      return asc ? String(a.po).localeCompare(String(b.po), undefined, {numeric:true}) : String(b.po).localeCompare(String(a.po), undefined, {numeric:true});
+    }
+    return asc ? String(va).localeCompare(String(vb), undefined, {numeric:true, sensitivity:'base'}) : String(vb).localeCompare(String(va), undefined, {numeric:true, sensitivity:'base'});
   });
   const dd = document.getElementById('inboundDrilldown');
   const arrow = c => col === c ? (asc ? ' ▲' : ' ▼') : '';
