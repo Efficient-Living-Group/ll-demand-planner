@@ -835,12 +835,10 @@ async function fetchCin7POs() {
         if (po.isVoid) continue; // Skip void POs only - keep Received for shipment tracker
         const items = {};
         const itemNames = {};
-        const itemCategories = {};
         for (const li of (po.lineItems || [])) {
           if (li.code && li.qty > 0) {
             items[li.code] = (items[li.code] || 0) + li.qty;
             if (li.name && !itemNames[li.code]) itemNames[li.code] = li.name;
-            if (li.option1 && !itemCategories[li.code]) itemCategories[li.code] = li.option1;
           }
         }
         if (Object.keys(items).length > 0) {
@@ -868,7 +866,6 @@ async function fetchCin7POs() {
             invoiceDate: po.invoiceDate || null,
             supplierInvoiceReference: po.supplierInvoiceReference || '',
             itemNames,
-            itemCategories,
             items
           });
         }
@@ -2394,8 +2391,7 @@ app.get('/api/all-pos', requireAuth, (req, res) => {
       itemNames: po.itemNames || {},
       itemCategories: {
         ...ckCategoriesForPoItems(po.items || {}),
-        ...Object.fromEntries(Object.keys(po.items || {}).map(sku => [sku, dataCache.cin7Products?.[sku]?.option1 || '']).filter(([, option1]) => option1)),
-        ...(po.itemCategories || {})
+        ...Object.fromEntries(Object.keys(po.items || {}).map(sku => [sku, dataCache.cin7Products?.[sku]?.option1 || '']).filter(([, option1]) => option1))
       },
       items: po.items || {}
     };
