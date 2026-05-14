@@ -227,8 +227,8 @@ function ckCategoryForSku(sku) {
   return 'Uncategorised';
 }
 
-function ckCategoriesForPoItems(items) {
-  return Object.fromEntries(Object.keys(items || {}).map(sku => [sku, ckCategoryForSku(sku)]));
+function cin7Option1CategoriesForPoItems(items) {
+  return Object.fromEntries(Object.keys(items || {}).map(sku => [sku, dataCache.cin7Products?.[sku]?.option1 || '']));
 }
 
 function isCaseGoodsSku(sku) {
@@ -2389,10 +2389,7 @@ app.get('/api/all-pos', requireAuth, (req, res) => {
       quality,
       etaHistory: getPoEtaHistoryRecord(po),
       itemNames: po.itemNames || {},
-      itemCategories: {
-        ...ckCategoriesForPoItems(po.items || {}),
-        ...Object.fromEntries(Object.keys(po.items || {}).map(sku => [sku, dataCache.cin7Products?.[sku]?.option1 || '']).filter(([, option1]) => option1))
-      },
+      itemCategories: cin7Option1CategoriesForPoItems(po.items || {}),
       items: po.items || {}
     };
   });

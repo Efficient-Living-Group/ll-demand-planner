@@ -858,7 +858,7 @@ async function loadAllPOs() {
 function cleanPoRef(ref){return(ref||'').replace(/-cover$/i,'')}
 function uniquePoCount(pos){return new Set((pos||[]).map(po=>cleanPoRef(po.reference)).filter(Boolean)).size}
 function poProductName(po, sku){return (po.itemNames && po.itemNames[sku]) || (DATA.names && DATA.names[sku]) || sku}
-function poItemCategory(po, sku){return (po.itemCategories && po.itemCategories[sku]) || 'Uncategorised'}
+function poItemCategory(po, sku){return (po.itemCategories && Object.prototype.hasOwnProperty.call(po.itemCategories, sku)) ? (po.itemCategories[sku] || '') : ''}
 function collapseAllPORows(){document.querySelectorAll('#poList .po-items.open').forEach(row=>row.classList.remove('open'))}
 function expandAllPORows(){document.querySelectorAll('#poList .po-items').forEach(row=>row.classList.add('open'))}
 function poSortArrow(key){return _poSort.key===key ? (_poSort.dir==='asc'?' ▲':' ▼') : ''}
