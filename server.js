@@ -14,6 +14,8 @@ app.use(express.urlencoded({ extended: true }));
 // ===== CONFIG =====
 const PORT = process.env.PORT || 3000;
 const APP_PASSWORD = process.env.APP_PASSWORD || 'lifely2026';
+const MASTERHUB_URL = (process.env.MASTERHUB_URL || 'https://lifely-report.onrender.com').replace(/\/$/, '');
+const MASTERHUB_SSO_SECRET = process.env.MASTERHUB_SSO_SECRET || '';
 const DISCORD_WEBHOOK = process.env.DISCORD_WEBHOOK || '';
 const CIN7_USER = process.env.CIN7_USER || '';
 const CIN7_KEY = process.env.CIN7_KEY || '';
@@ -166,6 +168,35 @@ function validSession(id) {
     return Number(data.exp || 0) > Date.now();
   } catch (_) {
     return false;
+  }
+}
+
+function timingSafeStringEqual(left, right) {
+  const leftBuffer = Buffer.from(String(left || ''));
+  const rightBuffer = Buffer.from(String(right || ''));
+  if (leftBuffer.length !== rightBuffer.length) return false;
+  return crypto.timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function validateMasterhubToken(token, expectedAudience) {
+  if (!MASTERHUB_SSO_SECRET || !token) return null;
+  const [encodedPayload, signature] = String(token).split('.');
+  if (!encodedPayload || !signature) return null;
+  const expectedSignature = crypto
+    .createHmac('sha256', MASTERHUB_SSO_SECRET)
+    .update(encodedPayload)
+    .digest('base64url');
+  if (!timingSafeStringEqual(expectedSignature, signature)) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf8'));
+    const now = Math.floor(Date.now() / 1000);
+    if (payload.aud !== expectedAudience) return null;
+    if (payload.iss !== 'lifely-masterhub') return null;
+    if (!payload.email || typeof payload.exp !== 'number' || payload.exp < now) return null;
+    if (typeof payload.iat === 'number' && payload.iat > now + 60) return null;
+    return payload;
+  } catch {
+    return null;
   }
 }
 
@@ -2198,19 +2229,21 @@ function buildCKData(ckId) {
 
 // Login
 app.post('/api/login', (req, res) => {
-  if (req.body.password === APP_PASSWORD) {
-    const session = createSession();
-    res.json({ ok: true, session, expiresAt: Date.now() + SESSION_TTL_MS });
-  } else {
-    res.json({ ok: false });
-  }
+  res.status(401).json({ ok: false, error: 'Use Masterhub to open Demand Planner.' });
 });
 
-app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
+app.get('/sso/masterhub', (req, res) => {
+  const token = typeof req.query.token === 'string' ? req.query.token : '';
+  const payload = validateMasterhubToken(token, 'demand-planner');
+  if (!payload) return res.redirect(MASTERHUB_URL);
+  const session = createSession();
+  return res.redirect('/?session=' + encodeURIComponent(session));
+});
+
+app.get('/login', (req, res) => res.redirect(MASTERHUB_URL));
 
 // Public assets
 app.use('/logos', express.static(path.join(__dirname, 'public', 'logos')));
-app.use('/login', express.static(path.join(__dirname, 'public')));
 
 // CK list
 function getBrandGroup(id, def) {
