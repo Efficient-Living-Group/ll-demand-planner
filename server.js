@@ -752,11 +752,11 @@ async function fetchCin7AllProducts() {
           if (v.code) {
             const pc = v.priceColumns || {};
             const costAUD = pc.costAUD || (pc.costUSD ? pc.costUSD * fxRate.USDAUD : 0);
-            products[v.code] = { soh: v.stockOnHand || 0, available: v.stockAvailable || 0, costAUD, cbm };
+            products[v.code] = { soh: v.stockOnHand || 0, available: v.stockAvailable || 0, costAUD, cbm, option1: v.option1 || product.option1 || '' };
           }
         }
         if (product.styleCode && product.stockOnHand > 0) {
-          products[product.styleCode] = { soh: product.stockOnHand, available: product.stockAvailable || 0, cbm };
+          products[product.styleCode] = { soh: product.stockOnHand, available: product.stockAvailable || 0, cbm, option1: product.option1 || '' };
         }
       }
     } catch (e) { console.error(`CIN7 Products page ${page} error:`, e.message); continue; }
@@ -834,8 +834,14 @@ async function fetchCin7POs() {
       for (const po of body) {
         if (po.isVoid) continue; // Skip void POs only - keep Received for shipment tracker
         const items = {};
+        const itemNames = {};
+        const itemCategories = {};
         for (const li of (po.lineItems || [])) {
-          if (li.code && li.qty > 0) items[li.code] = (items[li.code] || 0) + li.qty;
+          if (li.code && li.qty > 0) {
+            items[li.code] = (items[li.code] || 0) + li.qty;
+            if (li.name && !itemNames[li.code]) itemNames[li.code] = li.name;
+            if (li.option1 && !itemCategories[li.code]) itemCategories[li.code] = li.option1;
+          }
         }
         if (Object.keys(items).length > 0) {
           results.push({
@@ -861,6 +867,8 @@ async function fetchCin7POs() {
             createdBy: po.createdBy || null,
             invoiceDate: po.invoiceDate || null,
             supplierInvoiceReference: po.supplierInvoiceReference || '',
+            itemNames,
+            itemCategories,
             items
           });
         }
@@ -2384,7 +2392,11 @@ app.get('/api/all-pos', requireAuth, (req, res) => {
       quality,
       etaHistory: getPoEtaHistoryRecord(po),
       itemNames: po.itemNames || {},
-      itemCategories: ckCategoriesForPoItems(po.items || {}),
+      itemCategories: {
+        ...ckCategoriesForPoItems(po.items || {}),
+        ...Object.fromEntries(Object.keys(po.items || {}).map(sku => [sku, dataCache.cin7Products?.[sku]?.option1 || '']).filter(([, option1]) => option1)),
+        ...(po.itemCategories || {})
+      },
       items: po.items || {}
     };
   });
