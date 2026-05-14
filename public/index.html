@@ -805,7 +805,7 @@ async function sendChat(){const i=document.getElementById('chatInput'),m=i.value
 ms.innerHTML+=`<div class="chat-msg user">${escapeHtml(m)}</div><div class="chat-msg bot" id="typing"><span style="opacity:0.6">Thinking...</span></div>`;ms.scrollTop=ms.scrollHeight;chatHistory.push({role:'user',text:m});
 try{const r=await fetch('/api/chat',{method:'POST',headers:H(),body:JSON.stringify({message:m,history:chatHistory.slice(-10),ckId:currentCK})});const d=await r.json();document.getElementById('typing')?.remove();
 ms.innerHTML+=`<div class="chat-msg bot">${d.reply||'Error'}</div>`;chatHistory.push({role:'assistant',text:d.reply})}catch(e){document.getElementById('typing')?.remove();ms.innerHTML+=`<div class="chat-msg bot">Connection error.</div>`}ms.scrollTop=ms.scrollHeight}
-async function manualRefresh(){document.getElementById('refreshBtn').textContent='⏳...';try{await fetch('/api/refresh',{method:'POST',headers:H()});if(currentCK)await selectCK(currentCK);loadSidebar()}catch(e){}document.getElementById('refreshBtn').textContent='🔄 Refresh'}
+async function manualRefresh(){document.getElementById('refreshBtn').textContent='⏳...';try{await fetch('/api/refresh',{method:'POST',headers:H()});if(document.getElementById('allPOsView').style.display==='block'){await loadAllPOs(true)}else if(currentCK){await selectCK(currentCK)}loadSidebar()}catch(e){}document.getElementById('refreshBtn').textContent='🔄 Refresh'}
 // Forecast Accuracy (WMAPE)
 async function showAllPOs() {
   closeMobileMenu();
@@ -836,8 +836,9 @@ function setPoFilter(f, btn) {
   renderPurchaseOrders(_allPOsCache);
 }
 
-async function loadAllPOs() {
+async function loadAllPOs(force=false) {
   const container = document.getElementById('poList');
+  if (!force && _allPOsCache.length) { renderPurchaseOrders(_allPOsCache); return; }
   if (!_allPOsCache.length) container.innerHTML = '<p style="text-align:center;padding:40px;color:var(--text-dim)">Loading...</p>';
   try {
     const r = await fetch('/api/all-pos', { headers: H() });
