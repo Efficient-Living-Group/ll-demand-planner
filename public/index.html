@@ -28,7 +28,7 @@ body.sidebar-collapsed .sidebar{overflow:hidden;opacity:0}
 .sidebar-subgroup-children{margin-top:4px;display:flex;flex-direction:column;gap:2px}
 .sidebar-subgroup.collapsed .sidebar-subgroup-children{display:none}
 .sidebar-subgroup-caret{font-size:11px;color:#A8C5C8}
-.sidebar-item{display:grid;grid-template-columns:minmax(0,1fr);align-items:center;column-gap:8px;padding:8px 12px;margin:1px 0;border-radius:8px;cursor:pointer;font-size:13px;color:#A8C5C8;transition:all 0.15s}
+.sidebar-item{display:grid;grid-template-columns:70px minmax(0,1fr);align-items:center;column-gap:8px;padding:8px 12px;margin:1px 0;border-radius:8px;cursor:pointer;font-size:13px;color:#A8C5C8;transition:all 0.15s}
 .sidebar-item:hover{background:rgba(255,255,255,0.08);color:#fff}.sidebar-item.active{background:rgba(255,255,255,0.15);color:#fff;font-weight:600}
 .sidebar-item img{width:70px;height:14px;object-fit:contain;object-position:left center;filter:brightness(0) invert(1);opacity:0.7}.sidebar-item.active img{opacity:1}.sidebar-item[data-ck="wfhcr"] img{width:60px;height:12px}.sidebar-item span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sidebar-mark{width:70px;display:flex;align-items:center;justify-content:flex-start;font-size:16px;line-height:1;opacity:0.85}.sidebar-item.tool-box{margin:0 8px 8px;padding:10px 12px;border:1px solid rgba(255,255,255,0.15);display:flex;align-items:center;gap:8px;grid-template-columns:none}
 .sidebar-link-block{padding:0 8px 8px}
@@ -430,8 +430,8 @@ async function loadSidebar(){
         <span class="sidebar-brand-caret">${brandOpenState[group.brand.id]===false?'▸':'▾'}</span>
       </div>
       <div class="sidebar-brand-children">
-        ${group.subgroupOrder.map(subId=>{const sub=group.subgroups[subId];return `<div class="sidebar-subgroup ${subgroupOpenState[subId]===false?'collapsed':''}" data-subgroup="${subId}"><div class="sidebar-subgroup-toggle" onclick="toggleSubgroup('${subId}')"><span>${sub.meta.name}</span><span class="sidebar-subgroup-caret">${subgroupOpenState[subId]===false?'▸':'▾'}</span></div><div class="sidebar-subgroup-children">${sub.items.map(ck=>`<div class="sidebar-item" data-ck="${ck.id}" onclick="selectCK('${ck.id}')"><span>${ck.name}</span></div>`).join('')}</div></div>`}).join('')}
-        ${group.items.map(ck=>`<div class="sidebar-item" data-ck="${ck.id}" onclick="selectCK('${ck.id}')"><span>${ck.name}</span></div>`).join('')}
+        ${group.subgroupOrder.map(subId=>{const sub=group.subgroups[subId];return `<div class="sidebar-subgroup ${subgroupOpenState[subId]===false?'collapsed':''}" data-subgroup="${subId}"><div class="sidebar-subgroup-toggle" onclick="toggleSubgroup('${subId}')"><span>${sub.meta.name}</span><span class="sidebar-subgroup-caret">${subgroupOpenState[subId]===false?'▸':'▾'}</span></div><div class="sidebar-subgroup-children">${sub.items.map(ck=>`<div class="sidebar-item" data-ck="${ck.id}" onclick="selectCK('${ck.id}')"><img src="/logos/${ck.logo}" alt=""><span>${ck.name}</span></div>`).join('')}</div></div>`}).join('')}
+        ${group.items.map(ck=>`<div class="sidebar-item" data-ck="${ck.id}" onclick="selectCK('${ck.id}')"><img src="/logos/${ck.logo}" alt=""><span>${ck.name}</span></div>`).join('')}
       </div>
     </div>`).join('');
   document.getElementById('sidebarFooter').textContent=d.lastRefresh?'Updated: '+new Date(d.lastRefresh).toLocaleTimeString():'Loading...';
