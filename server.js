@@ -249,6 +249,28 @@ function skuMatchesDef(sku, def) {
   return true;
 }
 
+function poStageValue(po) {
+  return String(po?.stage || '').trim().toLowerCase();
+}
+
+function poStatusValue(po) {
+  return String(po?.status || '').trim().toLowerCase();
+}
+
+function isReceivedPO(po) {
+  return !!po?.fullyReceivedDate || poStageValue(po) === 'received';
+}
+
+function isVoidPO(po) {
+  const stage = poStageValue(po);
+  const status = poStatusValue(po);
+  return /void|cancel|deleted/.test(stage) || /void|cancel|deleted/.test(status);
+}
+
+function isOpenPO(po) {
+  return !!po && !isReceivedPO(po) && !isVoidPO(po);
+}
+
 function ckCategoryForSku(sku) {
   const s = String(sku || '').toUpperCase().trim();
   if (!s) return 'Uncategorised';
@@ -1309,7 +1331,7 @@ function buildCKData(ckId) {
   const poDestination = def.poDestination || null;
   const salesCountry = def.salesCountry || null;
   const stockBranches = def.stockBranches || null;
-  const strictStockBranches = def.strictStockBranches || false;
+  const strictStockBranches = !!(stockBranches && Array.isArray(stockBranches)) || !!def.strictStockBranches;
   const relatedStores = getStoreKeysForCk(ckId, storeKey);
 
   let sizes = def.sizes;
@@ -1331,7 +1353,7 @@ function buildCKData(ckId) {
         }, { soh: 0, available: 0, matched: 0 });
         cin7Raw[sku] = branchData.matched > 0
           ? { ...data, soh: branchData.soh, available: branchData.available }
-          : (strictStockBranches ? { ...data, soh: 0, available: 0 } : data);
+          : { ...data, soh: 0, available: 0 };
       } else {
         cin7Raw[sku] = data;
       }
@@ -1496,7 +1518,7 @@ function buildCKData(ckId) {
     if (Object.keys(relevantItems).length > 0) {
       const normalizedPoItems = ckId.startsWith('cusb') ? normalizeCushiePoItems(relevantItems) : relevantItems;
       allPos.push({ ...po, items: relevantItems, analyticsItems: normalizedPoItems });
-      if (po.stage !== 'Received') {
+      if (isOpenPO(po)) {
         pos.push({ ...po, items: relevantItems, analyticsItems: normalizedPoItems });
       }
     }
@@ -1559,7 +1581,7 @@ function buildCKData(ckId) {
     }
     const poRows = {};
     for (const po of dataCache.cin7POs || []) {
-      if (po.stage === 'Received') continue;
+      if (!isOpenPO(po)) continue;
       if (poDestination && resolvePoDestination(po) !== poDestination) continue;
       const etaRaw = po.arrival || po.estimatedArrivalDate || null;
       for (const [sku, qty] of Object.entries(po.items || {})) {
@@ -1599,7 +1621,7 @@ function buildCKData(ckId) {
     const componentIncoming = {};
     const componentPoRows = {};
     for (const po of dataCache.cin7POs) {
-      if (po.stage === 'Received') continue;
+      if (!isOpenPO(po)) continue;
       const etaRaw = po.arrival || po.estimatedArrivalDate || null;
       for (const [sku, qty] of Object.entries(po.items || {})) {
         if (sku.startsWith('LLAU-CB-') && !sku.includes('CBCF')) {
@@ -1768,7 +1790,7 @@ function buildCKData(ckId) {
           return acc;
         }, { soh: 0, available: 0, matched: 0 });
         if (branchData.matched > 0) return { ...data, soh: branchData.soh, available: branchData.available };
-        if (strictStockBranches) return { ...data, soh: 0, available: 0 };
+        return { ...data, soh: 0, available: 0 };
       }
       return data;
     };
@@ -1871,17 +1893,18 @@ function buildCKData(ckId) {
 
     for (const po of dataCache.cin7POs || []) {
       if (poDestination && resolvePoDestination(po) !== poDestination) continue;
+      const poOpen = isOpenPO(po);
       const relevantItems = {};
       for (const [rawSku, qty] of Object.entries(po.items || {})) {
         const sku = normalizePoSku(rawSku);
         if (!componentSkus.has(sku)) continue;
         relevantItems[sku] = (relevantItems[sku] || 0) + qty;
         ensureComponent(sku);
-        componentStats[sku].incoming += qty;
+        if (poOpen) componentStats[sku].incoming += qty;
       }
       if (Object.keys(relevantItems).length > 0) {
         componentAllPos.push({ ...po, items: relevantItems });
-        if (po.stage !== 'Received') componentPos.push({ ...po, items: relevantItems });
+        if (poOpen) componentPos.push({ ...po, items: relevantItems });
       }
     }
 
@@ -1998,7 +2021,7 @@ function buildCKData(ckId) {
 
     for (const po of dataCache.cin7POs || []) {
       if (poDestination && resolvePoDestination(po) !== poDestination) continue;
-      if (po.stage === 'Received') continue;
+      if (!isOpenPO(po)) continue;
       for (const [sku, qty] of Object.entries(po.items || {})) {
         if (shouldSkipMicroSku(sku)) continue;
         const c = ensureMicro(sku);
@@ -2062,7 +2085,7 @@ function buildCKData(ckId) {
 
   // Step 2: For SKUs NOT in Excel, use CBM-based estimation from open POs
   for (const po of allPos) {
-    if (po.stage === 'Received') continue;
+    if (!isOpenPO(po)) continue;
     const destination = inferDestination(po);
     const landed = estimateLandedCost(po, destination);
     const containerFreight = landed.freight || 0;
@@ -2119,21 +2142,29 @@ function buildCKData(ckId) {
     coverageAux,
     fx: { USDAUD: fxRate.USDAUD, lastFetch: fxRate.lastFetch },
     trendData: (() => {
-      const vel = dataCache.shopifyVelocity?.[storeKey] || {};
-      const d7 = vel._7d || {};
-      const d30 = vel._30d || {};
-      const firstSeen = vel._firstSeen || {};
-      const weekly = vel._weeklyBreakdown || {};
       const result = {};
       const allSkus = [...new Set([...Object.keys(cin7), ...Object.keys(velocity)])];
       for (const sku of allSkus) {
-        const v7 = (d7[sku] || 0) / 7 * 7; // weekly rate from 7d
-        const v30 = (d30[sku] || 0) / 30 * 7; // weekly rate from 30d
-        // Last 5 weeks sparkline
-        const wk = weekly[sku] || {};
+        let d7Qty = 0;
+        let d30Qty = 0;
+        let firstSeenValue = null;
+        const wk = {};
+        for (const sourceStore of relatedStores) {
+          const velSource = salesCountry
+            ? dataCache.shopifyVelocityByCountry?.[sourceStore]?.[salesCountry] || {}
+            : dataCache.shopifyVelocity?.[sourceStore] || {};
+          d7Qty += Number(velSource._7d?.[sku] || 0);
+          d30Qty += Number(velSource._30d?.[sku] || 0);
+          const fs = velSource._firstSeen?.[sku] || null;
+          if (fs && (!firstSeenValue || String(fs) < String(firstSeenValue))) firstSeenValue = fs;
+          for (const [week, qty] of Object.entries(velSource._weeklyBreakdown?.[sku] || {})) {
+            wk[week] = (wk[week] || 0) + Number(qty || 0);
+          }
+        }
+        const v7 = d7Qty; // already a 7-day total, shown as weekly rate
+        const v30 = d30Qty / 30 * 7;
         const weekKeys = Object.keys(wk).sort().slice(-5);
         const sparkline = weekKeys.map(k => wk[k] || 0);
-        // Last in-stock velocity: avg of last 4 weeks that had sales
         const allWeekKeys = Object.keys(wk).sort();
         const weeksWithSales = allWeekKeys.filter(k => wk[k] > 0);
         let lastInStockVel = null;
@@ -2142,22 +2173,36 @@ function buildCKData(ckId) {
           const avgSales = lastActive.reduce((t, k) => t + wk[k], 0) / lastActive.length;
           lastInStockVel = Math.round(avgSales * 10) / 10;
         }
-        result[sku] = { v7: Math.round(v7*10)/10, v30: Math.round(v30*10)/10, sparkline, firstSeen: firstSeen[sku] || null, lastInStockVel };
+        result[sku] = { v7: Math.round(v7*10)/10, v30: Math.round(v30*10)/10, sparkline, firstSeen: firstSeenValue, lastInStockVel };
       }
       return result;
     })(),
     bomData,
     reorderBomData,
     weeklyData: (() => {
-      const weekly = dataCache.shopifyVelocity?.[storeKey]?._weeklyBreakdown || {};
       const result = {};
       const allSkus = [...new Set([...Object.keys(cin7), ...Object.keys(velocity)])];
-      for (const sku of allSkus) {
-        if (weekly[sku]) result[sku] = weekly[sku];
+      const addWeekly = (weekly = {}) => {
+        for (const sku of allSkus) {
+          if (!weekly[sku]) continue;
+          if (!result[sku]) result[sku] = {};
+          for (const [week, qty] of Object.entries(weekly[sku])) {
+            result[sku][week] = (result[sku][week] || 0) + Number(qty || 0);
+          }
+        }
+      };
+      for (const sourceStore of relatedStores) {
+        const weekly = salesCountry
+          ? dataCache.shopifyVelocityByCountry?.[sourceStore]?.[salesCountry]?._weeklyBreakdown
+          : dataCache.shopifyVelocity?.[sourceStore]?._weeklyBreakdown;
+        addWeekly(weekly || {});
       }
       return Object.keys(result).length > 0 ? result : null;
     })(),
-    lastRefresh: dataCache.lastRefresh
+    lastRefresh: dataCache.lastRefresh,
+    lastCin7Refresh: dataCache.lastCin7Refresh,
+    lastPoRefresh: dataCache.lastPoRefresh,
+    lastShopifyRefresh: dataCache.lastShopifyRefresh
   };
 }
 
@@ -2272,21 +2317,31 @@ const FREIGHT_TARIFF = {
 function estimateLandedCost(po, destination) {
   const freightActual = po.freightTotal > 0 ? po.freightTotal : 0;
   const productValue = po.total || 0;
+  const productCurrency = po.currencyCode || 'USD';
+  const toAud = (value, currency) => {
+    const n = Number(value || 0);
+    const c = String(currency || 'AUD').toUpperCase();
+    if (!n) return 0;
+    if (c === 'AUD') return n;
+    if (c === 'USD') return n * (fxRate.USDAUD || 1.45);
+    return n;
+  };
+  const productValueAUD = toAud(productValue, productCurrency);
   const dest = FREIGHT_TARIFF[destination];
   const isEstimated = freightActual === 0;
-  const freight = freightActual > 0 ? freightActual : (dest ? dest.freight : 0);
-  const freightCurrency = freightActual > 0 ? (po.currencyCode || 'USD') : (dest ? dest.freightCurrency : 'USD');
+  const freight = freightActual > 0 ? toAud(freightActual, productCurrency) : (dest ? dest.freight : 0);
+  const freightCurrency = 'AUD';
   const tariffRate = dest ? dest.tariff : 0;
-  const tariffAmount = productValue * tariffRate;
+  const tariffAmount = productValueAUD * tariffRate;
   const tariffNote = dest ? dest.tariffNote : '';
-  return { freight, freightCurrency, tariffRate, tariffAmount, tariffNote, isEstimated, landedTotal: productValue + freight + tariffAmount };
+  return { productValueAUD, freight, freightCurrency, tariffRate, tariffAmount, tariffNote, isEstimated, landedTotal: productValueAUD + freight + tariffAmount };
 }
 
 // PO Data Quality Score
 function scorePO(po) {
   const crd = po.crd || po.etd;
-  const isInTransitOrReceived = po.stage === 'Received' || (crd && po.estimatedArrivalDate && new Date(crd) <= new Date() && hasContainerNumber(po) && (po.stage !== 'Draft' && po.stage !== 'Confirmed'));
-  const isReceived = po.stage === 'Received';
+  const isReceived = isReceivedPO(po);
+  const isInTransitOrReceived = isReceived || (crd && po.estimatedArrivalDate && new Date(crd) <= new Date() && hasContainerNumber(po) && (po.stage !== 'Draft' && po.stage !== 'Confirmed'));
 
   let score = 0;
   let maxScore = 0;
@@ -2342,6 +2397,7 @@ app.get('/api/all-pos', requireAuth, (req, res) => {
       fullyReceivedDate: po.fullyReceivedDate || null,
       total: po.total || 0,
       currencyCode: po.currencyCode || 'USD',
+      productTotalAUD: landed.productValueAUD,
       deliveryCountry: destination,
       freight: landed.freight,
       freightCurrency: landed.freightCurrency,
@@ -2681,7 +2737,7 @@ function buildShipmentData() {
     let status = 'production';
 
     // If it has a received date OR stage is "Received", it's arrived
-    if (receivedDate || po.stage === 'Received') {
+    if (receivedDate || isReceivedPO(po)) {
       progress = 1;
       status = 'arrived';
     } else if (crd && crd <= now && hasContainer) {
@@ -2897,8 +2953,8 @@ app.get('/api/incoming-pos', requireAuth, (req, res) => {
 
   const pos = [];
   for (const po of (dataCache.cin7POs || [])) {
-    // Skip received
-    if (po.fullyReceivedDate || po.stage === 'Received') continue;
+    // Use the same open-PO rule as the PO tab and CK incoming logic.
+    if (!isOpenPO(po)) continue;
 
     // Determine destination
     let destination = resolvePoDestination(po);
