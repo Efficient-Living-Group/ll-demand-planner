@@ -56,6 +56,7 @@ const CK_DEFS = {
   'llca':     { name: 'Little Lifely CA',       prefix: 'LLNA',   logo: 'little-lifely.png', store: 'lifely', excludeCV: false, poDestination: 'Canada', salesCountry: 'CA', stockBranches: [61831], sizes: {'-TWX-':'Twin XL','-TW-':'Twin','-F-':'Full'} },
   'lluk':     { name: 'Little Lifely UK',       prefix: 'LLUK',   logo: 'little-lifely.png', store: 'lifely', excludeCV: false, salesCountry: 'GB', stockBranches: [62444], sizes: {'-S-':'Single','-SD-':'Small Double','-D-':'Double'} },
   'llsg':     { name: 'Little Lifely SG',       prefix: 'LLSG',   logo: 'little-lifely.png', store: 'lifely', excludeCV: false, salesCountry: 'SG', stockBranches: [57843], strictStockBranches: true, sizes: {'-SS-':'Super Single','-S-':'Single','-Q-':'Queen'} },
+  'll-mattresses': { name: 'LL Mattresses',     prefix: 'MULTI',  logo: 'little-lifely.png', store: 'lifely', filter: sku => ['DD-21915CF','DD-21107CF','DD-21137CF'].includes(sku) || sku.startsWith('DDUK'), sizes: {'21915':'Single','21107':'King Single','21137':'Double','2190':'Single UK','21120':'Small Double UK','21135':'Double UK'} },
   'dd':       { name: 'Deep Dream',             prefix: 'DD',     logo: 'deep-dream.png',    store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, sizes: {'915':'Single','107':'King Single','137':'Double','153':'Queen','183':'King'} },
   'cocoon':   { name: 'Cocoon Bed',             prefix: 'COCOON', logo: 'cocoon-bed.png',    store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, sizes: {'-DOUBLE-':'Double','-QUEEN-':'Queen','-KING-':'King'} },
   'rdnt':     { name: 'Radiant',                prefix: 'RDNT',   logo: 'radiant.png',       store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, sizes: {'-D-':'Double','-Q-':'Queen','-K-':'King'} },
@@ -2045,11 +2046,12 @@ function buildCKData(ckId) {
 
   // Remove inactive Shopify SKUs (draft/archived)
   const inactiveSet = new Set(relatedStores.flatMap(sourceStore => dataCache.shopifyInventory?.[sourceStore]?.['__inactive__'] || []));
+  const keepInactiveForPanel = ckId === 'll-mattresses';
   for (const sku of Object.keys(cin7)) {
-    if (inactiveSet.has(sku)) { delete cin7[sku]; delete velocity[sku]; delete shopify[sku]; }
+    if (!keepInactiveForPanel && inactiveSet.has(sku)) { delete cin7[sku]; delete velocity[sku]; delete shopify[sku]; }
   }
   for (const sku of Object.keys(velocity)) {
-    if (inactiveSet.has(sku)) { delete velocity[sku]; }
+    if (!keepInactiveForPanel && inactiveSet.has(sku)) { delete velocity[sku]; }
   }
 
   // === Per-SKU landed cost calculation ===
