@@ -353,11 +353,6 @@ def fetch_shopify_snapshot() -> dict[str, Any]:
     }
 
 
-def clean_po_reference(ref: Any) -> str:
-    value = str(ref or "")
-    return value[:-6] if value.lower().endswith("-cover") else value
-
-
 def build_products_and_stock(products_raw: list[dict[str, Any]], stock_raw: list[dict[str, Any]], fx_usd_aud: float) -> tuple[dict[str, Any], dict[str, Any]]:
     products: dict[str, Any] = {}
     stock_by_branch: dict[str, Any] = {}
@@ -408,25 +403,6 @@ def build_products_and_stock(products_raw: list[dict[str, Any]], stock_raw: list
     return products, stock_by_branch
 
 
-def merge_pos_by_reference(pos: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    merged: dict[str, dict[str, Any]] = {}
-    for po in pos:
-        ref = po.get("reference") or f"__id_{po.get('id')}"
-        if ref not in merged:
-            merged[ref] = po
-            continue
-        existing = merged[ref]
-        for sku, qty in (po.get("items") or {}).items():
-            existing.setdefault("items", {})[sku] = existing.setdefault("items", {}).get(sku, 0) + qty
-        for sku, name in (po.get("itemNames") or {}).items():
-            existing.setdefault("itemNames", {})[sku] = name
-        # Prefer non-empty latest metadata without discarding received/status fields.
-        for field in ["arrival", "etd", "estimatedArrivalDate", "fullyReceivedDate", "trackingCode", "port", "stage", "status"]:
-            if po.get(field):
-                existing[field] = po[field]
-    return list(merged.values())
-
-
 def build_purchase_orders(pos_raw: list[dict[str, Any]]) -> list[dict[str, Any]]:
     pos: list[dict[str, Any]] = []
     for po in pos_raw:
@@ -445,7 +421,7 @@ def build_purchase_orders(pos_raw: list[dict[str, Any]]) -> list[dict[str, Any]]
             continue
         pos.append({
             "id": po.get("id") or po.get("ID") or po.get("purchaseOrderId") or po.get("orderId"),
-            "reference": clean_po_reference(po.get("reference")),
+            "reference": str(po.get("reference") or ""),
             "status": po.get("status"),
             "stage": po.get("stage") or "",
             "arrival": po.get("estimatedArrivalDate"),
@@ -469,7 +445,7 @@ def build_purchase_orders(pos_raw: list[dict[str, Any]]) -> list[dict[str, Any]]
             "itemNames": item_names,
             "items": items,
         })
-    return merge_pos_by_reference(pos)
+    return pos
 
 
 def write_cache(

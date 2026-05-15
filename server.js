@@ -288,72 +288,8 @@ function snapshotHasCin7Data(snap) {
   ));
 }
 
-function cleanPoReference(ref) {
-  return (ref || '').replace(/-cover$/i, '');
-}
-
-function mergeCin7POsByReference(rows) {
-  if (!Array.isArray(rows) || rows.length === 0) return [];
-  const now = Date.now();
-  const grouped = new Map();
-
-  const priority = po => {
-    if (!po) return 0;
-    if (po.fullyReceivedDate || po.stage === 'Received') return 4;
-    const eta = po.estimatedArrivalDate || po.arrival;
-    const etd = po.etd;
-    const etaMs = eta ? new Date(eta).getTime() : NaN;
-    const etdMs = etd ? new Date(etd).getTime() : NaN;
-    if (!Number.isNaN(etaMs) && etaMs <= now) return 3;
-    if (!Number.isNaN(etdMs) && etdMs <= now) return 2;
-    return 1;
-  };
-
-  for (const po of rows) {
-    const key = cleanPoReference(po.reference);
-    if (!grouped.has(key)) grouped.set(key, []);
-    grouped.get(key).push({ ...po, reference: key });
-  }
-
-  const merged = [];
-  for (const [reference, group] of grouped.entries()) {
-    if (group.length === 1) {
-      merged.push(group[0]);
-      continue;
-    }
-
-    group.sort((a, b) => priority(b) - priority(a));
-    const base = { ...group[0], reference, items: {} };
-
-    for (const po of group) {
-      for (const [sku, qty] of Object.entries(po.items || {})) {
-        base.items[sku] = (base.items[sku] || 0) + qty;
-      }
-      base.total = (base.total || 0) + (po.total || 0);
-      base.freightTotal = (base.freightTotal || 0) + (po.freightTotal || 0);
-      if (!base.company && po.company) base.company = po.company;
-      if (!base.status && po.status) base.status = po.status;
-      if (!base.stage && po.stage) base.stage = po.stage;
-      if (!base.deliveryCountry && po.deliveryCountry) base.deliveryCountry = po.deliveryCountry;
-      if (!base.deliveryCity && po.deliveryCity) base.deliveryCity = po.deliveryCity;
-      if (!base.trackingCode && po.trackingCode) base.trackingCode = po.trackingCode;
-      if (!base.port && po.port) base.port = po.port;
-      if (!base.logisticsCarrier && po.logisticsCarrier) base.logisticsCarrier = po.logisticsCarrier;
-      if (!base.internalComments && po.internalComments) base.internalComments = po.internalComments;
-      if (!base.createdBy && po.createdBy) base.createdBy = po.createdBy;
-      if (!base.invoiceDate && po.invoiceDate) base.invoiceDate = po.invoiceDate;
-      if (!base.supplierInvoiceReference && po.supplierInvoiceReference) base.supplierInvoiceReference = po.supplierInvoiceReference;
-      if ((!base.customFields || Object.keys(base.customFields).length === 0) && po.customFields) base.customFields = po.customFields;
-      if (!base.fullyReceivedDate && po.fullyReceivedDate) base.fullyReceivedDate = po.fullyReceivedDate;
-      if (!base.arrival && po.arrival) base.arrival = po.arrival;
-      if (!base.estimatedArrivalDate && po.estimatedArrivalDate) base.estimatedArrivalDate = po.estimatedArrivalDate;
-      if (!base.etd && po.etd) base.etd = po.etd;
-    }
-
-    merged.push(base);
-  }
-
-  return merged;
+function rawPoReference(ref) {
+  return String(ref || '');
 }
 
 
@@ -387,7 +323,7 @@ function daysBetweenDateKeys(from, to) {
 function poHistoryKey(po) {
   const id = po.id || po.orderId || po.purchaseOrderId;
   if (id) return `id:${id}`;
-  return `ref:${cleanPoReference(po.reference || '')}`;
+  return `ref:${rawPoReference(po.reference || '')}`;
 }
 
 function loadPoEtaHistory() {
@@ -417,7 +353,7 @@ function updatePoEtaHistory(pos, detectedAt = new Date().toISOString()) {
   for (const po of pos) {
     const key = poHistoryKey(po);
     if (!key || key === 'ref:') continue;
-    const reference = cleanPoReference(po.reference || '');
+    const reference = rawPoReference(po.reference || '');
     const currentEta = parsePoDateKey(po.estimatedArrivalDate || po.arrival);
     const originalEta = parsePoDateKey(po.customFields?.orders_1000);
     const receivedDate = parsePoDateKey(po.fullyReceivedDate);
@@ -541,7 +477,7 @@ function loadCacheSnapshot(silent = false) {
           ),
           error: null
         };
-        dataCache.cin7POs = mergeCin7POsByReference(dataCache.cin7POs || []);
+        dataCache.cin7POs = dataCache.cin7POs || [];
         if (!silent) console.log(`Loaded cache snapshot from ${path.basename(snapPath)}: ${Object.keys(dataCache.cin7Products).length} CIN7 SKUs, ${dataCache.cin7POs.length} POs`);
         loaded = true;
         break;
@@ -573,7 +509,7 @@ function saveCacheSnapshot(pushToGit = false, pushReason = 'cin7-refresh') {
       lastShopifyRefresh: dataCache.lastShopifyRefresh,
       cin7Products: dataCache.cin7Products,
       cin7StockByBranch: dataCache.cin7StockByBranch,
-      cin7POs: mergeCin7POsByReference(dataCache.cin7POs),
+      cin7POs: dataCache.cin7POs || [],
       shopifyVelocity: dataCache.shopifyVelocity,
       shopifyVelocityByCountry: dataCache.shopifyVelocityByCountry,
       shopifyInventory: dataCache.shopifyInventory,
@@ -875,7 +811,7 @@ async function fetchCin7POs() {
         if (Object.keys(items).length > 0) {
           results.push({
             id: po.id || po.ID || po.purchaseOrderId || po.orderId || null,
-            reference: cleanPoReference(po.reference),
+            reference: rawPoReference(po.reference),
             status: po.status,
             stage: po.stage || '',
             arrival: po.estimatedArrivalDate || null, // ETA only - never fall back to ETD
@@ -903,7 +839,7 @@ async function fetchCin7POs() {
       }
     } catch (e) { console.error(`CIN7 POs page ${page} error:`, e.message); break; }
   }
-  return mergeCin7POsByReference(results);
+  return results;
 }
 
 // ===== SHOPIFY: FETCH ORDERS & CALCULATE VELOCITY =====
@@ -1172,7 +1108,7 @@ async function refreshAllData(forceCin7 = false) {
       }
 
       if (fetchedPoCount > 0) {
-        nextCache.cin7POs = mergeCin7POsByReference(cin7POs);
+        nextCache.cin7POs = cin7POs;
         nextCache.lastCin7Refresh = nowIso;
         nextCache.lastPoRefresh = nowIso;
         cin7Updated = true;
@@ -2934,7 +2870,7 @@ function destFromRef(ref) {
 function resolvePoDestination(po) {
   let destination = inferDestination(po);
   if (!destination || destination === 'Australia') {
-    const refDest = destFromRef(cleanPoReference(po.reference));
+    const refDest = destFromRef(rawPoReference(po.reference));
     if (refDest) destination = refDest;
     else destination = 'Australia';
   }
@@ -2945,8 +2881,7 @@ app.get('/api/incoming-pos', requireAuth, (req, res) => {
   const allCKGroups = new Set();
   const allMonths = new Set();
   const allCountries = new Set();
-  const cleanPoReference = ref => (ref || '').replace(/-cover$/i, '');
-
+  
   // Build global landed cost lookup from ALL CK panels
   const globalLanded = {};
   for (const ckId of Object.keys(CK_DEFS)) {
@@ -3033,7 +2968,7 @@ app.get('/api/incoming-pos', requireAuth, (req, res) => {
     const landedTotal = productTotal + freightEst + tariffEst;
 
     pos.push({
-      reference: cleanPoReference(po.reference),
+      reference: rawPoReference(po.reference),
       supplier: po.company || '',
       destination: countryCode,
       destinationFull: destination,
