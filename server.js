@@ -831,34 +831,32 @@ async function fetchCin7POs() {
             if (li.name && !itemNames[li.code]) itemNames[li.code] = li.name;
           }
         }
-        if (Object.keys(items).length > 0) {
-          results.push({
-            id: po.id || po.ID || po.purchaseOrderId || po.orderId || null,
-            reference: rawPoReference(po.reference),
-            status: po.status,
-            stage: po.stage || '',
-            arrival: po.estimatedArrivalDate || null, // ETA only - never fall back to ETD
-            etd: po.estimatedDeliveryDate || null,
-            estimatedArrivalDate: po.estimatedArrivalDate || null,
-            fullyReceivedDate: po.fullyReceivedDate || null,
-            customFields: po.customFields || {},
-            company: po.company || '',
-            total: po.total || 0,
-            currencyCode: po.currencyCode || 'USD',
-            deliveryCountry: po.deliveryCountry || '',
-            deliveryCity: po.deliveryCity || '',
-            trackingCode: po.trackingCode || '',
-            port: po.port || '',
-            logisticsCarrier: po.logisticsCarrier || '',
-            internalComments: po.internalComments || '',
-            freightTotal: po.freightTotal || 0,
-            createdBy: po.createdBy || null,
-            invoiceDate: po.invoiceDate || null,
-            supplierInvoiceReference: po.supplierInvoiceReference || '',
-            itemNames,
-            items
-          });
-        }
+        results.push({
+          id: po.id || po.ID || po.purchaseOrderId || po.orderId || null,
+          reference: rawPoReference(po.reference),
+          status: po.status,
+          stage: po.stage || '',
+          arrival: po.estimatedArrivalDate || null, // ETA only - never fall back to ETD
+          etd: po.estimatedDeliveryDate || null,
+          estimatedArrivalDate: po.estimatedArrivalDate || null,
+          fullyReceivedDate: po.fullyReceivedDate || null,
+          customFields: po.customFields || {},
+          company: po.company || '',
+          total: po.total || 0,
+          currencyCode: po.currencyCode || 'USD',
+          deliveryCountry: po.deliveryCountry || '',
+          deliveryCity: po.deliveryCity || '',
+          trackingCode: po.trackingCode || '',
+          port: po.port || '',
+          logisticsCarrier: po.logisticsCarrier || '',
+          internalComments: po.internalComments || '',
+          freightTotal: po.freightTotal || 0,
+          createdBy: po.createdBy || null,
+          invoiceDate: po.invoiceDate || null,
+          supplierInvoiceReference: po.supplierInvoiceReference || '',
+          itemNames,
+          items
+        });
       }
     } catch (e) { console.error(`CIN7 POs page ${page} error:`, e.message); break; }
   }
