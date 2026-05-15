@@ -2125,14 +2125,34 @@ function buildCKData(ckId) {
   let mattressRegions = null;
   if (ckId === 'll-mattresses') {
     const mattressRegionConfigs = {
-      AU: { skus: ['DD-21915CF', 'DD-21107CF', 'DD-21137CF'], branchIds: LL_AU_BRANCH_IDS, destination: 'Australia' },
-      NZ: { skus: ['DD-21915CF', 'DD-21107CF', 'DD-21137CF'], branchIds: LL_NZ_BRANCH_IDS, destination: 'New Zealand' },
-      UK: { skus: ['DDUK-2190CF', 'DDUK-21120CF', 'DDUK-21135CF'], branchIds: [62444], destination: 'United Kingdom' }
+      AU: {
+        skus: ['DD-21915CF', 'DD-21107CF', 'DD-21137CF'],
+        branchIds: LL_AU_BRANCH_IDS,
+        destination: 'Australia',
+        salesCountry: 'AU',
+        comboMap: { 'LLAU-CBCF-S-': 'DD-21915CF', 'LLAU-CBCF-KS-': 'DD-21107CF', 'LLAU-CBCF-D-': 'DD-21137CF' }
+      },
+      NZ: {
+        skus: ['DD-21915CF', 'DD-21107CF', 'DD-21137CF'],
+        branchIds: LL_NZ_BRANCH_IDS,
+        destination: 'New Zealand',
+        salesCountry: 'NZ',
+        comboMap: { 'LLAU-CBCF-S-': 'DD-21915CF', 'LLAU-CBCF-KS-': 'DD-21107CF', 'LLAU-CBCF-D-': 'DD-21137CF' }
+      },
+      UK: {
+        skus: ['DDUK-2190CF', 'DDUK-21120CF', 'DDUK-21135CF'],
+        branchIds: [62444],
+        destination: 'United Kingdom',
+        salesCountry: 'GB',
+        comboMap: { 'LLUK-CBDS-S-': 'DDUK-2190CF', 'LLUK-CBDS-SD-': 'DDUK-21120CF', 'LLUK-CBDS-D-': 'DDUK-21135CF' }
+      }
     };
     mattressRegions = Object.fromEntries(Object.entries(mattressRegionConfigs).map(([region, cfg]) => {
       const regionCin7 = {};
       const regionShopify = {};
-      const regionVelocity = {};
+      const regionVelocity = { _7d: {}, _30d: {}, _weeklyBreakdown: {}, _firstSeen: {} };
+      const regionTrendData = {};
+      const regionWeeklyData = {};
       for (const sku of cfg.skus) {
         const data = dataCache.cin7Products?.[sku];
         if (!data) continue;
@@ -2148,6 +2168,61 @@ function buildCKData(ckId) {
         regionCin7[sku] = branchData.matched > 0 ? branchData.soh : 0;
         regionShopify[sku] = 0;
       }
+
+      // Little Lifely mattresses are not sold as standalone Shopify SKUs.
+      // Each Little Lifely bed + mattress combo consumes one matching mattress, so
+      // drive open demand and velocity from combo line items by shipping country.
+      for (const sourceStore of relatedStores) {
+        const velSource = dataCache.shopifyVelocityByCountry?.[sourceStore]?.[cfg.salesCountry] || {};
+        const demandSource = dataCache.shopifyOpenDemand?.[sourceStore]?.[cfg.salesCountry] || {};
+
+        for (const [comboSku, qty] of Object.entries(demandSource)) {
+          const mattressSku = Object.entries(cfg.comboMap).find(([prefix]) => comboSku.startsWith(prefix))?.[1];
+          if (!mattressSku) continue;
+          regionShopify[mattressSku] = (regionShopify[mattressSku] || 0) - Number(qty || 0);
+        }
+
+        for (const [comboSku, vel] of Object.entries(velSource)) {
+          if (comboSku.startsWith('_')) continue;
+          const mattressSku = Object.entries(cfg.comboMap).find(([prefix]) => comboSku.startsWith(prefix))?.[1];
+          if (!mattressSku) continue;
+          regionVelocity[mattressSku] = (regionVelocity[mattressSku] || 0) + Number(vel || 0);
+          regionVelocity._7d[mattressSku] = (regionVelocity._7d[mattressSku] || 0) + Number(velSource._7d?.[comboSku] || 0);
+          regionVelocity._30d[mattressSku] = (regionVelocity._30d[mattressSku] || 0) + Number(velSource._30d?.[comboSku] || 0);
+          const firstSeen = velSource._firstSeen?.[comboSku] || null;
+          if (firstSeen && (!regionVelocity._firstSeen[mattressSku] || String(firstSeen) < String(regionVelocity._firstSeen[mattressSku]))) {
+            regionVelocity._firstSeen[mattressSku] = firstSeen;
+          }
+          for (const [week, qty] of Object.entries(velSource._weeklyBreakdown?.[comboSku] || {})) {
+            if (!regionVelocity._weeklyBreakdown[mattressSku]) regionVelocity._weeklyBreakdown[mattressSku] = {};
+            regionVelocity._weeklyBreakdown[mattressSku][week] = (regionVelocity._weeklyBreakdown[mattressSku][week] || 0) + Number(qty || 0);
+            if (!regionWeeklyData[mattressSku]) regionWeeklyData[mattressSku] = {};
+            regionWeeklyData[mattressSku][week] = (regionWeeklyData[mattressSku][week] || 0) + Number(qty || 0);
+          }
+        }
+      }
+
+      for (const sku of cfg.skus) {
+        regionVelocity[sku] = Math.round((Number(regionVelocity._30d[sku] || 0) / 30 * 7) * 10) / 10;
+        const wk = regionVelocity._weeklyBreakdown[sku] || {};
+        const weekKeys = Object.keys(wk).sort().slice(-5);
+        const allWeekKeys = Object.keys(wk).sort();
+        const weeksWithSales = allWeekKeys.filter(k => wk[k] > 0);
+        let lastInStockVel = null;
+        if (weeksWithSales.length >= 2) {
+          const lastActive = weeksWithSales.slice(-4);
+          const avgSales = lastActive.reduce((t, k) => t + wk[k], 0) / lastActive.length;
+          lastInStockVel = Math.round(avgSales * 10) / 10;
+        }
+        regionTrendData[sku] = {
+          v7: Math.round(Number(regionVelocity._7d[sku] || 0) * 10) / 10,
+          v30: Math.round((Number(regionVelocity._30d[sku] || 0) / 30 * 7) * 10) / 10,
+          sparkline: weekKeys.map(k => wk[k] || 0),
+          firstSeen: regionVelocity._firstSeen[sku] || null,
+          lastInStockVel
+        };
+      }
+
       const regionAllPos = [];
       const regionPos = [];
       for (const po of dataCache.cin7POs || []) {
@@ -2161,7 +2236,7 @@ function buildCKData(ckId) {
         regionAllPos.push(row);
         if (isOpenPO(po)) regionPos.push(row);
       }
-      return [region, { cin7: regionCin7, shopify: regionShopify, velocity: regionVelocity, pos: regionPos, allPos: regionAllPos }];
+      return [region, { cin7: regionCin7, shopify: regionShopify, velocity: regionVelocity, trendData: regionTrendData, weeklyData: regionWeeklyData, pos: regionPos, allPos: regionAllPos }];
     }));
   }
 
