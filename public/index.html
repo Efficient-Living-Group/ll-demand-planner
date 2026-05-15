@@ -605,12 +605,14 @@ function renderDashboard(){
   const skus=getSkus();let tSOH=0,tInc=0,tOver=0,tVel=0;
   skus.forEach(s=>{tSOH+=(DATA.cin7[s]||0);tInc+=getIncoming(s);let sh=DATA.shopify[s]||0;if(sh<0)tOver+=sh;tVel+=getVel(s)});
   let wksT=tVel>0?Math.round((tSOH+Math.min(tOver,0))/tVel):99;
-  let preorderBreakdownCard='';
+  let preorderBreakdownCard='', openOrdersCard='';
   if(currentCK==='llau'){
     let standaloneBeds=0,comboBeds=0,swatchPacks=0;
     const openBySku=DATA.coverageAux?.openDemandBySku||{};
     Object.entries(openBySku).forEach(([sku,qty])=>{const q=Number(qty||0);if(sku==='LLAU-CB-CS-PACK'||sku.includes('-CS-PACK'))swatchPacks+=q;else if(sku.startsWith('LLAU-CBCF-'))comboBeds+=q;else if(sku.startsWith('LLAU-CB-'))standaloneBeds+=q;});
     preorderBreakdownCard=`<div class="card red" title="Open Shopify orders split by product type before stock coverage is applied."><div class="label">Preorder Breakdown</div><div class="value">${Math.round(standaloneBeds+comboBeds+swatchPacks).toLocaleString()}</div><div class="sub">Beds ${Math.round(standaloneBeds).toLocaleString()} · Combos ${Math.round(comboBeds).toLocaleString()} · Swatches ${Math.round(swatchPacks).toLocaleString()}</div></div>`;
+  } else {
+    openOrdersCard=`<div class="card red" title="Units already sold on Shopify but not yet shipped. These eat into your physical stock — Net after Open Orders accounts for them."><div class="label">Open Orders</div><div class="value">${tOver.toLocaleString()}</div><div class="sub">Pre-order commitments</div></div>`;
   }
   let overstockVal=0,deadstockVal=0;
   skus.forEach(s=>{let vel=getVel(s),soh=DATA.cin7[s]||0,cost=(DATA.costs||{})[s]||0;
@@ -625,7 +627,7 @@ function renderDashboard(){
   document.getElementById('summary-cards').innerHTML=`
     <div class="card green" title="Total physical units in warehouse from CIN7. This is what you can actually ship today."><div class="label">CIN7 SOH</div><div class="value">${tSOH.toLocaleString()}</div><div class="sub">Physical stock</div></div>
     <div class="card blue" style="cursor:pointer;border:2px solid var(--blue);transition:all 0.15s" title="Units on the way from open Purchase Orders. Click for PO-level breakdown." onclick="toggleInboundDrilldown()" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(44,71,75,0.15)'" onmouseout="this.style.transform='';this.style.boxShadow=''"><div class="label" style="display:flex;align-items:center;gap:4px">Incoming <span style="font-size:9px;background:var(--blue);color:#fff;padding:1px 6px;border-radius:8px">▼ Details</span></div><div class="value">${tInc.toLocaleString()}</div><div class="sub">${uniquePoCount(DATA.pos)} open POs</div></div>
-    <div class="card red" title="Units already sold on Shopify but not yet shipped. These eat into your physical stock — Net after Open Orders accounts for them."><div class="label">Open Orders</div><div class="value">${tOver.toLocaleString()}</div><div class="sub">Pre-order commitments</div></div>
+    ${openOrdersCard}
     ${preorderBreakdownCard}
     <div class="card ${overstockVal>0?'yellow':'green'}" title="Dollar value of stock above 25 weeks of cover at current velocity, excluding dead stock. Supplier price (FOB) only, not landed cost."><div class="label">Overstock Value</div><div class="value">$${overstockVal>=1000000?(overstockVal/1000000).toFixed(1)+'M':Math.round(overstockVal).toLocaleString()}</div><div class="sub">Excess above 25 weeks, FOB only</div></div>
     <div class="card ${deadstockVal>0?'red':'green'}" title="Dollar value of SKUs with physical stock but zero sales velocity. Supplier price (FOB) only, not landed cost."><div class="label">💀 Dead Stock Value</div><div class="value">$${deadstockVal>=1000000?(deadstockVal/1000000).toFixed(1)+'M':Math.round(deadstockVal).toLocaleString()}</div><div class="sub">Zero-velocity stock, FOB only</div></div>`;
