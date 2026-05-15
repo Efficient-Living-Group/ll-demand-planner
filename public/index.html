@@ -247,7 +247,7 @@ let DATA={cin7:{},shopify:{},velocity:{},pos:[],allPos:[],names:{},sizes:{},cbmM
 let brandOpenState={};
 let subgroupOpenState={};
 const TODAY=new Date();
-function getSkus(){return[...new Set([...Object.keys(DATA.cin7),...Object.keys(DATA.velocity)])].filter(s=>!(s.includes('-CS-')&&!s.includes('PACK')))}
+function getSkus(){return[...new Set([...Object.keys(DATA.cin7),...Object.keys(DATA.velocity)])].filter(s=>s&&!s.startsWith('_')&&!(s.includes('-CS-')&&!s.includes('PACK')))}
 function updateHeaderSub(){const el=document.getElementById('headerSub');if(el)el.textContent=`${Object.keys(DATA.cin7).length} CIN7 SKUs · ${Object.keys(DATA.velocity).filter(k=>!k.startsWith('_')).length} with velocity · ${uniquePoCount(DATA.pos)} open POs`;}
 function applyMattressRegion(){if(currentCK!=='ll-mattresses'||!DATA.mattressRegions)return;const region=dashFilter.region||'AU';const r=DATA.mattressRegions[region];if(!r)return;DATA.cin7=r.cin7||{};DATA.shopify=r.shopify||{};DATA.velocity=r.velocity||{};DATA.trendData=r.trendData||{};DATA.weeklyData=r.weeklyData||null;DATA.pos=r.pos||[];DATA.allPos=r.allPos||r.pos||[];updateHeaderSub();}
 function setMattressRegion(region){dashFilter.region=region;dashFilter.size='All';applyMattressRegion();renderDashboard()}
@@ -379,7 +379,7 @@ function buildPreorderCoverage(s){
     mattressStatus: null
   };
 }
-function getVel(s){let v=DATA.velocity[s]||0;if(v===0&&(DATA.trendData||{})[s]?.lastInStockVel){return DATA.trendData[s].lastInStockVel}return v}
+function getVel(s){let v=DATA.velocity[s]||0;if(typeof v!=='number')v=Number(v)||0;if(v===0&&(DATA.trendData||{})[s]?.lastInStockVel){return DATA.trendData[s].lastInStockVel}return v}
 function isEstVel(s){return(DATA.velocity[s]||0)===0&&(DATA.trendData||{})[s]?.lastInStockVel>0}
 function getSize(s){for(const[k,l]of Object.entries(DATA.sizes||{})){if(s.includes(k))return l}return'Other'}
 function getSizeKeys(){const s=new Set(getSkus().map(x=>getSize(x)));return['All',...s]}
