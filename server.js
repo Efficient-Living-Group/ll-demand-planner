@@ -2124,6 +2124,49 @@ function buildCKData(ckId) {
     }
   }
 
+  let mattressRegions = null;
+  if (ckId === 'll-mattresses') {
+    const mattressRegionConfigs = {
+      AU: { skus: ['DD-21915CF', 'DD-21107CF', 'DD-21137CF'], branchIds: LL_AU_BRANCH_IDS, destination: 'Australia' },
+      NZ: { skus: ['DD-21915CF', 'DD-21107CF', 'DD-21137CF'], branchIds: LL_NZ_BRANCH_IDS, destination: 'New Zealand' },
+      UK: { skus: ['DDUK-2190CF', 'DDUK-21120CF', 'DDUK-21135CF'], branchIds: [62444], destination: 'United Kingdom' }
+    };
+    mattressRegions = Object.fromEntries(Object.entries(mattressRegionConfigs).map(([region, cfg]) => {
+      const regionCin7 = {};
+      const regionShopify = {};
+      const regionVelocity = {};
+      for (const sku of cfg.skus) {
+        const data = dataCache.cin7Products?.[sku];
+        if (!data) continue;
+        const branchRows = dataCache.cin7StockByBranch?.[sku] || {};
+        const branchData = cfg.branchIds.reduce((acc, branchId) => {
+          const row = branchRows[branchId];
+          if (!row) return acc;
+          acc.soh += Number(row.soh || 0);
+          acc.available += Number(row.available || 0);
+          acc.matched += 1;
+          return acc;
+        }, { soh: 0, available: 0, matched: 0 });
+        regionCin7[sku] = branchData.matched > 0 ? branchData.soh : 0;
+        regionShopify[sku] = 0;
+      }
+      const regionAllPos = [];
+      const regionPos = [];
+      for (const po of dataCache.cin7POs || []) {
+        if (resolvePoDestination(po) !== cfg.destination) continue;
+        const relevantItems = {};
+        for (const [sku, qty] of Object.entries(po.items || {})) {
+          if (cfg.skus.includes(sku)) relevantItems[sku] = Number(qty || 0);
+        }
+        if (!Object.keys(relevantItems).length) continue;
+        const row = { ...po, items: relevantItems, analyticsItems: relevantItems };
+        regionAllPos.push(row);
+        if (isOpenPO(po)) regionPos.push(row);
+      }
+      return [region, { cin7: regionCin7, shopify: regionShopify, velocity: regionVelocity, pos: regionPos, allPos: regionAllPos }];
+    }));
+  }
+
   return {
     ck: def,
     cin7,
@@ -2138,6 +2181,7 @@ function buildCKData(ckId) {
     suppliers,
     landedCosts,
     coverageAux,
+    mattressRegions,
     fx: { USDAUD: fxRate.USDAUD, lastFetch: fxRate.lastFetch },
     trendData: (() => {
       const result = {};
