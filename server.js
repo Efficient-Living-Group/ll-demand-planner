@@ -1541,24 +1541,20 @@ function buildCKData(ckId) {
     }
   }
 
-  // BOM explosion for combos - component-level planning
+  // BOM/preorder support for Little Lifely panels.
+  // AU/NZ/UK use this for component-level coverage; all Little Lifely country
+  // panels use openDemandBySku for the summary preorder breakdown card.
   let coverageAux = null;
-  if (ckId === 'llau' || ckId === 'llnz' || ckId === 'lluk') {
-    const coverageConfig = ckId === 'lluk'
-      ? {
-          demandCountry: 'GB',
-          bedPrefix: 'LLUK-CB-',
-          comboPrefix: 'LLUK-CBDS-',
-          mattressMap: { S: 'DD-21107CF', SD: 'DD-21137CF', D: 'DD-21153CF' },
-          mattressSkus: ['DD-21107CF', 'DD-21137CF', 'DD-21153CF']
-        }
-      : {
-          demandCountry: ckId === 'llnz' ? 'NZ' : 'AU',
-          bedPrefix: 'LLAU-CB-',
-          comboPrefix: 'LLAU-CBCF-',
-          mattressMap: { S: 'DD-21915CF', KS: 'DD-21107CF', D: 'DD-21137CF' },
-          mattressSkus: ['DD-21915CF', 'DD-21107CF', 'DD-21137CF']
-        };
+  const littleLifelyCoverageConfigs = {
+    llau: { demandCountry: 'AU', bedPrefix: 'LLAU-CB-', comboPrefix: 'LLAU-CBCF-', mattressMap: { S: 'DD-21915CF', KS: 'DD-21107CF', D: 'DD-21137CF' }, mattressSkus: ['DD-21915CF', 'DD-21107CF', 'DD-21137CF'] },
+    llnz: { demandCountry: 'NZ', bedPrefix: 'LLAU-CB-', comboPrefix: 'LLAU-CBCF-', mattressMap: { S: 'DD-21915CF', KS: 'DD-21107CF', D: 'DD-21137CF' }, mattressSkus: ['DD-21915CF', 'DD-21107CF', 'DD-21137CF'] },
+    llna: { demandCountry: 'US', bedPrefix: 'LLNA-CB-', comboPrefix: 'LLNA-CFDS-', mattressMap: {}, mattressSkus: [] },
+    llca: { demandCountry: 'CA', bedPrefix: 'LLNA-CB-', comboPrefix: 'LLNA-CFDS-', mattressMap: {}, mattressSkus: [] },
+    lluk: { demandCountry: 'GB', bedPrefix: 'LLUK-CB-', comboPrefix: 'LLUK-CBDS-', mattressMap: { S: 'DD-21107CF', SD: 'DD-21137CF', D: 'DD-21153CF' }, mattressSkus: ['DD-21107CF', 'DD-21137CF', 'DD-21153CF'] },
+    llsg: { demandCountry: 'SG', bedPrefix: 'LLSG-CB-', comboPrefix: 'LLSG-CFDS-', mattressMap: {}, mattressSkus: [] }
+  };
+  const coverageConfig = littleLifelyCoverageConfigs[ckId];
+  if (coverageConfig) {
     const openDemandBySku = {};
     for (const sourceStore of relatedStores) {
       for (const [sku, qty] of Object.entries(dataCache.shopifyOpenDemand?.[sourceStore]?.[coverageConfig.demandCountry] || {})) {
