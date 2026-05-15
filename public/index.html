@@ -169,7 +169,8 @@ th[data-tip]{position:relative;cursor:help}th[data-tip]:after{content:' ⓘ';fon
     <div id="reorder" class="view">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
         <h2 style="font-size:16px">Reorder Recommendations</h2>
-        <div style="display:flex;gap:8px;align-items:center">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+          <div id="reorderTypeFilters" style="display:none;gap:6px;align-items:center"></div>
           <div style="font-size:12px;display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:var(--bg-card);user-select:none" onclick="window._incPO=!window._incPO;this.style.background=window._incPO?'#E8EFEF':'var(--bg-card)';this.style.borderColor=window._incPO?'var(--blue)':'var(--border)';this.querySelector('input').checked=window._incPO;renderReorder()"><input type="checkbox" style="accent-color:var(--blue);pointer-events:none"> <span>+ Incoming POs</span></div>
           <button class="btn btn-primary" onclick="exportCSV()">📥 Export CSV</button>
         </div>
@@ -446,7 +447,7 @@ async function selectCK(ckId){
   try{const r=await fetch(`/api/ck/${ckId}`,{headers:H()});if(r.status===401)return window.location.href='/login';const d=await r.json();
   DATA={cin7:d.cin7||{},shopify:d.shopify||{},velocity:d.velocity||{},pos:d.pos||[],allPos:d.allPos||d.pos||[],names:d.names||{},sizes:d.sizes||{},bomData:d.bomData||null,reorderBomData:d.reorderBomData||null,costs:d.costs||{},trendData:d.trendData||{},weeklyData:d.weeklyData||null,cbmMap:d.cbmMap||{},suppliers:d.suppliers||{},landedCosts:d.landedCosts||{},coverageAux:d.coverageAux||null,mattressRegions:d.mattressRegions||null,fx:d.fx||null,lastRefresh:d.lastRefresh||null,lastCin7Refresh:d.lastCin7Refresh||null,lastPoRefresh:d.lastPoRefresh||null,lastShopifyRefresh:d.lastShopifyRefresh||null};
   document.getElementById('headerTitle').innerHTML=`<img src="/logos/${d.ck.logo}" style="height:32px;filter:brightness(0) invert(1)"> ${d.ck.name}`;
-  Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}});charts={};dashFilter.size='All';dashFilter.region='AU';applyMattressRegion();updateHeaderSub();
+  Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}});charts={};dashFilter.size='All';dashFilter.region='AU';dashFilter.reorderType='All';applyMattressRegion();updateHeaderSub();
   document.getElementById('headerMeta').textContent=d.lastRefresh?'Last refresh: '+new Date(d.lastRefresh).toLocaleString():'';renderFreshnessWarning();
   document.getElementById('loadingScreen').style.display='none';document.getElementById('dashboard').classList.add('active');
   document.querySelector('.tab.active')?.classList.remove('active');document.querySelector('[data-view="dashboard"]').classList.add('active');
@@ -799,8 +800,21 @@ function renderCaRestockPlan(rows){
 
 function renderReorder(){
   const reorderSource=DATA.reorderBomData;
+  const littleLifelyCountryPanels=['llau','llnz','llna','llca','lluk','llsg'];
+  const isLittleLifelyCountry=littleLifelyCountryPanels.includes(currentCK);
+  const isCoverSku=sku=>String(sku||'').includes('-CV');
+  const isFrameSku=sku=>String(sku||'').includes('-CB-')&&!String(sku||'').includes('-CV')&&!String(sku||'').includes('-CS-');
+  const typeFilter=isLittleLifelyCountry?(dashFilter.reorderType||'All'):'All';
+  const filterEl=document.getElementById('reorderTypeFilters');
+  if(filterEl){
+    if(isLittleLifelyCountry){
+      filterEl.style.display='flex';
+      filterEl.innerHTML=['All','Frame','Cover'].map(t=>`<button class="filter-btn ${typeFilter===t?'active':''}" onclick="dashFilter.reorderType='${t}';renderReorder()">${t}</button>`).join('');
+    }else{filterEl.style.display='none';filterEl.innerHTML='';}
+  }
   const shouldHideFromReorder=sku=>currentCK==='dd'&&/(PROTECTOR|DD-BM|BEDDING)/i.test(sku);
-  const reorderSkus=(reorderSource?Object.keys(reorderSource.cin7||{}):getSkus()).filter(sku=>!shouldHideFromReorder(sku));
+  const matchesReorderType=sku=>!isLittleLifelyCountry||typeFilter==='All'||(typeFilter==='Cover'?isCoverSku(sku):isFrameSku(sku));
+  const reorderSkus=(reorderSource?Object.keys(reorderSource.cin7||{}):getSkus()).filter(sku=>!shouldHideFromReorder(sku)&&matchesReorderType(sku));
   const getBomSize=sku=>{if(!reorderSource?.sizes)return getSize(sku);for(const[k,label] of Object.entries(reorderSource.sizes)){if(sku.includes(k))return label}return getSize(sku)};
   const getBomNet=sku=>reorderSource?((reorderSource.cin7?.[sku]||0)+Math.min(reorderSource.shopify?.[sku]||0,0)):getNet(sku);
   const getBomVel=sku=>reorderSource?(reorderSource.velocity?.[sku]||0):getVel(sku);
