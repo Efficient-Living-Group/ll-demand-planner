@@ -288,7 +288,7 @@ function loadPoLineOverrides() {
 }
 
 function applyPoLineOverride(po, overrides = {}) {
-  const override = overrides[rawPoReference(po.reference)] || overrides[cleanPoReference(po.reference)];
+  const override = overrides[rawPoReference(po.reference)];
   if (!override) return po;
   const currentItems = po.items || {};
   if (Object.keys(currentItems).length > 0) return po;
