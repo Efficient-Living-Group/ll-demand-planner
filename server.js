@@ -57,7 +57,7 @@ const CK_DEFS = {
   'lluk':     { name: 'Little Lifely UK',       prefix: 'LLUK',   logo: 'little-lifely.png', store: 'lifely', excludeCV: false, salesCountry: 'GB', stockBranches: [62444], sizes: {'-S-':'Single','-SD-':'Small Double','-D-':'Double'} },
   'llsg':     { name: 'Little Lifely SG',       prefix: 'LLSG',   logo: 'little-lifely.png', store: 'lifely', excludeCV: false, salesCountry: 'SG', stockBranches: [57843], strictStockBranches: true, sizes: {'-SS-':'Super Single','-S-':'Single','-Q-':'Queen'} },
   'll-mattresses': { name: 'LL Mattresses',     prefix: 'MULTI',  logo: 'little-lifely.png', store: 'lifely', filter: sku => ['DD-21915CF','DD-21107CF','DD-21137CF'].includes(sku) || sku.startsWith('DDUK'), sizes: {'21915':'Single','21107':'King Single','21137':'Double','2190':'Single UK','21120':'Small Double UK','21135':'Double UK'} },
-  'dd':       { name: 'Deep Dream',             prefix: 'DD',     logo: 'deep-dream.png',    store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, sizes: {'915':'Single','107':'King Single','137':'Double','153':'Queen','183':'King'} },
+  'dd':       { name: 'Deep Dream',             prefix: 'MULTI',  logo: 'deep-dream.png',    store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: ['Category Killer - Deepdream', 'Category Killer - Deep Dream'], sizes: {'915':'Single','107':'King Single','137':'Double','153':'Queen','183':'King'} },
   'cocoon':   { name: 'Cocoon Bed',             prefix: 'COCOON', logo: 'cocoon-bed.png',    store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, sizes: {'-DOUBLE-':'Double','-QUEEN-':'Queen','-KING-':'King'} },
   'rdnt':     { name: 'Radiant',                prefix: 'RDNT',   logo: 'radiant.png',       store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, sizes: {'-D-':'Double','-Q-':'Queen','-K-':'King'} },
   'wfhcr':    { name: 'WFH Chair',              prefix: 'WFHCR',  logo: 'wfh-chair.png',     store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, sizes: {} },
@@ -239,7 +239,23 @@ function getStoreKeysForCk(ckId, primaryStore) {
   return [...keys];
 }
 
-function skuMatchesDef(sku, def) {
+function normalizeOption1(value) {
+  return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function skuOption1(sku, override = '') {
+  return dataCache.cin7Products?.[sku]?.option1 || override || '';
+}
+
+function skuMatchesOption1(sku, def, override = '') {
+  if (!def.option1) return true;
+  const actual = normalizeOption1(skuOption1(sku, override));
+  if (!actual) return false;
+  const allowed = Array.isArray(def.option1) ? def.option1 : [def.option1];
+  return allowed.some(value => normalizeOption1(value) === actual);
+}
+
+function skuMatchesDef(sku, def, option1Override = '') {
   const filter = def.filter || (() => true);
   const prefix = def.prefix;
   if (prefix === 'MULTI') {
@@ -248,6 +264,7 @@ function skuMatchesDef(sku, def) {
     return false;
   }
   if (def.excludeCV && sku.includes('-CV')) return false;
+  if (!skuMatchesOption1(sku, def, option1Override)) return false;
   return true;
 }
 
@@ -773,6 +790,48 @@ async function fetchCin7AllProducts() {
 
   for (let page = 1; page <= 50; page++) {
     try {
+      console.log('CIN7 ProductOptions: fetching page ' + page);
+      let body, status, headers;
+      try {
+        await throttleCin7Request();
+        const resp = await apiRequest({
+          hostname: 'api.cin7.com',
+          path: `/api/v1/ProductOptions?page=${page}&rows=250`,
+          headers: { 'Authorization': `Basic ${auth}` }
+        });
+        body = resp.body;
+        status = resp.status;
+        headers = resp.headers || {};
+      } catch (fetchErr) {
+        console.error(`CIN7 ProductOptions page ${page} failed:`, fetchErr.message);
+        break;
+      }
+      console.log('CIN7 ProductOptions page ' + page + ': status=' + status + ' isArray=' + Array.isArray(body) + ' length=' + (Array.isArray(body) ? body.length : 'N/A'));
+      if (status === 429) {
+        markCin7Backoff(`ProductOptions page ${page}`, parseInt(headers['retry-after'] || '0', 10));
+        break;
+      }
+      if (!Array.isArray(body) || body.length === 0) break;
+      for (const option of body) {
+        const sku = option.code || option.productOptionCode;
+        if (!sku) continue;
+        const pc = option.priceColumns || {};
+        const costAUD = pc.costAUD || (pc.costUSD ? pc.costUSD * fxRate.USDAUD : 0);
+        const existing = products[sku] || {};
+        products[sku] = {
+          ...existing,
+          soh: existing.soh ?? (option.stockOnHand || 0),
+          available: existing.available ?? (option.stockAvailable || 0),
+          costAUD: existing.costAUD || costAUD || 0,
+          cbm: existing.cbm || 0,
+          option1: option.option1 || existing.option1 || ''
+        };
+      }
+    } catch (e) { console.error(`CIN7 ProductOptions page ${page} error:`, e.message); continue; }
+  }
+
+  for (let page = 1; page <= 50; page++) {
+    try {
       console.log('CIN7 Stock: fetching page ' + page);
       let body, status, headers;
       try {
@@ -844,10 +903,12 @@ async function fetchCin7POs() {
         if (po.isVoid) continue; // Skip void POs only - keep Received for shipment tracker
         const items = {};
         const itemNames = {};
+        const itemOption1 = {};
         for (const li of (po.lineItems || [])) {
           if (li.code && li.qty > 0) {
             items[li.code] = (items[li.code] || 0) + li.qty;
             if (li.name && !itemNames[li.code]) itemNames[li.code] = li.name;
+            if (li.option1 && !itemOption1[li.code]) itemOption1[li.code] = li.option1;
           }
         }
         results.push({
@@ -874,6 +935,7 @@ async function fetchCin7POs() {
           invoiceDate: po.invoiceDate || null,
           supplierInvoiceReference: po.supplierInvoiceReference || '',
           itemNames,
+          itemOption1,
           items
         });
       }
@@ -1228,7 +1290,8 @@ function normalizeCIN7(cin7Raw) {
     // Sum costs across all boxes (each box is a separate shipped piece)
     const costAUD = boxes.reduce((sum, b) => sum + (typeof b === 'object' ? (b.costAUD || 0) : 0), 0);
     const cbm = boxes.reduce((sum, b) => sum + (typeof b === 'object' ? (b.cbm || 0) : 0), 0);
-    result[base] = { soh, available, costAUD, cbm };
+    const option1 = boxes.map(b => typeof b === 'object' ? (b.option1 || '') : '').find(Boolean) || '';
+    result[base] = { soh, available, costAUD, cbm, option1 };
   }
 
   return result;
@@ -1529,7 +1592,7 @@ function buildCKData(ckId) {
     if (poDestination && resolvePoDestination(po) !== poDestination) continue;
     const relevantItems = {};
     for (const [sku, qty] of Object.entries(po.items)) {
-      if (skuMatchesDef(sku, def) || (ckId === 'llau' && ['DD-21915CF','DD-21107CF','DD-21137CF'].includes(sku))) {
+      if (skuMatchesDef(sku, def, po.itemOption1?.[sku]) || (ckId === 'llau' && ['DD-21915CF','DD-21107CF','DD-21137CF'].includes(sku))) {
         relevantItems[sku] = qty;
       }
     }
@@ -1553,7 +1616,7 @@ function buildCKData(ckId) {
     const company = po.company || '';
     if (!company) continue;
     for (const sku of Object.keys(po.items || {})) {
-      if (skuMatchesDef(sku, def) || (ckId === 'llau' && ['DD-21915CF','DD-21107CF','DD-21137CF'].includes(sku))) {
+      if (skuMatchesDef(sku, def, po.itemOption1?.[sku]) || (ckId === 'llau' && ['DD-21915CF','DD-21107CF','DD-21137CF'].includes(sku))) {
         if (!suppliers[sku]) suppliers[sku] = company;
       }
     }
