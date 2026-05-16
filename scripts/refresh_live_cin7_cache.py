@@ -353,7 +353,7 @@ def fetch_shopify_snapshot() -> dict[str, Any]:
     }
 
 
-def build_products_and_stock(products_raw: list[dict[str, Any]], stock_raw: list[dict[str, Any]], fx_usd_aud: float) -> tuple[dict[str, Any], dict[str, Any]]:
+def build_products_and_stock(products_raw: list[dict[str, Any]], product_options_raw: list[dict[str, Any]], stock_raw: list[dict[str, Any]], fx_usd_aud: float) -> tuple[dict[str, Any], dict[str, Any]]:
     products: dict[str, Any] = {}
     stock_by_branch: dict[str, Any] = {}
 
@@ -370,6 +370,7 @@ def build_products_and_stock(products_raw: list[dict[str, Any]], stock_raw: list
                 "available": variant.get("stockAvailable") or 0,
                 "costAUD": cost_aud,
                 "cbm": cbm,
+                "option1": variant.get("option1") or product.get("option1") or "",
             }
         style_code = product.get("styleCode")
         if style_code and (product.get("stockOnHand") or 0) > 0:
@@ -377,7 +378,24 @@ def build_products_and_stock(products_raw: list[dict[str, Any]], stock_raw: list
                 "soh": product.get("stockOnHand") or 0,
                 "available": product.get("stockAvailable") or 0,
                 "cbm": cbm,
+                "option1": product.get("option1") or "",
             }
+
+    for option in product_options_raw:
+        sku = option.get("code") or option.get("productOptionCode")
+        if not sku:
+            continue
+        pc = option.get("priceColumns") or {}
+        cost_aud = pc.get("costAUD") or ((pc.get("costUSD") or 0) * fx_usd_aud)
+        existing = products.get(sku) or {}
+        products[sku] = {
+            **existing,
+            "soh": existing.get("soh", option.get("stockOnHand") or 0),
+            "available": existing.get("available", option.get("stockAvailable") or 0),
+            "costAUD": existing.get("costAUD") or cost_aud or 0,
+            "cbm": existing.get("cbm") or 0,
+            "option1": option.get("option1") or existing.get("option1") or "",
+        }
 
     for row in stock_raw:
         sku = row.get("code")
@@ -398,7 +416,7 @@ def build_products_and_stock(products_raw: list[dict[str, Any]], stock_raw: list
             products[sku]["soh"] = total_soh
             products[sku]["available"] = total_available
         else:
-            products[sku] = {"soh": total_soh, "available": total_available, "costAUD": 0, "cbm": 0}
+            products[sku] = {"soh": total_soh, "available": total_available, "costAUD": 0, "cbm": 0, "option1": ""}
 
     return products, stock_by_branch
 
@@ -410,6 +428,7 @@ def build_purchase_orders(pos_raw: list[dict[str, Any]]) -> list[dict[str, Any]]
             continue
         items: dict[str, float] = {}
         item_names: dict[str, str] = {}
+        item_option1: dict[str, str] = {}
         for line in po.get("lineItems") or []:
             sku = line.get("code")
             qty = line.get("qty") or 0
@@ -417,6 +436,8 @@ def build_purchase_orders(pos_raw: list[dict[str, Any]]) -> list[dict[str, Any]]
                 items[sku] = items.get(sku, 0) + float(qty)
                 if line.get("name"):
                     item_names[sku] = line["name"]
+                if line.get("option1"):
+                    item_option1[sku] = line["option1"]
         if not items:
             continue
         pos.append({
@@ -443,6 +464,7 @@ def build_purchase_orders(pos_raw: list[dict[str, Any]]) -> list[dict[str, Any]]
             "invoiceDate": po.get("invoiceDate"),
             "supplierInvoiceReference": po.get("supplierInvoiceReference") or "",
             "itemNames": item_names,
+            "itemOption1": item_option1,
             "items": items,
         })
     return pos
@@ -526,15 +548,16 @@ def main() -> int:
         auth = cin7_auth_header()
         try:
             products_raw = fetch_all("Products", auth, max_pages=60)
+            product_options_raw = fetch_all("ProductOptions", auth, max_pages=60)
             stock_raw = fetch_all("Stock", auth, max_pages=80)
             pos_raw = fetch_all("PurchaseOrders", auth, max_pages=20)
         except RateLimited as exc:
             print(str(exc))
             return 75
 
-        products, stock_by_branch = build_products_and_stock(products_raw, stock_raw, fx_usd_aud=1.45)
+        products, stock_by_branch = build_products_and_stock(products_raw, product_options_raw, stock_raw, fx_usd_aud=1.45)
         pos = build_purchase_orders(pos_raw)
-        print(f"Fetched live Cin7: products_raw={len(products_raw)}, stock_rows={len(stock_raw)}, SKUs={len(products)}, POs={len(pos)}")
+        print(f"Fetched live Cin7: products_raw={len(products_raw)}, product_options={len(product_options_raw)}, stock_rows={len(stock_raw)}, SKUs={len(products)}, POs={len(pos)}")
 
     if len(products) < MIN_PRODUCTS or len(pos) < MIN_PURCHASE_ORDERS:
         print(f"Refusing to write suspicious cache: SKUs={len(products)}, POs={len(pos)}")
