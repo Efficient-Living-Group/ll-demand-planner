@@ -226,7 +226,6 @@ let dataCache = {
   error: null
 };
 const CACHE_SNAPSHOT_PATH = path.join(__dirname, 'data', 'cache-snapshot.json');
-const CACHE_SNAPSHOT_BACKUP_PATH = path.join(__dirname, 'data', 'cache-snapshot.last-good.json');
 const PO_LINE_OVERRIDES_PATH = path.join(__dirname, 'data', 'po-line-overrides.json');
 const SNAPSHOT_PUSH_STATE_PATH = path.join(__dirname, 'data', 'snapshot-push-state.json');
 let cacheSnapshotPushInFlight = false;
@@ -504,7 +503,7 @@ function maybePushCacheSnapshotToGit(reason = 'cin7-refresh') {
   if (cacheSnapshotPushInFlight || (state.cacheLastSuccessAtMs && now - state.cacheLastSuccessAtMs < 30 * 60 * 1000)) return;
   cacheSnapshotPushInFlight = true;
   const command = [
-    'git add data/cache-snapshot.json data/cache-snapshot.last-good.json data/po-eta-history.json data/po-eta-history.last-good.json',
+    'git add data/cache-snapshot.json data/po-eta-history.json data/po-eta-history.last-good.json',
     'git diff --cached --quiet && exit 0',
     `git commit -m "Update cache snapshot (${reason})"`,
     'git push'
@@ -524,7 +523,7 @@ function maybePushCacheSnapshotToGit(reason = 'cin7-refresh') {
 
 function loadCacheSnapshot(silent = false) {
   let loaded = false;
-  for (const snapPath of [CACHE_SNAPSHOT_PATH, CACHE_SNAPSHOT_BACKUP_PATH]) {
+  for (const snapPath of [CACHE_SNAPSHOT_PATH]) {
     try {
       const snap = JSON.parse(fs.readFileSync(snapPath, 'utf8'));
       if (snapshotHasCin7Data(snap)) {
@@ -586,7 +585,6 @@ function saveCacheSnapshot(pushToGit = false, pushReason = 'cin7-refresh') {
     fs.mkdirSync(path.dirname(CACHE_SNAPSHOT_PATH), { recursive: true });
     const payload = JSON.stringify(snapshot);
     fs.writeFileSync(CACHE_SNAPSHOT_PATH, payload);
-    fs.writeFileSync(CACHE_SNAPSHOT_BACKUP_PATH, payload);
     console.log('Saved cache snapshot');
     if (pushToGit) maybePushCacheSnapshotToGit(pushReason);
   } catch (e) {
@@ -3025,11 +3023,107 @@ app.get('/api/shipments', requireAuth, (req, res) => {
 app.get('/tracker', (req, res) => res.sendFile(path.join(__dirname, 'public', 'tracker.html')));
 
 // Health check endpoint (no auth needed - used by keep-alive and monitoring)
+const HEALTH_EXPECTED_STORES = ['lifely', 'cushie', 'littlelifely'];
+const HEALTH_REQUIRED_OPTION1 = [
+  'Category Killer - Little Lifely',
+  'Category Killer - 21cm Mattress',
+  'Category Killer - Deepdream',
+  'Category Killer - Deep Dream',
+  'Category Killer - Cocoon Bed',
+  'Category Killer - Radiant',
+  'Category Killer - WFH Chair',
+  'Category Killer - Cushie V3 Snuggle',
+  'Category Killer - Cushie V2',
+  'Category Killer - Lifely Sofa',
+  'Case goods - Active',
+  'Case goods - Discontinued'
+];
+const HEALTH_STALE_WARN_HOURS = 6;
+const HEALTH_STALE_CRITICAL_HOURS = 12;
+const HEALTH_MIN_CIN7_PRODUCTS = 1000;
+const HEALTH_MIN_PURCHASE_ORDERS = 50;
+
+function hoursSinceIso(value) {
+  if (!value) return null;
+  const ts = Date.parse(value);
+  if (!Number.isFinite(ts)) return null;
+  return Math.round(((Date.now() - ts) / 36e5) * 10) / 10;
+}
+
+function hasStorePayload(source, store) {
+  return !!source?.[store] && Object.keys(source[store] || {}).filter(k => !k.startsWith('__')).length > 0;
+}
+
+function buildHealthStatus() {
+  const products = dataCache.cin7Products || {};
+  const stockByBranch = dataCache.cin7StockByBranch || {};
+  const pos = dataCache.cin7POs || [];
+  const option1Counts = {};
+  let productsWithOption1 = 0;
+  for (const product of Object.values(products)) {
+    const option1 = String(product?.option1 || '').trim();
+    if (!option1) continue;
+    productsWithOption1 += 1;
+    option1Counts[option1] = (option1Counts[option1] || 0) + 1;
+  }
+
+  const checks = {
+    cin7Products: Object.keys(products).length,
+    cin7StockByBranchSkus: Object.keys(stockByBranch).length,
+    purchaseOrders: pos.length,
+    purchaseOrdersWithoutLineItems: pos.filter(po => Object.keys(po.items || {}).length === 0).length,
+    productsWithOption1,
+    productsMissingOption1: Object.keys(products).length - productsWithOption1,
+    missingRequiredOption1: HEALTH_REQUIRED_OPTION1.filter(option1 => !option1Counts[option1]),
+    shopifyStores: Object.fromEntries(HEALTH_EXPECTED_STORES.map(store => [store, {
+      inventory: hasStorePayload(dataCache.shopifyInventory, store),
+      velocity: hasStorePayload(dataCache.shopifyVelocity, store),
+      velocityByCountry: hasStorePayload(dataCache.shopifyVelocityByCountry, store),
+      openDemand: hasStorePayload(dataCache.shopifyOpenDemand, store)
+    }])),
+    refreshAgeHours: {
+      overall: hoursSinceIso(dataCache.lastRefresh),
+      cin7: hoursSinceIso(dataCache.lastCin7Refresh),
+      purchaseOrders: hoursSinceIso(dataCache.lastPoRefresh),
+      shopify: hoursSinceIso(dataCache.lastShopifyRefresh)
+    }
+  };
+
+  const warnings = [];
+  const critical = [];
+  if (checks.cin7Products < HEALTH_MIN_CIN7_PRODUCTS) critical.push(`Cin7 product count below floor: ${checks.cin7Products}`);
+  if (checks.purchaseOrders < HEALTH_MIN_PURCHASE_ORDERS) critical.push(`Purchase order count below floor: ${checks.purchaseOrders}`);
+  if (checks.cin7StockByBranchSkus === 0) critical.push('Cin7 branch stock payload missing');
+  if (checks.productsMissingOption1 > 0) warnings.push(`${checks.productsMissingOption1} Cin7 products/options have blank Option1`);
+  if (checks.missingRequiredOption1.length) warnings.push(`Required Option1 categories missing: ${checks.missingRequiredOption1.join(', ')}`);
+  if (checks.purchaseOrdersWithoutLineItems > 0) warnings.push(`${checks.purchaseOrdersWithoutLineItems} purchase orders currently have no line items`);
+
+  for (const [store, storeChecks] of Object.entries(checks.shopifyStores)) {
+    for (const [name, ok] of Object.entries(storeChecks)) {
+      if (!ok) critical.push(`Shopify ${store} ${name} payload missing/empty`);
+    }
+  }
+
+  for (const [name, age] of Object.entries(checks.refreshAgeHours)) {
+    if (age === null) {
+      critical.push(`${name} refresh timestamp missing`);
+    } else if (age > HEALTH_STALE_CRITICAL_HOURS) {
+      critical.push(`${name} data stale: ${age}h old`);
+    } else if (age > HEALTH_STALE_WARN_HOURS) {
+      warnings.push(`${name} data getting stale: ${age}h old`);
+    }
+  }
+
+  if (dataCache.error) warnings.push(`Last cache error: ${dataCache.error}`);
+  return { status: critical.length ? 'critical' : warnings.length ? 'warning' : 'ok', ok: critical.length === 0, warnings, critical, checks };
+}
+
 app.get('/api/health', (req, res) => {
   reloadSnapshotIfNewer();
   const cin7Count = Object.keys(dataCache.cin7Products).length;
   const poCount = dataCache.cin7POs.length;
-  res.json({ ok: cin7Count > 0, cin7: cin7Count, pos: poCount, cin7Source: CIN7_DATA_SOURCE, nextScheduledRefreshEveryHours: ENABLE_RENDER_CIN7_SCHEDULER ? 4 : null, externalCacheRefreshEveryHours: 4, cacheFallback: true, lastRefresh: dataCache.lastRefresh, lastCin7Refresh: dataCache.lastCin7Refresh, lastPoRefresh: dataCache.lastPoRefresh, lastShopifyRefresh: dataCache.lastShopifyRefresh, error: dataCache.error || null, uptime: Math.round(process.uptime()) });
+  const health = buildHealthStatus();
+  res.json({ ok: health.ok, status: health.status, cin7: cin7Count, pos: poCount, cin7Source: CIN7_DATA_SOURCE, nextScheduledRefreshEveryHours: ENABLE_RENDER_CIN7_SCHEDULER ? 4 : null, externalCacheRefreshEveryHours: 4, cacheFallback: true, lastRefresh: dataCache.lastRefresh, lastCin7Refresh: dataCache.lastCin7Refresh, lastPoRefresh: dataCache.lastPoRefresh, lastShopifyRefresh: dataCache.lastShopifyRefresh, error: dataCache.error || null, uptime: Math.round(process.uptime()), warnings: health.warnings, critical: health.critical, checks: health.checks });
 });
 
 // Main app shell is public; all data APIs remain protected by requireAuth.

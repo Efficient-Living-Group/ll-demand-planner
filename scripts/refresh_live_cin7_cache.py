@@ -25,7 +25,6 @@ from urllib.parse import urlencode, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 CACHE_PATH = ROOT / "data" / "cache-snapshot.json"
-CACHE_BACKUP_PATH = ROOT / "data" / "cache-snapshot.last-good.json"
 CIN7_CRED_PATH = Path("/home/lifely-agent/.openclaw/credentials/cin7.json")
 SHOPIFY_CRED_PATH = Path("/home/lifely-agent/.openclaw/credentials/shopify.json")
 GITHUB_JAKE_PATH = Path("/home/lifely-agent/.openclaw/credentials/github-jake.json")
@@ -438,8 +437,9 @@ def build_purchase_orders(pos_raw: list[dict[str, Any]]) -> list[dict[str, Any]]
                     item_names[sku] = line["name"]
                 if line.get("option1"):
                     item_option1[sku] = line["option1"]
-        if not items:
-            continue
+        # Keep POs even when Cin7 currently has no line items. Empty/open POs
+        # still matter operationally and should remain visible to health/audit
+        # checks instead of disappearing from the snapshot.
         pos.append({
             "id": po.get("id") or po.get("ID") or po.get("purchaseOrderId") or po.get("orderId"),
             "reference": str(po.get("reference") or ""),
@@ -507,12 +507,11 @@ def write_cache(
     CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
     payload = json.dumps(snapshot, separators=(",", ":"))
     CACHE_PATH.write_text(payload)
-    CACHE_BACKUP_PATH.write_text(payload)
     print(f"Wrote cache: {len(products)} SKUs, {len(pos)} POs at {ts}")
 
 
 def git_commit_and_push(message: str) -> None:
-    subprocess.run(["git", "add", "data/cache-snapshot.json", "data/cache-snapshot.last-good.json"], cwd=ROOT, check=True)
+    subprocess.run(["git", "add", "data/cache-snapshot.json"], cwd=ROOT, check=True)
     diff = subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=ROOT)
     if diff.returncode == 0:
         print("No cache diff to commit")
