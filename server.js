@@ -1986,38 +1986,35 @@ function buildCKData(ckId) {
     for (const sku of Object.keys(componentStats)) {
       const c = componentStats[sku];
       c.totalDemand = c.standaloneDemand + c.comboDemand;
+      c.totalOversold = c.standaloneOversold + c.comboOversold;
+      c.totalPreorders = Math.max(-c.totalOversold, 0);
       componentVelocity[sku] = c.totalDemand;
-      componentShopify[sku] = c.standaloneOversold + c.comboOversold;
+      componentShopify[sku] = c.totalOversold;
     }
 
-    for (const key of Object.keys(cin7)) delete cin7[key];
-    for (const key of Object.keys(shopify)) delete shopify[key];
-    for (const key of Object.keys(velocity)) delete velocity[key];
-    Object.assign(cin7, componentCin7);
-    Object.assign(shopify, componentShopify);
-    Object.assign(velocity, componentVelocity);
-    pos.splice(0, pos.length, ...componentPos);
-    allPos.splice(0, allPos.length, ...componentAllPos);
-
+    // Keep the main Cocoon tab category-pure: COCOON Option1 rows stay in the
+    // primary table. Radiant mattress/base rows are required components for
+    // Cocoon+Radiant bundles, so expose them as a separate component panel like
+    // Little Lifely exposes DD mattress dependency separately from LL beds.
     sizes = {
       '-DOUBLE-': 'Double',
       '-QUEEN-': 'Queen',
-      '-KING-': 'King',
-      'RDNT-D-': 'Double',
-      'RDNT-Q-': 'Queen',
-      'RDNT-K-': 'King'
+      '-KING-': 'King'
     };
 
     bomData = {
       _components: componentStats,
       _sizeOrder: ['D', 'Q', 'K'],
       _sizeLabels: sizeLabels,
+      _separateFromMain: true,
+      _title: 'Cocoon required components',
+      _componentsSub: 'Radiant mattress/base requirements shown separately from Cocoon category rows',
       _summary: {
         primaryType: 'mattress',
-        stockLabel: 'Mattress SOH',
-        stockSub: 'Radiant mattress components',
-        incomingSub: 'Radiant mattress POs',
-        oversoldSub: 'Radiant + combo commitments',
+        stockLabel: 'Radiant Component SOH',
+        stockSub: 'Radiant mattress/base components',
+        incomingSub: 'Radiant component POs',
+        oversoldSub: 'Radiant + Cocoon combo commitments',
         weeksSub: 'At total component velocity'
       }
     };
@@ -3042,6 +3039,13 @@ const HEALTH_STALE_WARN_HOURS = 6;
 const HEALTH_STALE_CRITICAL_HOURS = 12;
 const HEALTH_MIN_CIN7_PRODUCTS = 1000;
 const HEALTH_MIN_PURCHASE_ORDERS = 50;
+const HEALTH_ROUTE_FIXTURES = [
+  { sku: 'LIFELY-CPD', expected: 'Case Goods' },
+  { sku: 'COCOON-DOUBLE-IVR', expected: 'Cocoon Bed' },
+  { sku: 'RDNT-D-BASE', expected: 'Radiant' },
+  { sku: 'LLAU-CB-S-MSM', expected: 'Little Lifely AU' },
+  { sku: 'DD-21153CF', expected: 'Deep Dream' }
+];
 
 function hoursSinceIso(value) {
   if (!value) return null;
@@ -3067,6 +3071,17 @@ function buildHealthStatus() {
     option1Counts[option1] = (option1Counts[option1] || 0) + 1;
   }
 
+  const fixtureRoutes = HEALTH_ROUTE_FIXTURES.map(({ sku, expected }) => ({ sku, expected, actual: ckCategoryForSku(sku) }));
+  const ckPanelSkuCounts = {};
+  for (const id of Object.keys(CK_DEFS).filter(id => id !== 'llau-cbcf')) {
+    try {
+      const ckData = buildCKData(id);
+      ckPanelSkuCounts[id] = Object.keys(ckData?.cin7 || {}).length;
+    } catch (err) {
+      ckPanelSkuCounts[id] = 0;
+    }
+  }
+
   const checks = {
     cin7Products: Object.keys(products).length,
     cin7StockByBranchSkus: Object.keys(stockByBranch).length,
@@ -3075,6 +3090,8 @@ function buildHealthStatus() {
     productsWithOption1,
     productsMissingOption1: Object.keys(products).length - productsWithOption1,
     missingRequiredOption1: HEALTH_REQUIRED_OPTION1.filter(option1 => !option1Counts[option1]),
+    fixtureRoutes,
+    ckPanelSkuCounts,
     shopifyStores: Object.fromEntries(HEALTH_EXPECTED_STORES.map(store => [store, {
       inventory: hasStorePayload(dataCache.shopifyInventory, store),
       velocity: hasStorePayload(dataCache.shopifyVelocity, store),
@@ -3097,6 +3114,10 @@ function buildHealthStatus() {
   if (checks.productsMissingOption1 > 0) warnings.push(`${checks.productsMissingOption1} Cin7 products/options have blank Option1`);
   if (checks.missingRequiredOption1.length) warnings.push(`Required Option1 categories missing: ${checks.missingRequiredOption1.join(', ')}`);
   if (checks.purchaseOrdersWithoutLineItems > 0) warnings.push(`${checks.purchaseOrdersWithoutLineItems} purchase orders currently have no line items`);
+  const badFixtures = fixtureRoutes.filter(row => row.actual !== row.expected);
+  if (badFixtures.length) critical.push(`SKU route fixture mismatch: ${badFixtures.map(row => `${row.sku} expected ${row.expected}, got ${row.actual}`).join('; ')}`);
+  const zeroPanels = Object.entries(ckPanelSkuCounts).filter(([, count]) => count === 0).map(([id]) => id);
+  if (zeroPanels.length) critical.push(`CK panels returned zero Cin7 SKUs: ${zeroPanels.join(', ')}`);
 
   for (const [store, storeChecks] of Object.entries(checks.shopifyStores)) {
     for (const [name, ok] of Object.entries(storeChecks)) {

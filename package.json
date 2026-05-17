@@ -4,7 +4,8 @@
   "description": "Little Lifely Demand Planning Dashboard",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "npm run validate && node server.js",
+    "validate": "node --check server.js && node scripts/validate_deploy_gate.js"
   },
   "dependencies": {
     "express": "^4.18.2",

@@ -451,7 +451,7 @@ async function selectCK(ckId){
   document.getElementById('headerMeta').textContent=d.lastRefresh?'Last refresh: '+new Date(d.lastRefresh).toLocaleString():'';renderFreshnessWarning();
   document.getElementById('loadingScreen').style.display='none';document.getElementById('dashboard').classList.add('active');
   document.querySelector('.tab.active')?.classList.remove('active');document.querySelector('[data-view="dashboard"]').classList.add('active');
-  try{renderDashboard()}catch(e){console.error('Dashboard error:',e);document.getElementById('summary-cards').innerHTML='<div class="card red"><div class="label">Dashboard Error</div><div class="value">'+e.message+'</div></div>'};if(DATA.bomData){try{renderBOM()}catch(e){console.error('BOM error:',e);document.getElementById('summary-cards').innerHTML='<div class="card red"><div class="label">BOM Error</div><div class="value">'+e.message+'</div></div>'}}}catch(e){document.getElementById('loadingScreen').innerHTML=`<div style="color:var(--alert)">Error: ${e.message}</div>`}}
+  try{renderDashboard()}catch(e){console.error('Dashboard error:',e);document.getElementById('summary-cards').innerHTML='<div class="card red"><div class="label">Dashboard Error</div><div class="value">'+e.message+'</div></div>'};if(DATA.bomData&&!DATA.bomData._separateFromMain){try{renderBOM()}catch(e){console.error('BOM error:',e);document.getElementById('summary-cards').innerHTML='<div class="card red"><div class="label">BOM Error</div><div class="value">'+e.message+'</div></div>'}}}catch(e){document.getElementById('loadingScreen').innerHTML=`<div style="color:var(--alert)">Error: ${e.message}</div>`}}
 
 
 function refreshAgeHours(ts){const t=ts?new Date(ts).getTime():0;return t?((Date.now()-t)/36e5):null}
@@ -463,6 +463,33 @@ function renderFreshnessWarning(){
   if(!stale.length){el.style.display='none';el.innerHTML='';return;}
   el.style.display='block';
   el.innerHTML='<b>Freshness warning:</b> '+stale.map(x=>x.label+' updated '+ageText(x.hours)).join(' · ')+' . Demand Planner refreshes every 4 hours; treat stale figures carefully until the next refresh completes.';
+}
+
+function renderSeparateComponentPanel(){
+  const panel=document.getElementById('auMarketingPanel');
+  if(!panel||!DATA.bomData||!DATA.bomData._separateFromMain||!DATA.bomData._components)return false;
+  const comps=Object.entries(DATA.bomData._components||{});
+  const sizeLabels=DATA.bomData._sizeLabels||{};
+  const sizeOrder=DATA.bomData._sizeOrder||[];
+  const sizeRank=code=>{const idx=sizeOrder.indexOf(code);return idx>=0?idx:99};
+  const rows=comps.sort((a,b)=>sizeRank(a[1].size)-sizeRank(b[1].size)||String(a[1].type).localeCompare(String(b[1].type))||a[0].localeCompare(b[0]));
+  const totalSOH=rows.reduce((s,[,c])=>s+Number(c.soh||0),0);
+  const totalIncoming=rows.reduce((s,[,c])=>s+Number(c.incoming||0),0);
+  const totalPreorders=rows.reduce((s,[,c])=>s+Number(c.totalPreorders||0),0);
+  panel.style.display='block';
+  panel.innerHTML=`<div class="chart-container" style="margin-bottom:0">
+    <h3>🧩 ${DATA.bomData._title||'Required components'}</h3>
+    <p style="font-size:12px;color:var(--text-dim);margin-bottom:12px">${DATA.bomData._componentsSub||'Components shown separately from the main category table.'}</p>
+    <div class="cards" style="margin-bottom:12px">
+      <div class="card green"><div class="label">Component SOH</div><div class="value">${Math.round(totalSOH).toLocaleString()}</div><div class="sub">separate from Cocoon category rows</div></div>
+      <div class="card blue"><div class="label">Incoming</div><div class="value">${Math.round(totalIncoming).toLocaleString()}</div><div class="sub">open component POs</div></div>
+      <div class="card red"><div class="label">Preorders</div><div class="value">${Math.round(totalPreorders).toLocaleString()}</div><div class="sub">component demand from bundles</div></div>
+    </div>
+    <div class="table-wrap" style="max-height:420px"><table><thead><tr><th>Component SKU</th><th>Source Category</th><th>Type</th><th>Size</th><th>SOH</th><th>Incoming</th><th>Preorders</th><th>Standalone/wk</th><th>Combo/wk</th><th>Total/wk</th><th>Used By Combos</th></tr></thead><tbody>
+    ${rows.map(([sku,c])=>`<tr><td style="font-family:monospace;font-size:10px">${sku}</td><td>${sku.startsWith('RDNT-')?'Radiant':'Cocoon'}</td><td>${c.type==='bed'?'🛏️ Bed':'🛌 Mattress'}</td><td>${sizeLabels[c.size]||c.size||''}</td><td>${Math.round(Number(c.soh||0))}</td><td>${Math.round(Number(c.incoming||0))}</td><td>${Math.round(Number(c.totalPreorders||0))}</td><td>${Number(c.standaloneDemand||0).toFixed(1)}</td><td>${Number(c.comboDemand||0).toFixed(1)}</td><td><b>${Number(c.totalDemand||0).toFixed(1)}</b></td><td style="font-size:10px">${(c.combos||[]).slice(0,3).join('<br>')}${(c.combos||[]).length>3?'<br>+ '+((c.combos||[]).length-3)+' more':''}</td></tr>`).join('')}
+    </tbody></table></div>
+  </div>`;
+  return true;
 }
 
 function renderBOM() {
@@ -691,7 +718,7 @@ function renderDashboard(){
         ${comboRows.map(r=>`<tr><td style="font-family:monospace;font-size:10px">${r.comboSku}</td><td>${fmt(r.openOrders||0)}</td><td><span class="badge ${marketingBadgeClass(r.bedStatus)}">${r.bedStatus}</span></td><td><span class="badge ${marketingBadgeClass(r.mattressStatus)}">${r.mattressStatus}</span></td><td>${r.limiting}</td><td style="font-size:10px">${fmtEtaShort(r.coverageETA)}</td><td><span class="badge ${marketingBadgeClass(r.status)}">${r.status}</span></td></tr>`).join('')}
         </tbody></table></div>
       </div>`;
-  }else {
+  }else if(!(DATA.bomData&&DATA.bomData._separateFromMain&&renderSeparateComponentPanel())) {
     if(auMarketingPanel){ auMarketingPanel.style.display='none'; auMarketingPanel.innerHTML=''; }
   }
   const coverageHeader=showCoverage
