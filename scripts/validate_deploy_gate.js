@@ -46,7 +46,7 @@ const CK_DEFS = {
   llau: { name:'Little Lifely AU', prefix:'LLAU-CB-', option1:'Category Killer - Little Lifely', filter:s=>!s.includes('CBCF') },
   llnz: { name:'Little Lifely NZ', prefix:'LLAU-CB-', option1:'Category Killer - Little Lifely', filter:s=>!s.includes('CBCF') },
   'll-mattresses': { name:'LL Mattresses', prefix:'MULTI', option1:['Category Killer - 21cm Mattress','Category Killer - Deep Dream'], option1Bypass:s=>s.startsWith('DDUK'), filter:s=>['DD-21915CF','DD-21107CF','DD-21137CF'].includes(s)||s.startsWith('DDUK') },
-  dd: { name:'Deep Dream', prefix:'MULTI', option1:['Category Killer - Deepdream','Category Killer - Deep Dream'], filter:s=>!s.startsWith('DDUK') },
+  dd: { name:'Deep Dream', prefix:'MULTI', option1:'Category Killer - Deepdream' },
   cocoon: { name:'Cocoon Bed', prefix:'COCOON', option1:'Category Killer - Cocoon Bed' },
   rdnt: { name:'Radiant', prefix:'RDNT', option1:'Category Killer - Radiant' },
   wfhcr: { name:'WFH Chair', prefix:'WFHCR', option1:'Category Killer - WFH Chair' },
@@ -123,6 +123,7 @@ const fixtures = [
   { sku: 'RDNT-D-BASE', expected: 'Radiant' },
   { sku: 'LLAU-CB-S-MSM', expected: 'Little Lifely AU' },
   { sku: 'DD-21153CF', expected: 'Deep Dream' },
+  { sku: 'DD-34183K-SFM', expected: 'Deep Dream' },
   { sku: 'DDUK-2190CF', expected: 'LL Mattresses' }
 ];
 for (const fixture of fixtures) {
