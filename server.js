@@ -56,8 +56,8 @@ const CK_DEFS = {
   'llca':     { name: 'Little Lifely CA',       prefix: 'LLNA',   logo: 'little-lifely.png', store: 'lifely', excludeCV: false, poDestination: 'Canada', salesCountry: 'CA', stockBranches: [61831], option1: 'Category Killer - Little Lifely', sizes: {'-TWX-':'Twin XL','-TW-':'Twin','-F-':'Full'} },
   'lluk':     { name: 'Little Lifely UK',       prefix: 'LLUK',   logo: 'little-lifely.png', store: 'lifely', excludeCV: false, salesCountry: 'GB', stockBranches: [62444], option1: 'Category Killer - Little Lifely', sizes: {'-S-':'Single','-SD-':'Small Double','-D-':'Double'} },
   'llsg':     { name: 'Little Lifely SG',       prefix: 'LLSG',   logo: 'little-lifely.png', store: 'lifely', excludeCV: false, salesCountry: 'SG', stockBranches: [57843], strictStockBranches: true, option1: 'Category Killer - Little Lifely', sizes: {'-SS-':'Super Single','-S-':'Single','-Q-':'Queen'} },
-  'll-mattresses': { name: 'LL Mattresses',     prefix: 'MULTI',  logo: 'little-lifely.png', store: 'lifely', option1: ['Category Killer - 21cm Mattress', 'Category Killer - Deep Dream'], filter: sku => ['DD-21915CF','DD-21107CF','DD-21137CF'].includes(sku) || sku.startsWith('DDUK'), sizes: {'21915':'Single','21107':'King Single','21137':'Double','2190':'Single UK','21120':'Small Double UK','21135':'Double UK'} },
-  'dd':       { name: 'Deep Dream',             prefix: 'MULTI',  logo: 'deep-dream.png',    store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: ['Category Killer - Deepdream', 'Category Killer - Deep Dream'], sizes: {'915':'Single','107':'King Single','137':'Double','153':'Queen','183':'King'} },
+  'll-mattresses': { name: 'LL Mattresses',     prefix: 'MULTI',  logo: 'little-lifely.png', store: 'lifely', option1: ['Category Killer - 21cm Mattress', 'Category Killer - Deep Dream'], option1Bypass: sku => sku.startsWith('DDUK'), filter: sku => ['DD-21915CF','DD-21107CF','DD-21137CF'].includes(sku) || sku.startsWith('DDUK'), sizes: {'21915':'Single','21107':'King Single','21137':'Double','2190':'Single UK','21120':'Small Double UK','21135':'Double UK'} },
+  'dd':       { name: 'Deep Dream',             prefix: 'MULTI',  logo: 'deep-dream.png',    store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: ['Category Killer - Deepdream', 'Category Killer - Deep Dream'], filter: sku => !sku.startsWith('DDUK'), sizes: {'915':'Single','107':'King Single','137':'Double','153':'Queen','183':'King'} },
   'cocoon':   { name: 'Cocoon Bed',             prefix: 'COCOON', logo: 'cocoon-bed.png',    store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Cocoon Bed', sizes: {'-DOUBLE-':'Double','-QUEEN-':'Queen','-KING-':'King'} },
   'rdnt':     { name: 'Radiant',                prefix: 'RDNT',   logo: 'radiant.png',       store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Radiant', sizes: {'-D-':'Double','-Q-':'Queen','-K-':'King'} },
   'wfhcr':    { name: 'WFH Chair',              prefix: 'WFHCR',  logo: 'wfh-chair.png',     store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - WFH Chair', sizes: {} },
@@ -247,6 +247,7 @@ function skuOption1(sku, override = '') {
 }
 
 function skuMatchesOption1(sku, def, override = '') {
+  if (def.option1Bypass && def.option1Bypass(String(sku || '').toUpperCase())) return true;
   if (!def.option1) return true;
   const actual = normalizeOption1(skuOption1(sku, override));
   if (!actual) return false;
@@ -3044,7 +3045,8 @@ const HEALTH_ROUTE_FIXTURES = [
   { sku: 'COCOON-DOUBLE-IVR', expected: 'Cocoon Bed' },
   { sku: 'RDNT-D-BASE', expected: 'Radiant' },
   { sku: 'LLAU-CB-S-MSM', expected: 'Little Lifely AU' },
-  { sku: 'DD-21153CF', expected: 'Deep Dream' }
+  { sku: 'DD-21153CF', expected: 'Deep Dream' },
+  { sku: 'DDUK-2190CF', expected: 'LL Mattresses' }
 ];
 
 function hoursSinceIso(value) {
