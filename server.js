@@ -1677,7 +1677,7 @@ function buildCKData(ckId) {
     llnz: { demandCountry: 'NZ', bedPrefix: 'LLAU-CB-', comboPrefix: 'LLAU-CBCF-', mattressMap: { S: 'DD-21915CF', KS: 'DD-21107CF', D: 'DD-21137CF' }, mattressSkus: ['DD-21915CF', 'DD-21107CF', 'DD-21137CF'] },
     llna: { demandCountry: 'US', bedPrefix: 'LLNA-CB-', comboPrefix: 'LLNA-CFDS-', mattressMap: {}, mattressSkus: [] },
     llca: { demandCountry: 'CA', bedPrefix: 'LLNA-CB-', comboPrefix: 'LLNA-CFDS-', mattressMap: {}, mattressSkus: [] },
-    lluk: { demandCountry: 'GB', bedPrefix: 'LLUK-CB-', comboPrefix: 'LLUK-CBDS-', mattressMap: { S: 'DD-21107CF', SD: 'DD-21137CF', D: 'DD-21153CF' }, mattressSkus: ['DD-21107CF', 'DD-21137CF', 'DD-21153CF'] },
+    lluk: { demandCountry: 'GB', bedPrefix: 'LLUK-CB-', comboPrefix: 'LLUK-CBDS-', comboPrefixes: ['LLUK-CBDS-', 'LLUK-CBCF-'], mattressMap: { S: 'DDUK-2190CF', SD: 'DDUK-21120CF', D: 'DDUK-21135CF' }, mattressSkus: ['DDUK-2190CF', 'DDUK-21120CF', 'DDUK-21135CF'] },
     llsg: { demandCountry: 'SG', bedPrefix: 'LLSG-CB-', comboPrefix: 'LLSG-CFDS-', mattressMap: {}, mattressSkus: [] }
   };
   const coverageConfig = littleLifelyCoverageConfigs[ckId];
