@@ -133,6 +133,11 @@ function explodeCocoonRadiantCombo(comboSku) {
   };
 }
 
+function isCocoonComboSku(sku) {
+  const s = String(sku || '').toUpperCase().trim();
+  return /^COCOON-(KMF|QMF|DMF)-/.test(s) || s.startsWith('COCOON-RDNT-');
+}
+
 // ===== SESSION STORE =====
 // Sessions are stateless signed tokens so users stay signed in across Render restarts/deploys.
 // The browser stores the token with a 30-day localStorage expiry.
@@ -1421,6 +1426,7 @@ function buildCKData(ckId) {
   // CIN7 stock - first collect raw, then normalize
   const cin7Raw = {};
   for (const [sku, data] of Object.entries(dataCache.cin7Products)) {
+    if (ckId === 'cocoon' && isCocoonComboSku(sku)) continue;
     if (skuMatchesDef(sku, def)) {
       if (stockBranches && Array.isArray(stockBranches)) {
         const branchRows = dataCache.cin7StockByBranch?.[sku] || {};
@@ -1488,6 +1494,7 @@ function buildCKData(ckId) {
   for (const sourceStore of relatedStores) {
     const storeInv = dataCache.shopifyInventory[sourceStore] || {};
     for (const [sku, qty] of Object.entries(storeInv)) {
+      if (ckId === 'cocoon' && isCocoonComboSku(sku)) continue;
       if (!skuMatchesDef(sku, def)) continue;
       shopify[sku] = (shopify[sku] || 0) + qty;
     }
@@ -1532,6 +1539,7 @@ function buildCKData(ckId) {
   const mergeVelocitySource = (source) => {
     for (const [sku, vel] of Object.entries(source || {})) {
       if (sku.startsWith('_')) continue;
+      if (ckId === 'cocoon' && isCocoonComboSku(sku)) continue;
       if (!skuMatchesDef(sku, def)) continue;
       velocity[sku] = (velocity[sku] || 0) + vel;
     }
@@ -1592,6 +1600,7 @@ function buildCKData(ckId) {
     if (poDestination && resolvePoDestination(po) !== poDestination) continue;
     const relevantItems = {};
     for (const [sku, qty] of Object.entries(po.items)) {
+      if (ckId === 'cocoon' && isCocoonComboSku(sku)) continue;
       if (skuMatchesDef(sku, def, po.itemOption1?.[sku]) || (ckId === 'llau' && ['DD-21915CF','DD-21107CF','DD-21137CF'].includes(sku))) {
         relevantItems[sku] = qty;
       }
@@ -1616,6 +1625,7 @@ function buildCKData(ckId) {
     const company = po.company || '';
     if (!company) continue;
     for (const sku of Object.keys(po.items || {})) {
+      if (ckId === 'cocoon' && isCocoonComboSku(sku)) continue;
       if (skuMatchesDef(sku, def, po.itemOption1?.[sku]) || (ckId === 'llau' && ['DD-21915CF','DD-21107CF','DD-21137CF'].includes(sku))) {
         if (!suppliers[sku]) suppliers[sku] = company;
       }
@@ -1866,190 +1876,9 @@ function buildCKData(ckId) {
     };
   }
 
-  if (ckId === 'cocoon') {
-    const allCin7 = dataCache.cin7Products || {};
-    const aggregatedShopifyInventory = {};
-    const aggregatedShopifyVelocity = {};
-    const componentStats = {};
-    const componentCin7 = {};
-    const componentShopify = {};
-    const componentVelocity = {};
-    const componentSkus = new Set();
-    const componentPos = [];
-    const componentAllPos = [];
-    const sizeLabels = { 'D': 'Double', 'Q': 'Queen', 'K': 'King' };
-
-    const readCin7Sku = (sku) => {
-      if (sku.startsWith('COCOON-') && cin7[sku] !== undefined) {
-        return { soh: cin7[sku], costAUD: costs[sku] || 0, cbm: cbmMap[sku] || 0 };
-      }
-      const data = allCin7[sku];
-      if (!data) return { soh: 0, costAUD: 0, cbm: 0 };
-      if (stockBranches && Array.isArray(stockBranches)) {
-        const branchRows = dataCache.cin7StockByBranch?.[sku] || {};
-        const branchData = stockBranches.reduce((acc, branchId) => {
-          const row = branchRows[branchId];
-          if (!row) return acc;
-          acc.soh += Number(row.soh || 0);
-          acc.available += Number(row.available || 0);
-          acc.matched += 1;
-          return acc;
-        }, { soh: 0, available: 0, matched: 0 });
-        if (branchData.matched > 0) return { ...data, soh: branchData.soh, available: branchData.available };
-        return { ...data, soh: 0, available: 0 };
-      }
-      return data;
-    };
-
-    const ensureComponent = (sku, meta = {}) => {
-      componentSkus.add(sku);
-      if (!componentStats[sku]) {
-        const data = readCin7Sku(sku) || {};
-        const soh = typeof data === 'object' ? Number(data.soh || 0) : Number(data || 0);
-        componentStats[sku] = {
-          soh,
-          standaloneDemand: 0,
-          comboDemand: 0,
-          totalDemand: 0,
-          incoming: 0,
-          standaloneOversold: 0,
-          comboOversold: 0,
-          combos: [],
-          type: meta.type || 'component',
-          size: meta.size || null
-        };
-        componentCin7[sku] = soh;
-        componentShopify[sku] = 0;
-        componentVelocity[sku] = 0;
-        names[sku] = sku;
-        if (typeof data === 'object' && data.costAUD) costs[sku] = data.costAUD;
-        if (typeof data === 'object' && data.cbm > 0) cbmMap[sku] = data.cbm;
-      }
-      if (meta.type) componentStats[sku].type = meta.type;
-      if (meta.size) componentStats[sku].size = meta.size;
-      return componentStats[sku];
-    };
-
-    const addStandalone = (sku, vel, oversold, meta = {}) => {
-      const c = ensureComponent(sku, meta);
-      c.standaloneDemand += vel;
-      c.standaloneOversold += oversold;
-    };
-
-    const addCombo = (sku, vel, oversold, comboSku, meta = {}) => {
-      const c = ensureComponent(sku, meta);
-      c.comboDemand += vel;
-      c.comboOversold += oversold;
-      if (comboSku && !c.combos.includes(comboSku)) c.combos.push(comboSku);
-    };
-
-    for (const sourceStore of relatedStores) {
-      for (const [sku, qty] of Object.entries(dataCache.shopifyInventory?.[sourceStore] || {})) {
-        if (!sku.startsWith('__')) aggregatedShopifyInventory[sku] = (aggregatedShopifyInventory[sku] || 0) + qty;
-      }
-      for (const [sku, vel] of Object.entries(dataCache.shopifyVelocity?.[sourceStore] || {})) {
-        if (!sku.startsWith('_')) aggregatedShopifyVelocity[sku] = (aggregatedShopifyVelocity[sku] || 0) + vel;
-      }
-    }
-
-    for (const [sku, vel] of Object.entries(aggregatedShopifyVelocity)) {
-      const oversold = Math.min(aggregatedShopifyInventory[sku] || 0, 0);
-
-      if (sku.match(/^COCOON-(DOUBLE|QUEEN|KING)-/) && !sku.includes('-CV') && !sku.startsWith('COCOON-RDNT-')) {
-        const size = sku.includes('-DOUBLE-') ? 'D' : sku.includes('-QUEEN-') ? 'Q' : sku.includes('-KING-') ? 'K' : null;
-        addStandalone(sku, vel, oversold, { type: 'bed', size });
-        continue;
-      }
-
-      const radiantSet = explodeRadiantSetSku(sku);
-      if (radiantSet) {
-        for (const componentSku of radiantSet.components) {
-          addStandalone(componentSku, vel, oversold, { type: 'mattress', size: radiantSet.size });
-        }
-        continue;
-      }
-
-      const cocoonCombo = explodeCocoonRadiantCombo(sku);
-      if (cocoonCombo) {
-        addCombo(cocoonCombo.bed, vel, oversold, sku, { type: 'bed', size: cocoonCombo.size });
-        for (const componentSku of cocoonCombo.mattressComponents) {
-          addCombo(componentSku, vel, oversold, sku, { type: 'mattress', size: cocoonCombo.size });
-        }
-      }
-    }
-
-    for (const sku of Object.keys(cin7)) {
-      if (sku.match(/^COCOON-(DOUBLE|QUEEN|KING)-/) && !sku.includes('-CV')) {
-        const size = sku.includes('-DOUBLE-') ? 'D' : sku.includes('-QUEEN-') ? 'Q' : sku.includes('-KING-') ? 'K' : null;
-        ensureComponent(sku, { type: 'bed', size });
-      }
-    }
-
-    for (const sku of Object.keys(allCin7)) {
-      if (sku.match(/^RDNT-(D|Q|K)-(BASE|S|MF|F)$/)) {
-        const size = sku.split('-')[1];
-        ensureComponent(sku, { type: 'mattress', size });
-      }
-    }
-
-    const normalizePoSku = (sku) => {
-      if (sku.match(/^COCOON-(DOUBLE|QUEEN|KING)-[A-Z]+-[12]$/)) return sku.replace(/-[12]$/, '');
-      return sku;
-    };
-
-    for (const po of dataCache.cin7POs || []) {
-      if (poDestination && resolvePoDestination(po) !== poDestination) continue;
-      const poOpen = isOpenPO(po);
-      const relevantItems = {};
-      for (const [rawSku, qty] of Object.entries(po.items || {})) {
-        const sku = normalizePoSku(rawSku);
-        if (!componentSkus.has(sku)) continue;
-        relevantItems[sku] = (relevantItems[sku] || 0) + qty;
-        ensureComponent(sku);
-        if (poOpen) componentStats[sku].incoming += qty;
-      }
-      if (Object.keys(relevantItems).length > 0) {
-        componentAllPos.push({ ...po, items: relevantItems });
-        if (poOpen) componentPos.push({ ...po, items: relevantItems });
-      }
-    }
-
-    for (const sku of Object.keys(componentStats)) {
-      const c = componentStats[sku];
-      c.totalDemand = c.standaloneDemand + c.comboDemand;
-      c.totalOversold = c.standaloneOversold + c.comboOversold;
-      c.totalPreorders = Math.max(-c.totalOversold, 0);
-      componentVelocity[sku] = c.totalDemand;
-      componentShopify[sku] = c.totalOversold;
-    }
-
-    // Keep the main Cocoon tab category-pure: COCOON Option1 rows stay in the
-    // primary table. Radiant mattress/base rows are required components for
-    // Cocoon+Radiant bundles, so expose them as a separate component panel like
-    // Little Lifely exposes DD mattress dependency separately from LL beds.
-    sizes = {
-      '-DOUBLE-': 'Double',
-      '-QUEEN-': 'Queen',
-      '-KING-': 'King'
-    };
-
-    bomData = {
-      _components: componentStats,
-      _sizeOrder: ['D', 'Q', 'K'],
-      _sizeLabels: sizeLabels,
-      _separateFromMain: true,
-      _title: 'Cocoon required components',
-      _componentsSub: 'Radiant mattress/base requirements shown separately from Cocoon category rows',
-      _summary: {
-        primaryType: 'mattress',
-        stockLabel: 'Radiant Component SOH',
-        stockSub: 'Radiant mattress/base components',
-        incomingSub: 'Radiant component POs',
-        oversoldSub: 'Radiant + Cocoon combo commitments',
-        weeksSub: 'At total component velocity'
-      }
-    };
-  }
+  // Cocoon combos (COCOON-KMF/QMF/DMF-* and COCOON-RDNT-*) are intentionally
+  // excluded from the Cocoon tab. The team only wants the Cocoon view to show
+  // non-combo Cocoon SKUs, not DD/Radiant combo dependency panels.
 
   let reorderBomData = null;
   if (ckId === 'cusb-au-snuggle') {
