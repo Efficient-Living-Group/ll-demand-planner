@@ -133,6 +133,42 @@ function explodeCocoonRadiantCombo(comboSku) {
   };
 }
 
+function explodeCocoonDeepDreamCombo(comboSku) {
+  const match = String(comboSku || '').toUpperCase().trim().match(/^COCOON-(D|Q|K)MF-(CRML|IVR|MSGRN)$/);
+  if (!match) return null;
+  const [, size, colour] = match;
+  const mattressMap = { D: 'DD-137DMF', Q: 'DD-153QMF', K: 'DD-183KMF' };
+  return {
+    size,
+    colour,
+    bed: 'COCOON-' + COCOON_SIZE_WORD[size] + '-' + colour,
+    mattress: mattressMap[size],
+    bedQty: 1,
+    mattressQty: 1
+  };
+}
+
+function explodeDemandSkuForCk(sku, ckId) {
+  const s = String(sku || '').toUpperCase().trim();
+  if (ckId === 'rdnt') {
+    const radiantSet = explodeRadiantSetSku(s);
+    if (radiantSet) return radiantSet.components;
+    const cocoonRadiant = explodeCocoonRadiantCombo(s);
+    if (cocoonRadiant) return cocoonRadiant.mattressComponents;
+  }
+  if (ckId === 'cocoon') {
+    const cocoonDream = explodeCocoonDeepDreamCombo(s);
+    if (cocoonDream) return [cocoonDream.bed];
+    const cocoonRadiant = explodeCocoonRadiantCombo(s);
+    if (cocoonRadiant) return [cocoonRadiant.bed];
+  }
+  if (ckId === 'dd') {
+    const cocoonDream = explodeCocoonDeepDreamCombo(s);
+    if (cocoonDream) return [cocoonDream.mattress];
+  }
+  return null;
+}
+
 function isCocoonComboSku(sku) {
   const s = String(sku || '').toUpperCase().trim();
   return /^COCOON-(KMF|QMF|DMF)-/.test(s) || s.startsWith('COCOON-RDNT-');
@@ -1687,12 +1723,23 @@ function buildCKData(ckId) {
   const lifelyCoverageIds = new Set(['dd', 'cocoon', 'rdnt', 'wfhcr', 'lifely-sofa', 'caterpillar']);
   if (!coverageAux && lifelyCoverageIds.has(ckId)) {
     const openDemandBySku = {};
+    const panelSkuSet = new Set([...Object.keys(cin7), ...Object.keys(velocity), ...Object.keys(shopify)]);
+    const addOpenDemand = (sku, qty) => {
+      if (!sku || !panelSkuSet.has(sku)) return;
+      openDemandBySku[sku] = (openDemandBySku[sku] || 0) + Number(qty || 0);
+    };
     for (const sourceStore of relatedStores) {
       const countries = dataCache.shopifyOpenDemand?.[sourceStore] || {};
       for (const countryDemand of Object.values(countries)) {
         for (const [sku, qty] of Object.entries(countryDemand || {})) {
-          if (cin7[sku] === undefined && velocity[sku] === undefined && shopify[sku] === undefined) continue;
-          openDemandBySku[sku] = (openDemandBySku[sku] || 0) + Number(qty || 0);
+          const q = Number(qty || 0);
+          if (!q) continue;
+          const exploded = explodeDemandSkuForCk(sku, ckId);
+          if (exploded) {
+            for (const componentSku of exploded) addOpenDemand(componentSku, q);
+            continue;
+          }
+          addOpenDemand(sku, q);
         }
       }
     }
