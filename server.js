@@ -148,6 +148,60 @@ function explodeCocoonDeepDreamCombo(comboSku) {
   };
 }
 
+function lfsbSizeFromCmss(size) {
+  if (size === 'K') return 'Q';
+  if (['S', 'D', 'Q', 'TW'].includes(size)) return size;
+  return null;
+}
+
+function explodeCushieModularSku(sku) {
+  const s = String(sku || '').toUpperCase().trim();
+  const colour = s.split('-').pop();
+  if (!['CHC', 'LTGN', 'WHT', 'DNM'].includes(colour || '')) return null;
+  const out = [];
+  const add = (componentSku, qty = 1) => {
+    if (!componentSku) return;
+    for (let i = 0; i < qty; i += 1) out.push(componentSku);
+  };
+
+  let m = s.match(/^CMSS-SB-S-([A-Z0-9]+)$/);
+  if (m) {
+    add(`LFSB-S-${m[1]}`);
+    return out;
+  }
+
+  m = s.match(/^CMSS-2S-SB-(D|Q|K)-([A-Z0-9]+)$/);
+  if (m) {
+    const size = lfsbSizeFromCmss(m[1]);
+    add(size ? `LFSB-${size}-${m[2]}` : null);
+    return out;
+  }
+
+  m = s.match(/^CMSS-(?:2S-SSB|[34]S-SSB-CHS)-(Q|K)-([A-Z0-9]+)$/);
+  if (m) {
+    const size = lfsbSizeFromCmss(m[1]);
+    add(size ? `LFSB-${size}-${m[2]}` : null);
+    add(`LFSB-CHS-${m[2]}`);
+    return out;
+  }
+
+  m = s.match(/^CMSS-(?:4S-USB-DCHS|5S-USB-CHS)-(Q|K)-([A-Z0-9]+)$/);
+  if (m) {
+    const size = lfsbSizeFromCmss(m[1]);
+    add(size ? `LFSB-${size}-${m[2]}` : null);
+    add(`LFSB-CHS-${m[2]}`, 2);
+    return out;
+  }
+
+  m = s.match(/^CMSS-(?:SOTM|OTSB)-([A-Z0-9]+)$/);
+  if (m) {
+    add(`LFSB-SOTM-${m[1]}`);
+    return out;
+  }
+
+  return null;
+}
+
 function explodeDemandSkuForCk(sku, ckId) {
   const s = String(sku || '').toUpperCase().trim();
   if (ckId === 'rdnt') {
@@ -165,6 +219,10 @@ function explodeDemandSkuForCk(sku, ckId) {
   if (ckId === 'dd') {
     const cocoonDream = explodeCocoonDeepDreamCombo(s);
     if (cocoonDream) return [cocoonDream.mattress];
+  }
+  if (ckId === 'cusb-au-lifely') {
+    const cushieModular = explodeCushieModularSku(s);
+    if (cushieModular) return cushieModular;
   }
   return null;
 }
@@ -1561,6 +1619,22 @@ function buildCKData(ckId) {
     }
   }
 
+  const cushieModularComponentDemand = {};
+  if (ckId === 'cusb-au-lifely') {
+    for (const sourceStore of relatedStores) {
+      const countries = dataCache.shopifyOpenDemand?.[sourceStore] || {};
+      for (const countryDemand of Object.values(countries)) {
+        for (const [demandSku, qty] of Object.entries(countryDemand || {})) {
+          const components = explodeCushieModularSku(demandSku);
+          if (!components) continue;
+          for (const componentSku of components) {
+            cushieModularComponentDemand[componentSku] = (cushieModularComponentDemand[componentSku] || 0) + Number(qty || 0);
+          }
+        }
+      }
+    }
+  }
+
   // Country panels should use Shopify open demand split by shipping destination as the preorder source of truth.
   // CIN7 SOH stays branch-filtered from /Stock above, oversold comes from Shopify destination-country demand.
   if (ckId === 'llau' || ckId === 'llau-cbcf' || ckId === 'llnz' || ckId === 'llna' || ckId === 'llca' || ckId === 'lluk' || ckId === 'llsg' || ckId === 'cusb-au' || ckId.startsWith('cusb-au-')) {
@@ -1591,6 +1665,7 @@ function buildCKData(ckId) {
           }
         }
       }
+      if (ckId === 'cusb-au-lifely') totalOpenDemand += Number(cushieModularComponentDemand[sku] || 0);
       shopify[sku] = -totalOpenDemand;
     }
   }
@@ -1613,6 +1688,21 @@ function buildCKData(ckId) {
   } else {
     for (const sourceStore of relatedStores) {
       mergeVelocitySource(dataCache.shopifyVelocity?.[sourceStore] || {});
+    }
+  }
+
+  if (ckId === 'cusb-au-lifely') {
+    for (const sourceStore of relatedStores) {
+      for (const [demandSku, vel] of Object.entries(dataCache.shopifyVelocity?.[sourceStore] || {})) {
+        if (String(demandSku || '').startsWith('_')) continue;
+        const components = explodeCushieModularSku(demandSku);
+        if (!components) continue;
+        for (const componentSku of components) {
+          if (cin7[componentSku] !== undefined || velocity[componentSku] !== undefined || shopify[componentSku] !== undefined) {
+            velocity[componentSku] = (velocity[componentSku] || 0) + Number(vel || 0);
+          }
+        }
+      }
     }
   }
 
