@@ -155,6 +155,26 @@ def country_code(order: dict[str, Any]) -> str | None:
     return raw.upper() if len(raw) == 2 else raw
 
 
+def canonical_demand_sku(sku: Any, country: str | None = "") -> str:
+    s = str(sku or "").upper().strip()
+    c = str(country or "").upper().strip()
+    if s.startswith("LLUK-CBDS-"):
+        return s.replace("LLUK-CBDS-", "LLUK-CBCF-", 1)
+    llau_combo = re.match(r"^LLAU-CBCF-(S|KS|D)-(.+)$", s)
+    if llau_combo and c and c not in {"AU", "NZ"}:
+        size, colour = llau_combo.groups()
+        if c in {"US", "CA"}:
+            size_map = {"S": "TW", "KS": "TWX", "D": "F"}
+            return f"LLNA-CFDS-{size_map[size]}-{colour}"
+        if c in {"GB", "UK"}:
+            size_map = {"S": "S", "KS": "SD", "D": "D"}
+            return f"LLUK-CBCF-{size_map[size]}-{colour}"
+        if c == "SG":
+            size_map = {"S": "S", "KS": "SS", "D": "Q"}
+            return f"LLSG-CFDS-{size_map[size]}-{colour}"
+    return s
+
+
 def week_key(dt: datetime) -> str:
     start = datetime(dt.year, 1, 1, tzinfo=dt.tzinfo)
     jan4 = datetime(dt.year, 1, 4, tzinfo=dt.tzinfo)
@@ -207,7 +227,7 @@ def fetch_shopify_velocity(store_key: str, store: dict[str, str], api_version: s
             c = country_code(order)
             bucket = ensure_country_bucket(by_country, c) if c else None
             for line in order.get("line_items") or []:
-                sku = canonical_demand_sku(line.get("sku"), country)
+                sku = canonical_demand_sku(line.get("sku"), c)
                 if not sku:
                     continue
                 qty = float(line.get("quantity") or 0)
@@ -277,7 +297,7 @@ def fetch_shopify_open_demand(store_key: str, store: dict[str, str], api_version
                 continue
             bucket = open_demand.setdefault(c, {})
             for line in order.get("line_items") or []:
-                sku = canonical_demand_sku(line.get("sku"), country)
+                sku = canonical_demand_sku(line.get("sku"), c)
                 if not sku:
                     continue
                 qty = line.get("fulfillable_quantity")
