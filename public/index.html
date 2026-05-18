@@ -354,6 +354,15 @@ function buildPreorderCoverage(s){
       mattressStatus: base.status
     };
   }
+  const genericAux=DATA.coverageAux?.mode==='generic'?DATA.coverageAux:null;
+  if(genericAux){
+    const openDemandBySku=genericAux.openDemandBySku||{};
+    const hasOpen=Object.prototype.hasOwnProperty.call(openDemandBySku,s);
+    const openSales=hasOpen?Number(openDemandBySku[s]||0):getOpenSales(s);
+    const soh=Number(DATA.cin7[s]||0);
+    const base=computeFromRows(Math.max(openSales-soh,0),(genericAux.poRows?.[s]||[]));
+    return {openSales,ownOpenSales:openSales,comboOpenSales:0,preorderUnits:base.preorderUnits,nextPO:base.nextPO,nextETA:base.nextETA,nextQty:base.nextQty,nextCovers:base.status==='Covered by next shipment',coveragePO:base.coveragePO,coverageETA:base.coverageETA,status:base.status,mattressPO:null,mattressETA:null,mattressStatus:null};
+  }
   const soh=Number(DATA.cin7[s]||0);
   const ownOpenSales=getOpenSales(s);
   const comboSku=isLlnaBed?s.replace('LLNA-CB-','LLNA-CFDS-'):null;
@@ -682,7 +691,13 @@ function renderDashboard(){
     llna:{label:'US', place:'United States'},
     llau:{label:'AU', place:'Australia'},
     llnz:{label:'NZ', place:'New Zealand'},
-    lluk:{label:'UK', place:'United Kingdom'}
+    lluk:{label:'UK', place:'United Kingdom'},
+    dd:{label:'Lifely', place:'Lifely'},
+    cocoon:{label:'Lifely', place:'Lifely'},
+    rdnt:{label:'Lifely', place:'Lifely'},
+    wfhcr:{label:'Lifely', place:'Lifely'},
+    'lifely-sofa':{label:'Lifely', place:'Lifely'},
+    caterpillar:{label:'Lifely', place:'Lifely'}
   };
   const coverageMeta=coverageCkMeta[currentCK]||null;
   const showCoverage=!!coverageMeta;
@@ -723,7 +738,7 @@ function renderDashboard(){
     if(auMarketingPanel){ auMarketingPanel.style.display='none'; auMarketingPanel.innerHTML=''; }
   }
   const coverageHeader=showCoverage
-    ? `<th data-tip>Preorders<span class="tip">Units still waiting after using current ${coverageMeta.label} stock. For LLNA CB rows this includes matching CFDS dropship combo demand.</span></th><th data-tip>Next PO<span class="tip">First ${coverageMeta.place} PO for this SKU by ETA, shown with incoming qty</span></th><th data-tip>Next ETA<span class="tip">ETA of the next ${coverageMeta.place} PO for this SKU</span></th><th data-tip>Coverage PO<span class="tip">PO that fully clears the preorder demand, corresponding to the Preorder Date</span></th><th data-tip>Preorder Date<span class="tip">ETA of the first PO that fully clears the preorder backlog using the limiting component</span></th><th data-tip>Coverage Status<span class="tip">In stock, Covered by next shipment, Covered by later shipment, No incoming PO, ETA missing, Not covered, or Dropship</span></th>`
+    ? `<th data-tip>Preorders<span class="tip">Units still waiting after using current ${coverageMeta.label} stock. Little Lifely bundle rows include matching combo/component demand where configured.</span></th><th data-tip>Next PO<span class="tip">First ${coverageMeta.place} PO for this SKU by ETA, shown with incoming qty</span></th><th data-tip>Next ETA<span class="tip">ETA of the next ${coverageMeta.place} PO for this SKU</span></th><th data-tip>Coverage PO<span class="tip">PO that fully clears the preorder demand, corresponding to the Preorder Date</span></th><th data-tip>Preorder Date<span class="tip">ETA of the first PO that fully clears the preorder backlog using the limiting component</span></th><th data-tip>Coverage Status<span class="tip">In stock, Covered by next shipment, Covered by later shipment, No incoming PO, ETA missing, Not covered, or Dropship</span></th>`
     : '';
   document.querySelector('#stockTable thead').innerHTML='<tr><th>SKU</th><th>Supplier</th><th>Size</th><th data-tip>CBM<span class="tip">Cubic meters per unit from CIN7 product volume</span></th><th data-tip>CIN7 SOH<span class="tip">Stock On Hand — physical units in the warehouse from CIN7</span></th><th data-tip>Open Orders<span class="tip">Open Shopify demand for country panels. Negative means pre-order/open-order units waiting to be fulfilled.</span></th><th data-tip>Net after Open Orders<span class="tip">Cin7 Stock On Hand minus Shopify open orders. Uses physical SOH, not Cin7 Available.</span></th><th data-tip>Incoming<span class="tip">Units arriving from open Purchase Orders using the same open-PO rule as the PO tab: not Received, no Fully Received Date, not void/cancelled.</span></th>'+coverageHeader+'<th data-tip>Units/wk<span class="tip">Average weekly sales velocity over the last 30 days from Shopify orders</span></th><th data-tip>Wks Left Now<span class="tip">Weeks of stock remaining before incoming POs. Net after Open Orders ÷ Units/wk.</span></th><th data-tip>Wks Left + Incoming<span class="tip">Weeks of stock after adding currently open incoming POs. This is visibility only; reorder quantity rules will be reviewed separately.</span></th><th data-tip>Status<span class="tip">STOCKOUT: 0wk | CRITICAL: 1-2wk | LOW: 3-4wk | OK: 5-8wk | HEALTHY: 8+wk</span></th><th data-tip>FOB<span class="tip">Factory cost per unit (AUD). From CIN7 costAUD or costUSD×FX</span></th><th data-tip>Freight/u<span class="tip">AUD freight per unit based on CBM share of container. (SKU CBM ÷ PO total CBM) × container freight ÷ qty</span></th><th data-tip>Landed<span class="tip">Full landed cost per unit in AUD = FOB + Freight + Tariff. Landed-cost sheet values are maintained in AUD; estimates use open POs</span></th></tr>';
   document.querySelector('#stockTable tbody').innerHTML=filtered.map(s=>{

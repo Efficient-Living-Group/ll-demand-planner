@@ -1669,6 +1669,35 @@ function buildCKData(ckId) {
     }
     coverageAux = { ...coverageConfig, openDemandBySku, stockBySku, poRows };
   }
+
+  // Generic preorder / coverage support for Lifely category panels.
+  // Little Lifely has special bed+mattress bundle logic above. Lifely CKs use
+  // direct SKU open-demand and PO rows so the dashboard can show the same
+  // Preorders / Next PO / Coverage columns without mixing category membership.
+  const lifelyCoverageIds = new Set(['dd', 'cocoon', 'rdnt', 'wfhcr', 'lifely-sofa', 'caterpillar']);
+  if (!coverageAux && lifelyCoverageIds.has(ckId)) {
+    const openDemandBySku = {};
+    for (const sourceStore of relatedStores) {
+      const countries = dataCache.shopifyOpenDemand?.[sourceStore] || {};
+      for (const countryDemand of Object.values(countries)) {
+        for (const [sku, qty] of Object.entries(countryDemand || {})) {
+          if (cin7[sku] === undefined && velocity[sku] === undefined && shopify[sku] === undefined) continue;
+          openDemandBySku[sku] = (openDemandBySku[sku] || 0) + Number(qty || 0);
+        }
+      }
+    }
+    const stockBySku = Object.fromEntries(Object.keys(cin7).map(sku => [sku, { soh: Number(cin7[sku] || 0), available: Number(cin7Available[sku] || cin7[sku] || 0) }]));
+    const poRows = {};
+    for (const po of pos || []) {
+      const etaRaw = po.arrival || po.estimatedArrivalDate || null;
+      for (const [sku, qty] of Object.entries(po.analyticsItems || po.items || {})) {
+        if (cin7[sku] === undefined && velocity[sku] === undefined && shopify[sku] === undefined) continue;
+        if (!poRows[sku]) poRows[sku] = [];
+        poRows[sku].push({ reference: po.reference, qty: Number(qty || 0), eta: etaRaw });
+      }
+    }
+    coverageAux = { mode: 'generic', label: def.name, place: 'Lifely', openDemandBySku, stockBySku, poRows };
+  }
   let bomData = null;
   if (ckId === 'llau-cbcf') {
     bomData = {};
