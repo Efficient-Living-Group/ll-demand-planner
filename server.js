@@ -283,6 +283,12 @@ function getStoreKeysForCk(ckId, primaryStore) {
 function normalizeOption1(value) {
   return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
 }
+function canonicalDemandSku(sku) {
+  const s = String(sku || '').toUpperCase().trim();
+  if (s.startsWith('LLUK-CBDS-')) return s.replace('LLUK-CBDS-', 'LLUK-CBCF-');
+  return s;
+}
+
 
 function skuOption1(sku, override = '') {
   return dataCache.cin7Products?.[sku]?.option1 || override || '';
@@ -1032,22 +1038,23 @@ async function fetchShopifyVelocity(storeKey) {
         const countryBucket = country ? ensureCountry(country) : null;
 
         for (const li of (o.line_items || [])) {
-          if (li.sku) {
+          const sku = canonicalDemandSku(li.sku);
+          if (sku) {
             const qty = li.quantity || 0;
-            skuUnits[li.sku] = (skuUnits[li.sku] || 0) + qty;
-            if (dt >= now7d) sku7d[li.sku] = (sku7d[li.sku] || 0) + qty;
-            if (dt >= now30d) sku30d[li.sku] = (sku30d[li.sku] || 0) + qty;
-            if (!skuFirstSeen[li.sku] || dt < skuFirstSeen[li.sku]) skuFirstSeen[li.sku] = dt;
-            if (!skuWeekly[li.sku]) skuWeekly[li.sku] = {};
-            skuWeekly[li.sku][weekKey] = (skuWeekly[li.sku][weekKey] || 0) + qty;
+            skuUnits[sku] = (skuUnits[sku] || 0) + qty;
+            if (dt >= now7d) sku7d[sku] = (sku7d[sku] || 0) + qty;
+            if (dt >= now30d) sku30d[sku] = (sku30d[sku] || 0) + qty;
+            if (!skuFirstSeen[sku] || dt < skuFirstSeen[sku]) skuFirstSeen[sku] = dt;
+            if (!skuWeekly[sku]) skuWeekly[sku] = {};
+            skuWeekly[sku][weekKey] = (skuWeekly[sku][weekKey] || 0) + qty;
 
             if (countryBucket) {
-              countryBucket.skuUnits[li.sku] = (countryBucket.skuUnits[li.sku] || 0) + qty;
-              if (dt >= now7d) countryBucket.sku7d[li.sku] = (countryBucket.sku7d[li.sku] || 0) + qty;
-              if (dt >= now30d) countryBucket.sku30d[li.sku] = (countryBucket.sku30d[li.sku] || 0) + qty;
-              if (!countryBucket.skuFirstSeen[li.sku] || dt < countryBucket.skuFirstSeen[li.sku]) countryBucket.skuFirstSeen[li.sku] = dt;
-              if (!countryBucket.skuWeekly[li.sku]) countryBucket.skuWeekly[li.sku] = {};
-              countryBucket.skuWeekly[li.sku][weekKey] = (countryBucket.skuWeekly[li.sku][weekKey] || 0) + qty;
+              countryBucket.skuUnits[sku] = (countryBucket.skuUnits[sku] || 0) + qty;
+              if (dt >= now7d) countryBucket.sku7d[sku] = (countryBucket.sku7d[sku] || 0) + qty;
+              if (dt >= now30d) countryBucket.sku30d[sku] = (countryBucket.sku30d[sku] || 0) + qty;
+              if (!countryBucket.skuFirstSeen[sku] || dt < countryBucket.skuFirstSeen[sku]) countryBucket.skuFirstSeen[sku] = dt;
+              if (!countryBucket.skuWeekly[sku]) countryBucket.skuWeekly[sku] = {};
+              countryBucket.skuWeekly[sku][weekKey] = (countryBucket.skuWeekly[sku][weekKey] || 0) + qty;
             }
           }
         }
@@ -1121,10 +1128,11 @@ async function fetchShopifyOpenDemand(storeKey) {
         const country = rawCountry.length === 2 ? rawCountry.toUpperCase() : rawCountry;
         if (!openDemand[country]) openDemand[country] = {};
         for (const li of (o.line_items || [])) {
-          if (!li.sku) continue;
+          const sku = canonicalDemandSku(li.sku);
+          if (!sku) continue;
           const qty = Number(li.fulfillable_quantity ?? li.current_quantity ?? li.quantity ?? 0);
           if (qty <= 0) continue;
-          openDemand[country][li.sku] = (openDemand[country][li.sku] || 0) + qty;
+          openDemand[country][sku] = (openDemand[country][sku] || 0) + qty;
         }
       }
 
@@ -1684,8 +1692,8 @@ function buildCKData(ckId) {
   if (coverageConfig) {
     const openDemandBySku = {};
     for (const sourceStore of relatedStores) {
-      for (const [sku, qty] of Object.entries(dataCache.shopifyOpenDemand?.[sourceStore]?.[coverageConfig.demandCountry] || {})) {
-        if (ckId === 'lluk' && String(sku || '').toUpperCase().startsWith('LLUK-CBDS-')) continue;
+      for (const [rawSku, qty] of Object.entries(dataCache.shopifyOpenDemand?.[sourceStore]?.[coverageConfig.demandCountry] || {})) {
+        const sku = canonicalDemandSku(rawSku);
         openDemandBySku[sku] = (openDemandBySku[sku] || 0) + Number(qty || 0);
       }
     }
@@ -2161,24 +2169,26 @@ function buildCKData(ckId) {
         const velSource = dataCache.shopifyVelocityByCountry?.[sourceStore]?.[cfg.salesCountry] || {};
         const demandSource = dataCache.shopifyOpenDemand?.[sourceStore]?.[cfg.salesCountry] || {};
 
-        for (const [comboSku, qty] of Object.entries(demandSource)) {
+        for (const [rawComboSku, qty] of Object.entries(demandSource)) {
+          const comboSku = canonicalDemandSku(rawComboSku);
           const mattressSku = Object.entries(cfg.comboMap).find(([prefix]) => comboSku.startsWith(prefix))?.[1];
           if (!mattressSku) continue;
           regionShopify[mattressSku] = (regionShopify[mattressSku] || 0) - Number(qty || 0);
         }
 
-        for (const [comboSku, vel] of Object.entries(velSource)) {
-          if (comboSku.startsWith('_')) continue;
+        for (const [rawComboSku, vel] of Object.entries(velSource)) {
+          if (rawComboSku.startsWith('_')) continue;
+          const comboSku = canonicalDemandSku(rawComboSku);
           const mattressSku = Object.entries(cfg.comboMap).find(([prefix]) => comboSku.startsWith(prefix))?.[1];
           if (!mattressSku) continue;
           regionVelocity[mattressSku] = (regionVelocity[mattressSku] || 0) + Number(vel || 0);
-          regionVelocity._7d[mattressSku] = (regionVelocity._7d[mattressSku] || 0) + Number(velSource._7d?.[comboSku] || 0);
-          regionVelocity._30d[mattressSku] = (regionVelocity._30d[mattressSku] || 0) + Number(velSource._30d?.[comboSku] || 0);
-          const firstSeen = velSource._firstSeen?.[comboSku] || null;
+          regionVelocity._7d[mattressSku] = (regionVelocity._7d[mattressSku] || 0) + Number(velSource._7d?.[rawComboSku] || velSource._7d?.[comboSku] || 0);
+          regionVelocity._30d[mattressSku] = (regionVelocity._30d[mattressSku] || 0) + Number(velSource._30d?.[rawComboSku] || velSource._30d?.[comboSku] || 0);
+          const firstSeen = velSource._firstSeen?.[rawComboSku] || velSource._firstSeen?.[comboSku] || null;
           if (firstSeen && (!regionVelocity._firstSeen[mattressSku] || String(firstSeen) < String(regionVelocity._firstSeen[mattressSku]))) {
             regionVelocity._firstSeen[mattressSku] = firstSeen;
           }
-          for (const [week, qty] of Object.entries(velSource._weeklyBreakdown?.[comboSku] || {})) {
+          for (const [week, qty] of Object.entries(velSource._weeklyBreakdown?.[rawComboSku] || velSource._weeklyBreakdown?.[comboSku] || {})) {
             if (!regionVelocity._weeklyBreakdown[mattressSku]) regionVelocity._weeklyBreakdown[mattressSku] = {};
             regionVelocity._weeklyBreakdown[mattressSku][week] = (regionVelocity._weeklyBreakdown[mattressSku][week] || 0) + Number(qty || 0);
             if (!regionWeeklyData[mattressSku]) regionWeeklyData[mattressSku] = {};
@@ -2993,6 +3003,17 @@ function buildHealthStatus() {
     }
   }
 
+  const staleDemandSkuAliases = [];
+  for (const [store, countries] of Object.entries(dataCache.shopifyOpenDemand || {})) {
+    for (const [country, rows] of Object.entries(countries || {})) {
+      for (const [sku, qty] of Object.entries(rows || {})) {
+        if (String(sku || '').toUpperCase().startsWith('LLUK-CBDS-') && Number(qty || 0) > 0) {
+          staleDemandSkuAliases.push({ store, country, sku, canonicalSku: canonicalDemandSku(sku), qty: Number(qty || 0) });
+        }
+      }
+    }
+  }
+
   const checks = {
     cin7Products: Object.keys(products).length,
     cin7StockByBranchSkus: Object.keys(stockByBranch).length,
@@ -3003,6 +3024,7 @@ function buildHealthStatus() {
     missingRequiredOption1: HEALTH_REQUIRED_OPTION1.filter(option1 => !option1Counts[normalizeOption1(option1)]),
     fixtureRoutes,
     ckPanelSkuCounts,
+    staleDemandSkuAliases,
     shopifyStores: Object.fromEntries(HEALTH_EXPECTED_STORES.map(store => [store, {
       inventory: hasStorePayload(dataCache.shopifyInventory, store),
       velocity: hasStorePayload(dataCache.shopifyVelocity, store),
@@ -3025,6 +3047,7 @@ function buildHealthStatus() {
   if (checks.productsMissingOption1 > 0) warnings.push(`${checks.productsMissingOption1} Cin7 products/options have blank Option1`);
   if (checks.missingRequiredOption1.length) warnings.push(`Required Option1 categories missing: ${checks.missingRequiredOption1.join(', ')}`);
   if (checks.purchaseOrdersWithoutLineItems > 0) warnings.push(`${checks.purchaseOrdersWithoutLineItems} purchase orders currently have no line items`);
+  if (checks.staleDemandSkuAliases.length) warnings.push(`${checks.staleDemandSkuAliases.length} Shopify open-demand rows use stale SKU aliases and are being canonicalized`);
   const badFixtures = fixtureRoutes.filter(row => row.actual !== row.expected);
   if (badFixtures.length) critical.push(`SKU route fixture mismatch: ${badFixtures.map(row => `${row.sku} expected ${row.expected}, got ${row.actual}`).join('; ')}`);
   const zeroPanels = Object.entries(ckPanelSkuCounts).filter(([, count]) => count === 0).map(([id]) => id);
