@@ -61,6 +61,7 @@ const CK_DEFS = {
   'cocoon':   { name: 'Cocoon Bed',             prefix: 'COCOON', logo: 'cocoon-bed.png',    store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Cocoon Bed', sizes: {'-DOUBLE-':'Double','-QUEEN-':'Queen','-KING-':'King'} },
   'rdnt':     { name: 'Radiant',                prefix: 'RDNT',   logo: 'radiant.png',       store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Radiant', sizes: {'-D-':'Double','-Q-':'Queen','-K-':'King'} },
   'wfhcr':    { name: 'WFH Chair',              prefix: 'WFHCR',  logo: 'wfh-chair.png',     store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - WFH Chair', sizes: {} },
+  'caterpillar': { name: 'Caterpillar Dining',    prefix: 'MULTI',  logo: 'lifely-sofa.png',  store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Caterpillar', sizes: {'EDT':'Dining Table','EDB':'Dining Chair'} },
   'cusb-au-snuggle': { name: 'Cushie Snuggle Bed',    prefix: 'MULTI',  logo: 'cushie.png',        store: 'lifely', poDestination: 'Australia', salesCountry: 'AU', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Cushie V3 Snuggle', filter: sku => sku.startsWith('CUSB') && !sku.includes('-UK') && !sku.includes('SGE'), excludeCV: true, sizes: {'ARST':'Armrest','-TW-':'Twin','-D-':'Double','-Q-':'Queen','-K-':'King'} },
   'cusb-au-lifely':  { name: 'Lifely Sofabed',         prefix: 'MULTI',  logo: 'cushie.png',        store: 'lifely', poDestination: 'Australia', salesCountry: 'AU', stockBranches: LL_AU_BRANCH_IDS, option1: ['Category Killer - Cushie V2', 'Category Killer - Lifely Sofa'], filter: sku => sku.startsWith('LFSB') && !sku.includes('-UK'), excludeCV: true, sizes: {'-TW-':'Twin','-S-':'Single','-D-':'Double','-Q-':'Queen','-CHS-':'Chaise','-SOTM-':'Ottoman','-AMST-':'Armrest'} },
   'cusb-us':  { name: 'Cushie US',              prefix: 'MULTI',  logo: 'cushie.png',        store: 'lifely', salesCountry: 'US', stockBranches: [60701], option1: ['Category Killer - Cushie V2', 'Category Killer - Cushie V3 Snuggle'], filter: sku => sku.startsWith('V2-') || sku.startsWith('V3-'), excludeCV: true, sizes: {'-TB-':'Twin','-DB-':'Full','-QB-':'Queen','-KB-':'King','-CH-':'Chaise','-OS-':'Ottoman','-OB-':'Ottoman Bed','-RMST-':'Armrest','-ARM-':'Armrest'} },
@@ -2424,7 +2425,7 @@ function getBrandGroup(id, def) {
   if (id.startsWith('cusb') || id === 'cmss') return { id: 'cushie', name: 'Cushie', logo: 'cushie.png' };
   if (id.startsWith('ll')) return { id: 'little-lifely', name: 'Little Lifely', logo: 'little-lifely.png' };
   if (id === 'case-goods') return { id: 'case-goods', name: 'Case Goods', logo: def.logo };
-  if (id === 'lifely-sofa' || id === 'dd' || id === 'cocoon' || id === 'rdnt' || id === 'wfhcr') return { id: 'lifely-home', name: 'Lifely', logo: def.logo };
+  if (id === 'lifely-sofa' || id === 'dd' || id === 'cocoon' || id === 'rdnt' || id === 'wfhcr' || id === 'caterpillar') return { id: 'lifely-home', name: 'Lifely', logo: def.logo };
   return { id: 'other', name: 'Other', logo: def.logo };
 }
 
@@ -3026,10 +3027,10 @@ const HEALTH_REQUIRED_OPTION1 = [
   'Category Killer - Little Lifely',
   'Category Killer - 21cm Mattress',
   'Category Killer - Deepdream',
-  'Category Killer - Deep Dream',
   'Category Killer - Cocoon Bed',
   'Category Killer - Radiant',
   'Category Killer - WFH Chair',
+  'Category Killer - Caterpillar',
   'Category Killer - Cushie V3 Snuggle',
   'Category Killer - Cushie V2',
   'Category Killer - Lifely Sofa',
@@ -3047,7 +3048,8 @@ const HEALTH_ROUTE_FIXTURES = [
   { sku: 'LLAU-CB-S-MSM', expected: 'Little Lifely AU' },
   { sku: 'DD-21153CF', expected: 'Deep Dream' },
   { sku: 'DD-34183K-SFM', expected: 'Deep Dream' },
-  { sku: 'DDUK-2190CF', expected: 'LL Mattresses' }
+  { sku: 'DDUK-2190CF', expected: 'LL Mattresses' },
+  { sku: 'CAT-EDT-NAL', expected: 'Caterpillar Dining' }
 ];
 
 function hoursSinceIso(value) {
@@ -3071,7 +3073,7 @@ function buildHealthStatus() {
     const option1 = String(product?.option1 || '').trim();
     if (!option1) continue;
     productsWithOption1 += 1;
-    option1Counts[option1] = (option1Counts[option1] || 0) + 1;
+    option1Counts[normalizeOption1(option1)] = (option1Counts[normalizeOption1(option1)] || 0) + 1;
   }
 
   const fixtureRoutes = HEALTH_ROUTE_FIXTURES.map(({ sku, expected }) => ({ sku, expected, actual: ckCategoryForSku(sku) }));
@@ -3092,7 +3094,7 @@ function buildHealthStatus() {
     purchaseOrdersWithoutLineItems: pos.filter(po => Object.keys(po.items || {}).length === 0).length,
     productsWithOption1,
     productsMissingOption1: Object.keys(products).length - productsWithOption1,
-    missingRequiredOption1: HEALTH_REQUIRED_OPTION1.filter(option1 => !option1Counts[option1]),
+    missingRequiredOption1: HEALTH_REQUIRED_OPTION1.filter(option1 => !option1Counts[normalizeOption1(option1)]),
     fixtureRoutes,
     ckPanelSkuCounts,
     shopifyStores: Object.fromEntries(HEALTH_EXPECTED_STORES.map(store => [store, {

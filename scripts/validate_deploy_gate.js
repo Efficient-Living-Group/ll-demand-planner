@@ -12,10 +12,10 @@ const REQUIRED_OPTION1 = [
   'Category Killer - Little Lifely',
   'Category Killer - 21cm Mattress',
   'Category Killer - Deepdream',
-  'Category Killer - Deep Dream',
   'Category Killer - Cocoon Bed',
   'Category Killer - Radiant',
   'Category Killer - WFH Chair',
+  'Category Killer - Caterpillar',
   'Category Killer - Cushie V3 Snuggle',
   'Category Killer - Cushie V2',
   'Category Killer - Lifely Sofa',
@@ -50,6 +50,7 @@ const CK_DEFS = {
   cocoon: { name:'Cocoon Bed', prefix:'COCOON', option1:'Category Killer - Cocoon Bed' },
   rdnt: { name:'Radiant', prefix:'RDNT', option1:'Category Killer - Radiant' },
   wfhcr: { name:'WFH Chair', prefix:'WFHCR', option1:'Category Killer - WFH Chair' },
+  caterpillar: { name:'Caterpillar Dining', prefix:'MULTI', option1:'Category Killer - Caterpillar' },
   'cusb-au-snuggle': { name:'Cushie Snuggle Bed', prefix:'MULTI', option1:'Category Killer - Cushie V3 Snuggle', filter:s=>s.startsWith('CUSB')&&!s.includes('-UK')&&!s.includes('SGE'), excludeCV:true },
   'cusb-au-lifely': { name:'Lifely Sofabed', prefix:'MULTI', option1:['Category Killer - Cushie V2','Category Killer - Lifely Sofa'], filter:s=>s.startsWith('LFSB')&&!s.includes('-UK'), excludeCV:true },
   'cusb-us': { name:'Cushie US', prefix:'MULTI', option1:['Category Killer - Cushie V2','Category Killer - Cushie V3 Snuggle'], filter:s=>s.startsWith('V2-')||s.startsWith('V3-'), excludeCV:true },
@@ -94,9 +95,9 @@ if (pos.some(po => !('items' in (po || {})))) blockers.push('One or more purchas
 const optionCounts = {};
 for (const product of Object.values(products)) {
   const option1 = String(product?.option1 || '').trim();
-  if (option1) optionCounts[option1] = (optionCounts[option1] || 0) + 1;
+  if (option1) optionCounts[norm(option1)] = (optionCounts[norm(option1)] || 0) + 1;
 }
-for (const required of REQUIRED_OPTION1) if (!optionCounts[required]) blockers.push(`Required Option1 category missing: ${required}`);
+for (const required of REQUIRED_OPTION1) if (!optionCounts[norm(required)]) blockers.push(`Required Option1 category missing: ${required}`);
 
 for (const store of EXPECTED_STORES) {
   if (!hasPayload(cache.shopifyInventory, store)) blockers.push(`Shopify ${store} inventory payload missing/empty`);
@@ -124,7 +125,8 @@ const fixtures = [
   { sku: 'LLAU-CB-S-MSM', expected: 'Little Lifely AU' },
   { sku: 'DD-21153CF', expected: 'Deep Dream' },
   { sku: 'DD-34183K-SFM', expected: 'Deep Dream' },
-  { sku: 'DDUK-2190CF', expected: 'LL Mattresses' }
+  { sku: 'DDUK-2190CF', expected: 'LL Mattresses' },
+  { sku: 'CAT-EDT-NAL', expected: 'Caterpillar Dining' }
 ];
 for (const fixture of fixtures) {
   const actual = routeSku(fixture.sku, products);
