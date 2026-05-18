@@ -283,9 +283,26 @@ function getStoreKeysForCk(ckId, primaryStore) {
 function normalizeOption1(value) {
   return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
 }
-function canonicalDemandSku(sku) {
+function canonicalDemandSku(sku, country = '') {
   const s = String(sku || '').toUpperCase().trim();
+  const c = String(country || '').toUpperCase().trim();
   if (s.startsWith('LLUK-CBDS-')) return s.replace('LLUK-CBDS-', 'LLUK-CBCF-');
+  const llauCombo = s.match(/^LLAU-CBCF-(S|KS|D)-(.+)$/);
+  if (llauCombo && c && c !== 'AU' && c !== 'NZ') {
+    const [, size, colour] = llauCombo;
+    if (c === 'US' || c === 'CA') {
+      const sizeMap = { S: 'TW', KS: 'TWX', D: 'F' };
+      return `LLNA-CFDS-${sizeMap[size]}-${colour}`;
+    }
+    if (c === 'GB' || c === 'UK') {
+      const sizeMap = { S: 'S', KS: 'SD', D: 'D' };
+      return `LLUK-CBCF-${sizeMap[size]}-${colour}`;
+    }
+    if (c === 'SG') {
+      const sizeMap = { S: 'S', KS: 'SS', D: 'Q' };
+      return `LLSG-CFDS-${sizeMap[size]}-${colour}`;
+    }
+  }
   return s;
 }
 
@@ -1038,7 +1055,7 @@ async function fetchShopifyVelocity(storeKey) {
         const countryBucket = country ? ensureCountry(country) : null;
 
         for (const li of (o.line_items || [])) {
-          const sku = canonicalDemandSku(li.sku);
+          const sku = canonicalDemandSku(li.sku, country);
           if (sku) {
             const qty = li.quantity || 0;
             skuUnits[sku] = (skuUnits[sku] || 0) + qty;
@@ -1128,7 +1145,7 @@ async function fetchShopifyOpenDemand(storeKey) {
         const country = rawCountry.length === 2 ? rawCountry.toUpperCase() : rawCountry;
         if (!openDemand[country]) openDemand[country] = {};
         for (const li of (o.line_items || [])) {
-          const sku = canonicalDemandSku(li.sku);
+          const sku = canonicalDemandSku(li.sku, country);
           if (!sku) continue;
           const qty = Number(li.fulfillable_quantity ?? li.current_quantity ?? li.quantity ?? 0);
           if (qty <= 0) continue;
@@ -1693,7 +1710,7 @@ function buildCKData(ckId) {
     const openDemandBySku = {};
     for (const sourceStore of relatedStores) {
       for (const [rawSku, qty] of Object.entries(dataCache.shopifyOpenDemand?.[sourceStore]?.[coverageConfig.demandCountry] || {})) {
-        const sku = canonicalDemandSku(rawSku);
+        const sku = canonicalDemandSku(rawSku, coverageConfig.demandCountry);
         openDemandBySku[sku] = (openDemandBySku[sku] || 0) + Number(qty || 0);
       }
     }
@@ -2170,7 +2187,7 @@ function buildCKData(ckId) {
         const demandSource = dataCache.shopifyOpenDemand?.[sourceStore]?.[cfg.salesCountry] || {};
 
         for (const [rawComboSku, qty] of Object.entries(demandSource)) {
-          const comboSku = canonicalDemandSku(rawComboSku);
+          const comboSku = canonicalDemandSku(rawComboSku, cfg.salesCountry);
           const mattressSku = Object.entries(cfg.comboMap).find(([prefix]) => comboSku.startsWith(prefix))?.[1];
           if (!mattressSku) continue;
           regionShopify[mattressSku] = (regionShopify[mattressSku] || 0) - Number(qty || 0);
@@ -2178,7 +2195,7 @@ function buildCKData(ckId) {
 
         for (const [rawComboSku, vel] of Object.entries(velSource)) {
           if (rawComboSku.startsWith('_')) continue;
-          const comboSku = canonicalDemandSku(rawComboSku);
+          const comboSku = canonicalDemandSku(rawComboSku, cfg.salesCountry);
           const mattressSku = Object.entries(cfg.comboMap).find(([prefix]) => comboSku.startsWith(prefix))?.[1];
           if (!mattressSku) continue;
           regionVelocity[mattressSku] = (regionVelocity[mattressSku] || 0) + Number(vel || 0);
@@ -3007,8 +3024,9 @@ function buildHealthStatus() {
   for (const [store, countries] of Object.entries(dataCache.shopifyOpenDemand || {})) {
     for (const [country, rows] of Object.entries(countries || {})) {
       for (const [sku, qty] of Object.entries(rows || {})) {
-        if (String(sku || '').toUpperCase().startsWith('LLUK-CBDS-') && Number(qty || 0) > 0) {
-          staleDemandSkuAliases.push({ store, country, sku, canonicalSku: canonicalDemandSku(sku), qty: Number(qty || 0) });
+        const canonicalSku = canonicalDemandSku(sku, country);
+        if (canonicalSku !== String(sku || '').toUpperCase().trim() && Number(qty || 0) > 0) {
+          staleDemandSkuAliases.push({ store, country, sku, canonicalSku, qty: Number(qty || 0) });
         }
       }
     }
@@ -3047,7 +3065,7 @@ function buildHealthStatus() {
   if (checks.productsMissingOption1 > 0) warnings.push(`${checks.productsMissingOption1} Cin7 products/options have blank Option1`);
   if (checks.missingRequiredOption1.length) warnings.push(`Required Option1 categories missing: ${checks.missingRequiredOption1.join(', ')}`);
   if (checks.purchaseOrdersWithoutLineItems > 0) warnings.push(`${checks.purchaseOrdersWithoutLineItems} purchase orders currently have no line items`);
-  if (checks.staleDemandSkuAliases.length) warnings.push(`${checks.staleDemandSkuAliases.length} Shopify open-demand rows use stale SKU aliases and are being canonicalized`);
+  if (checks.staleDemandSkuAliases.length) warnings.push(`${checks.staleDemandSkuAliases.length} Shopify open-demand rows use stale/cross-market SKU aliases and are being canonicalized`);
   const badFixtures = fixtureRoutes.filter(row => row.actual !== row.expected);
   if (badFixtures.length) critical.push(`SKU route fixture mismatch: ${badFixtures.map(row => `${row.sku} expected ${row.expected}, got ${row.actual}`).join('; ')}`);
   const zeroPanels = Object.entries(ckPanelSkuCounts).filter(([, count]) => count === 0).map(([id]) => id);

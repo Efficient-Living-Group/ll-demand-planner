@@ -207,7 +207,7 @@ def fetch_shopify_velocity(store_key: str, store: dict[str, str], api_version: s
             c = country_code(order)
             bucket = ensure_country_bucket(by_country, c) if c else None
             for line in order.get("line_items") or []:
-                sku = canonical_demand_sku(line.get("sku"))
+                sku = canonical_demand_sku(line.get("sku"), country)
                 if not sku:
                     continue
                 qty = float(line.get("quantity") or 0)
@@ -277,7 +277,7 @@ def fetch_shopify_open_demand(store_key: str, store: dict[str, str], api_version
                 continue
             bucket = open_demand.setdefault(c, {})
             for line in order.get("line_items") or []:
-                sku = canonical_demand_sku(line.get("sku"))
+                sku = canonical_demand_sku(line.get("sku"), country)
                 if not sku:
                     continue
                 qty = line.get("fulfillable_quantity")

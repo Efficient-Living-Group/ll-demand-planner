@@ -277,11 +277,14 @@ function buildPreorderCoverage(s){
     const rank={'In stock':0,'Covered by next shipment':1,'Covered by later shipment':2,'ETA missing':3,'No incoming PO':4,'Not covered':5,'Dropship':0};
     return (rank[a?.status]||0) >= (rank[b?.status]||0) ? a : b;
   };
-  const isLlnaFamily=currentCK==='llna'||currentCK==='llca';
+  const isDropshipComboFamily=currentCK==='llna'||currentCK==='llca'||currentCK==='llsg';
   const isOwnedMattressMarket=currentCK==='llau'||currentCK==='llnz'||currentCK==='lluk';
-  const isLlnaBed=isLlnaFamily&&s.startsWith('LLNA-CB-');
-  const isLlnaDropship=isLlnaFamily&&s.startsWith('LLNA-CFDS-');
-  if(isLlnaDropship){
+  const auxForCombo=DATA.coverageAux||{};
+  const familyBedPrefix=auxForCombo.bedPrefix || 'LLNA-CB-';
+  const familyComboPrefix=auxForCombo.comboPrefix || 'LLNA-CFDS-';
+  const isFamilyComboBed=isDropshipComboFamily&&s.startsWith(familyBedPrefix);
+  const isFamilyDropship=isDropshipComboFamily&&s.startsWith(familyComboPrefix);
+  if(isFamilyDropship){
     return {openSales:0,preorderUnits:null,nextPO:null,nextETA:null,nextQty:0,nextCovers:null,coveragePO:null,coverageETA:null,status:'Dropship',mattressPO:null,mattressETA:null,mattressStatus:'Dropship'};
   }
   if(isOwnedMattressMarket){
@@ -370,7 +373,7 @@ function buildPreorderCoverage(s){
   }
   const soh=Number(DATA.cin7[s]||0);
   const ownOpenSales=getOpenSales(s);
-  const comboSku=isLlnaBed?s.replace('LLNA-CB-','LLNA-CFDS-'):null;
+  const comboSku=isFamilyComboBed?s.replace(familyBedPrefix,familyComboPrefix):null;
   const comboOpenSales=comboSku?getOpenSales(comboSku):0;
   const openSales=ownOpenSales+comboOpenSales;
   const base=computeFromRows(Math.max(openSales-soh,0),(DATA.pos||[]).flatMap(po=>{
