@@ -252,9 +252,12 @@ function getSkus(){return[...new Set([...Object.keys(DATA.cin7),...Object.keys(D
 function updateHeaderSub(){const el=document.getElementById('headerSub');if(el)el.textContent=`${Object.keys(DATA.cin7).length} CIN7 SKUs · ${Object.keys(DATA.velocity).filter(k=>!k.startsWith('_')).length} with velocity · ${uniquePoCount(DATA.pos)} open POs`;}
 function applyMattressRegion(){if(currentCK!=='ll-mattresses'||!DATA.mattressRegions)return;const base=DATA._base||{};const region=dashFilter.region||'All';const src=region==='All'?base:DATA.mattressRegions[region];if(!src)return;DATA.cin7=src.cin7||{};DATA.shopify=src.shopify||{};DATA.velocity=src.velocity||{};DATA.trendData=src.trendData||{};DATA.weeklyData=src.weeklyData||null;DATA.pos=src.pos||[];DATA.allPos=src.allPos||src.pos||[];updateHeaderSub();}
 function setMattressRegion(region){dashFilter.region=region;dashFilter.size='All';applyMattressRegion();renderDashboard()}
-function getNet(s){return(DATA.cin7[s]||0)+Math.min(DATA.shopify[s]||0,0)}
+function getGenericOpenDemand(s){return DATA.coverageAux?.mode==='generic'?Number((DATA.coverageAux.openDemandBySku||{})[s]||0):null}
+function getNet(s){const genericOpen=getGenericOpenDemand(s);return genericOpen!==null?(DATA.cin7[s]||0)-genericOpen:(DATA.cin7[s]||0)+Math.min(DATA.shopify[s]||0,0)}
 function getIncoming(s){return(DATA.pos||[]).reduce((t,po)=>((po.analyticsItems||po.items)?.[s]||0)+t,0)}
-function getOpenSales(s){return Math.max(-Number(DATA.shopify[s]||0),0)}
+function getOpenSales(s){const genericOpen=getGenericOpenDemand(s);return genericOpen!==null?genericOpen:Math.max(-Number(DATA.shopify[s]||0),0)}
+function getOpenOrdersDisplay(s){const genericOpen=getGenericOpenDemand(s);return genericOpen!==null?genericOpen:(DATA.shopify[s]||0)}
+function getOversoldChartValue(s){const genericOpen=getGenericOpenDemand(s);return genericOpen!==null?-genericOpen:Math.min(DATA.shopify[s]||0,0)}
 function fmtEtaShort(v){if(!v)return'—';const d=new Date(v);return Number.isNaN(d.getTime())?'—':d.toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'})}
 function buildPreorderCoverage(s){
   const computeFromRows=(preorderUnits, rows=[])=>{
@@ -643,7 +646,7 @@ function renderBOM() {
 
 function renderDashboard(){
   const skus=getSkus();let tSOH=0,tInc=0,tOver=0,tVel=0;
-  skus.forEach(s=>{tSOH+=(DATA.cin7[s]||0);tInc+=getIncoming(s);let sh=DATA.shopify[s]||0;if(sh<0)tOver+=sh;tVel+=getVel(s)});
+  skus.forEach(s=>{tSOH+=(DATA.cin7[s]||0);tInc+=getIncoming(s);let genericOpen=getGenericOpenDemand(s);let sh=DATA.shopify[s]||0;if(genericOpen!==null)tOver-=genericOpen;else if(sh<0)tOver+=sh;tVel+=getVel(s)});
   let wksT=tVel>0?Math.round((tSOH+Math.min(tOver,0))/tVel):99;
   let preorderBreakdownCard='', openOrdersCard='';
   const littleLifelyPanels=['llau','llnz','llna','llca','lluk','llsg'];
@@ -661,7 +664,7 @@ function renderDashboard(){
     const otherText=otherLittleLifely?` · Other ${Math.round(otherLittleLifely).toLocaleString()}`:'';
     preorderBreakdownCard=`<div class="card red" title="Little Lifely open Shopify orders for this panel's destination country, split before stock coverage is applied."><div class="label">Preorder Breakdown</div><div class="value">${Math.round(totalPreorders).toLocaleString()}</div><div class="sub">Beds ${Math.round(standaloneBeds).toLocaleString()} · Combos ${Math.round(comboBeds).toLocaleString()} · Swatches ${Math.round(swatchPacks).toLocaleString()}${otherText}</div></div>`;
   } else {
-    openOrdersCard=`<div class="card red" title="Units already sold on Shopify but not yet shipped. These eat into your physical stock — Net after Open Orders accounts for them."><div class="label">Open Orders</div><div class="value">${tOver.toLocaleString()}</div><div class="sub">Pre-order commitments</div></div>`;
+    openOrdersCard=`<div class="card red" title="Units already sold on Shopify but not yet shipped. These eat into your physical stock — Net after Open Orders accounts for them."><div class="label">Open Orders</div><div class="value">${Math.abs(tOver).toLocaleString()}</div><div class="sub">Pre-order commitments</div></div>`;
   }
   let overstockVal=0,deadstockVal=0;
   skus.forEach(s=>{let vel=getVel(s),soh=DATA.cin7[s]||0,cost=(DATA.costs||{})[s]||0;
@@ -740,9 +743,9 @@ function renderDashboard(){
   const coverageHeader=showCoverage
     ? `<th data-tip>Preorders<span class="tip">Units still waiting after using current ${coverageMeta.label} stock. Little Lifely bundle rows include matching combo/component demand where configured.</span></th><th data-tip>Next PO<span class="tip">First ${coverageMeta.place} PO for this SKU by ETA, shown with incoming qty</span></th><th data-tip>Next ETA<span class="tip">ETA of the next ${coverageMeta.place} PO for this SKU</span></th><th data-tip>Coverage PO<span class="tip">PO that fully clears the preorder demand, corresponding to the Preorder Date</span></th><th data-tip>Preorder Date<span class="tip">ETA of the first PO that fully clears the preorder backlog using the limiting component</span></th><th data-tip>Coverage Status<span class="tip">In stock, Covered by next shipment, Covered by later shipment, No incoming PO, ETA missing, Not covered, or Dropship</span></th>`
     : '';
-  document.querySelector('#stockTable thead').innerHTML='<tr><th>SKU</th><th>Supplier</th><th>Size</th><th data-tip>CBM<span class="tip">Cubic meters per unit from CIN7 product volume</span></th><th data-tip>CIN7 SOH<span class="tip">Stock On Hand — physical units in the warehouse from CIN7</span></th><th data-tip>Open Orders<span class="tip">Open Shopify demand for country panels. Negative means pre-order/open-order units waiting to be fulfilled.</span></th><th data-tip>Net after Open Orders<span class="tip">Cin7 Stock On Hand minus Shopify open orders. Uses physical SOH, not Cin7 Available.</span></th><th data-tip>Incoming<span class="tip">Units arriving from open Purchase Orders using the same open-PO rule as the PO tab: not Received, no Fully Received Date, not void/cancelled.</span></th>'+coverageHeader+'<th data-tip>Units/wk<span class="tip">Average weekly sales velocity over the last 30 days from Shopify orders</span></th><th data-tip>Wks Left Now<span class="tip">Weeks of stock remaining before incoming POs. Net after Open Orders ÷ Units/wk.</span></th><th data-tip>Wks Left + Incoming<span class="tip">Weeks of stock after adding currently open incoming POs. This is visibility only; reorder quantity rules will be reviewed separately.</span></th><th data-tip>Status<span class="tip">STOCKOUT: 0wk | CRITICAL: 1-2wk | LOW: 3-4wk | OK: 5-8wk | HEALTHY: 8+wk</span></th><th data-tip>FOB<span class="tip">Factory cost per unit (AUD). From CIN7 costAUD or costUSD×FX</span></th><th data-tip>Freight/u<span class="tip">AUD freight per unit based on CBM share of container. (SKU CBM ÷ PO total CBM) × container freight ÷ qty</span></th><th data-tip>Landed<span class="tip">Full landed cost per unit in AUD = FOB + Freight + Tariff. Landed-cost sheet values are maintained in AUD; estimates use open POs</span></th></tr>';
+  document.querySelector('#stockTable thead').innerHTML='<tr><th>SKU</th><th>Supplier</th><th>Size</th><th data-tip>CBM<span class="tip">Cubic meters per unit from CIN7 product volume</span></th><th data-tip>CIN7 SOH<span class="tip">Stock On Hand — physical units in the warehouse from CIN7</span></th><th data-tip>Open Orders<span class="tip">Open Shopify demand units waiting to be fulfilled. For Lifely coverage tabs this comes from the preorder/open-demand feed, not Shopify inventory.</span></th><th data-tip>Net after Open Orders<span class="tip">Cin7 Stock On Hand minus Shopify open orders. Uses physical SOH, not Cin7 Available.</span></th><th data-tip>Incoming<span class="tip">Units arriving from open Purchase Orders using the same open-PO rule as the PO tab: not Received, no Fully Received Date, not void/cancelled.</span></th>'+coverageHeader+'<th data-tip>Units/wk<span class="tip">Average weekly sales velocity over the last 30 days from Shopify orders</span></th><th data-tip>Wks Left Now<span class="tip">Weeks of stock remaining before incoming POs. Net after Open Orders ÷ Units/wk.</span></th><th data-tip>Wks Left + Incoming<span class="tip">Weeks of stock after adding currently open incoming POs. This is visibility only; reorder quantity rules will be reviewed separately.</span></th><th data-tip>Status<span class="tip">STOCKOUT: 0wk | CRITICAL: 1-2wk | LOW: 3-4wk | OK: 5-8wk | HEALTHY: 8+wk</span></th><th data-tip>FOB<span class="tip">Factory cost per unit (AUD). From CIN7 costAUD or costUSD×FX</span></th><th data-tip>Freight/u<span class="tip">AUD freight per unit based on CBM share of container. (SKU CBM ÷ PO total CBM) × container freight ÷ qty</span></th><th data-tip>Landed<span class="tip">Full landed cost per unit in AUD = FOB + Freight + Tariff. Landed-cost sheet values are maintained in AUD; estimates use open POs</span></th></tr>';
   document.querySelector('#stockTable tbody').innerHTML=filtered.map(s=>{
-    let soh=DATA.cin7[s]||0,sh=DATA.shopify[s]||0,net=getNet(s),inc=getIncoming(s),vel=getVel(s),wks=net<=0?0:(vel>0?Math.max(0,Math.round(net/vel)):99),wksInc=(net+inc)<=0?0:(vel>0?Math.max(0,Math.round((net+inc)/vel)):99);
+    let soh=DATA.cin7[s]||0,sh=getOpenOrdersDisplay(s),net=getNet(s),inc=getIncoming(s),vel=getVel(s),wks=net<=0?0:(vel>0?Math.max(0,Math.round(net/vel)):99),wksInc=(net+inc)<=0?0:(vel>0?Math.max(0,Math.round((net+inc)/vel)):99);
     const lc=DATA.landedCosts[s];const fob=(DATA.costs||{})[s]||0;const isEst=lc&&lc.source==='estimated'; const supplier=(DATA.suppliers||{})[s]||'—'; const cbm=(DATA.cbmMap||{})[s]||0;
     const coverage=showCoverage?buildPreorderCoverage(s):null;
     const coverageBadgeClass=!coverage?''
@@ -761,8 +764,8 @@ function renderDashboard(){
   charts.stock=new Chart(document.getElementById('stockChart'),{type:'bar',data:{labels:cs.map(s=>s),datasets:[
     {label:'SOH',data:cs.map(s=>DATA.cin7[s]||0),backgroundColor:'#5BAB31'},
     {label:'Incoming',data:cs.map(s=>getIncoming(s)),backgroundColor:'#2C474B'},
-    {label:'Oversold',data:cs.map(s=>Math.min(DATA.shopify[s]||0,0)),backgroundColor:'#C33252'},
-    {label:'After Incoming',data:cs.map(s=>(DATA.cin7[s]||0)+getIncoming(s)+Math.min(DATA.shopify[s]||0,0)),type:'line',borderColor:'#D4930D',backgroundColor:'transparent',borderWidth:2,pointRadius:2,tension:0.3,order:0}
+    {label:'Open Orders',data:cs.map(s=>getOversoldChartValue(s)),backgroundColor:'#C33252'},
+    {label:'After Incoming',data:cs.map(s=>getNet(s)+getIncoming(s)),type:'line',borderColor:'#D4930D',backgroundColor:'transparent',borderWidth:2,pointRadius:2,tension:0.3,order:0}
   ]},options:{responsive:true,plugins:{legend:{labels:{color:'#282828',font:{size:10}}}},scales:{x:{stacked:true,ticks:{color:'#758068',maxRotation:45,font:{size:9}}},y:{stacked:true,ticks:{color:'#758068'},grid:{color:'#DDE3D5'}}}}})
 }
 
