@@ -711,7 +711,7 @@ function renderDashboard(){
     const marketLabel=currentCK==='llau'?'AU':currentCK==='llnz'?'NZ':'UK';
     const bedPattern=currentCK==='lluk'?/^LLUK-CB-(S|SD|D)-/:/^LLAU-CB-(S|KS|D)-/;
     const bedPrefix=DATA.coverageAux?.bedPrefix || (currentCK==='lluk'?'LLUK-CB-':'LLAU-CB-');
-    const comboPrefix=DATA.coverageAux?.comboPrefix || (currentCK==='lluk'?'LLUK-CBDS-':'LLAU-CBCF-');
+    const comboPrefix=DATA.coverageAux?.comboPrefix || (currentCK==='lluk'?'LLUK-CBCF-':'LLAU-CBCF-');
     const bedSkus=skus.filter(s=>bedPattern.test(s) && !s.includes('-CV') && !s.includes('-CS-')).sort((a,b)=>a.localeCompare(b));
     const statusRank={ 'In stock':0, 'Covered by next shipment':1, 'Covered by later shipment':2, 'ETA missing':3, 'No incoming PO':4, 'Not covered':5 };
     const marketingBadgeClass=status=>status==='Covered by next shipment'?'cover-next':status==='Covered by later shipment'?'cover-later':status==='In stock'?'ok':status==='No incoming PO'||status==='Not covered'?'critical':'blue';

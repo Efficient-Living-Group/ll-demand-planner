@@ -2129,7 +2129,7 @@ function buildCKData(ckId) {
         branchIds: [62444],
         destination: 'United Kingdom',
         salesCountry: 'GB',
-        comboMap: { 'LLUK-CBDS-S-': 'DDUK-2190CF', 'LLUK-CBDS-SD-': 'DDUK-21120CF', 'LLUK-CBDS-D-': 'DDUK-21135CF' }
+        comboMap: { 'LLUK-CBCF-S-': 'DDUK-2190CF', 'LLUK-CBCF-SD-': 'DDUK-21120CF', 'LLUK-CBCF-D-': 'DDUK-21135CF' }
       }
     };
     mattressRegions = Object.fromEntries(Object.entries(mattressRegionConfigs).map(([region, cfg]) => {
