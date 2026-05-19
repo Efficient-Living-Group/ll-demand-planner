@@ -68,7 +68,7 @@ const CK_DEFS = {
   'cusb-uk':  { name: 'Cushie UK',              prefix: 'MULTI',  logo: 'cushie.png',        store: 'lifely', salesCountry: 'GB', stockBranches: [62444], option1: ['Category Killer - Cushie V2', 'Category Killer - Cushie V3 Snuggle'], filter: sku => (sku.startsWith('CUSB') || sku.startsWith('LFSB')) && sku.includes('-UK'), excludeCV: true, sizes: {'-TW-':'Twin','-S-':'Single','-D-':'Double','-Q-':'Queen','-K-':'King','-CHS-':'Chaise','-SOTM-':'Ottoman','-AMST-':'Armrest'} },
 
   'cmss':     { name: 'Cushie Modular Sleeper', prefix: 'CMSS',   logo: 'cushie.png',        store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Cushie V2', sizes: {'-S-':'Single','-D-':'Double','-Q-':'Queen','-K-':'King'} },
-  'lifely-sofa': { name: 'Lifely Sofa',         prefix: 'LIFELY', logo: 'lifely-sofa.png',   store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Lifely Sofa', sizes: {} },
+  'lifely-sofa': { name: 'Lifely Sofa',         prefix: 'MULTI',  logo: 'lifely-sofa.png',   store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Lifely Sofa', filter: isLifelySofaComponentSku, sizes: {} },
   'case-goods': { name: 'Case Goods',           prefix: 'MULTI',  logo: 'lifely-sofa.png',   store: 'lifely', option1: ['Case goods - Active', 'Case goods - Discontinued'], filter: isCaseGoodsSku, sizes: {} }
 };
 
@@ -148,6 +148,80 @@ function explodeCocoonDeepDreamCombo(comboSku) {
   };
 }
 
+const LIFELY_SOFA_SWATCH_COLOURS = ['BLST', 'CHC', 'CRMPIP', 'DKGN', 'LB', 'OG', 'RST', 'WHT'];
+
+function isLifelySofaComponentSku(sku) {
+  const s = String(sku || '').toUpperCase().trim();
+  if (/^LIFELY-FS-(BLST|CHC|CRMPIP|DKGN|LB|OG|RST|WHT)$/.test(s)) return true;
+  if (/^LFSF-(AMLS|CRNR|OTM)-(FC|CV-[A-Z0-9]+)$/.test(s)) return true;
+  if (/^LIFELY-OTM-[A-Z0-9]+-\d+$/.test(s)) return true;
+  if (/^LIFELY-SOFA-(AMLS|AMCR|CRNR)-[A-Z0-9]+-\d+$/.test(s)) return true;
+  return false;
+}
+
+function lifelySofaColourFromSku(sku) {
+  const parts = String(sku || '').toUpperCase().trim().split('-').filter(Boolean);
+  if (!parts.length) return '';
+  if (parts[parts.length - 1] === 'CVR') return parts[parts.length - 2] || '';
+  return parts[parts.length - 1] || '';
+}
+
+function pushLifelySofaModules(out, module, colour, qty, includeFrame, includeCover) {
+  const q = Math.max(0, Number(qty || 0));
+  if (!q) return;
+  if (includeFrame) out.push({ sku: `LFSF-${module}-FC`, qty: q });
+  if (includeCover && colour) out.push({ sku: `LFSF-${module}-CV-${colour}`, qty: q });
+}
+
+function explodeLifelySofaSku(sku) {
+  const s = String(sku || '').toUpperCase().trim();
+  if (!s || isLifelySofaComponentSku(s)) return null;
+  if (s === 'LIFELY-FS-PACK') return LIFELY_SOFA_SWATCH_COLOURS.map(colour => ({ sku: `LIFELY-FS-${colour}`, qty: 1 }));
+
+  const colour = lifelySofaColourFromSku(s);
+  if (!colour) return null;
+  const coverOnly = s.endsWith('-CVR');
+  const includeFrame = !coverOnly;
+  const includeCover = true;
+  const out = [];
+
+  let m = s.match(/^LIFELY-OTM-[A-Z0-9]+(?:-CVR)?$/);
+  if (m) {
+    pushLifelySofaModules(out, 'OTM', colour, 1, includeFrame, includeCover);
+    return out;
+  }
+
+  m = s.match(/^LIFELY-SOFA-(AMLS|AMCR|CRNR)-[A-Z0-9]+(?:-CVR)?$/);
+  if (m) {
+    const direct = s.replace(/-CVR$/, '');
+    return [{ sku: direct + '-1', qty: 1 }, { sku: direct + '-2', qty: 1 }];
+  }
+
+  m = s.match(/^LIFELY-SOFA-(\d+)S(?:-(LEFT|RIGHT|OTM))?-[A-Z0-9]+(?:-CVR)?$/);
+  if (m) {
+    const seats = Number(m[1] || 0);
+    const layout = m[2] || '';
+    pushLifelySofaModules(out, 'AMLS', colour, seats, includeFrame, includeCover);
+    if (layout === 'LEFT' || layout === 'RIGHT' || layout === 'OTM') pushLifelySofaModules(out, 'OTM', colour, 1, includeFrame, includeCover);
+    return out;
+  }
+
+  m = s.match(/^LFSF-(\d+)S(?:-([A-Z0-9]+))?-[A-Z0-9]+(?:-CVR)?$/);
+  if (m) {
+    const seats = Number(m[1] || 0);
+    const layout = m[2] || '';
+    const ottomanMatch = layout.match(/(\d*)OTM/);
+    const ottomans = ottomanMatch ? Number(ottomanMatch[1] || 1) : 0;
+    const corners = /(^|-)U/.test(layout) ? 2 : /(^|-)L/.test(layout) ? 1 : 0;
+    pushLifelySofaModules(out, 'AMLS', colour, seats, includeFrame, includeCover);
+    pushLifelySofaModules(out, 'CRNR', colour, corners, includeFrame, includeCover);
+    pushLifelySofaModules(out, 'OTM', colour, ottomans, includeFrame, includeCover);
+    return out;
+  }
+
+  return null;
+}
+
 function lfsbSizeFromCmss(size) {
   if (size === 'K') return 'Q';
   if (['S', 'D', 'Q', 'TW'].includes(size)) return size;
@@ -223,6 +297,10 @@ function explodeDemandSkuForCk(sku, ckId) {
   if (ckId === 'cusb-au-lifely') {
     const cushieModular = explodeCushieModularSku(s);
     if (cushieModular) return cushieModular;
+  }
+  if (ckId === 'lifely-sofa') {
+    const lifelySofa = explodeLifelySofaSku(s);
+    if (lifelySofa) return lifelySofa.flatMap(row => Array.from({ length: Math.max(0, Number(row.qty || 0)) }, () => row.sku));
   }
   return null;
 }
@@ -1568,6 +1646,9 @@ function buildCKData(ckId) {
 
   // Normalize: merge box-splits, map components to sets
   let cin7Normalized = normalizeCIN7(cin7Raw);
+  // Lifely Sofa should show true physical component/carton SKUs. Do not merge
+  // component boxes back into sellable combo parents such as LIFELY-OTM-WHT.
+  if (ckId === 'lifely-sofa') cin7Normalized = { ...cin7Raw };
 
   // Special handling per CK
   if (ckId.startsWith('rdnt')) cin7Normalized = normalizeRadiant(cin7Normalized, Object.keys(dataCache.shopifyInventory[storeKey] || {}));
@@ -1700,6 +1781,22 @@ function buildCKData(ckId) {
         for (const componentSku of components) {
           if (cin7[componentSku] !== undefined || velocity[componentSku] !== undefined || shopify[componentSku] !== undefined) {
             velocity[componentSku] = (velocity[componentSku] || 0) + Number(vel || 0);
+          }
+        }
+      }
+    }
+  }
+
+  if (ckId === 'lifely-sofa') {
+    for (const sourceStore of relatedStores) {
+      for (const [demandSku, vel] of Object.entries(dataCache.shopifyVelocity?.[sourceStore] || {})) {
+        if (String(demandSku || '').startsWith('_')) continue;
+        const components = explodeLifelySofaSku(demandSku);
+        if (!components) continue;
+        for (const row of components) {
+          const componentSku = row.sku;
+          if (cin7[componentSku] !== undefined || velocity[componentSku] !== undefined || shopify[componentSku] !== undefined) {
+            velocity[componentSku] = (velocity[componentSku] || 0) + Number(vel || 0) * Number(row.qty || 1);
           }
         }
       }
@@ -2144,7 +2241,7 @@ function buildCKData(ckId) {
 
   // Remove inactive Shopify SKUs (draft/archived)
   const inactiveSet = new Set(relatedStores.flatMap(sourceStore => dataCache.shopifyInventory?.[sourceStore]?.['__inactive__'] || []));
-  const keepInactiveForPanel = ckId === 'll-mattresses' || ckId === 'dd';
+  const keepInactiveForPanel = ckId === 'll-mattresses' || ckId === 'dd' || ckId === 'lifely-sofa';
   for (const sku of Object.keys(cin7)) {
     if (!keepInactiveForPanel && inactiveSet.has(sku)) { delete cin7[sku]; delete velocity[sku]; delete shopify[sku]; }
   }
