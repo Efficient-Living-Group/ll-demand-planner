@@ -78,6 +78,7 @@ const COMBO_BOM = {
   mattress: { 'S': 'DD-21915CF', 'KS': 'DD-21107CF', 'D': 'DD-21137CF' }
 };
 
+const SWATCH_COLOURS = ['DSBL', 'DGY', 'PST', 'BABL', 'CTCN', 'MSM'];
 const COCOON_SIZE_WORD = { 'D': 'DOUBLE', 'Q': 'QUEEN', 'K': 'KING' };
 
 function getComboSize(sku) {
@@ -276,8 +277,90 @@ function explodeCushieModularSku(sku) {
   return null;
 }
 
-function explodeDemandSkuForCk(sku, ckId) {
+function pushComponent(out, sku, qty = 1) {
+  const q = Math.max(0, Number(qty || 0));
+  if (!sku || !q) return;
+  for (let i = 0; i < q; i += 1) out.push(sku);
+}
+
+function explodeLittleLifelyBundleSku(sku, ckId) {
   const s = String(sku || '').toUpperCase().trim();
+  if ((ckId === 'llau' || ckId === 'llnz') && s === 'LLAU-CB-CS-PACK') {
+    return SWATCH_COLOURS.map(colour => `LLAU-CB-CS-${colour}`);
+  }
+
+  const configs = {
+    llau: { comboPrefix: 'LLAU-CBCF-', bedPrefix: 'LLAU-CB-', mattressMap: { S: 'DD-21915CF', KS: 'DD-21107CF', D: 'DD-21137CF' } },
+    llnz: { comboPrefix: 'LLAU-CBCF-', bedPrefix: 'LLAU-CB-', mattressMap: { S: 'DD-21915CF', KS: 'DD-21107CF', D: 'DD-21137CF' } },
+    'llau-cbcf': { comboPrefix: 'LLAU-CBCF-', bedPrefix: 'LLAU-CB-', mattressMap: { S: 'DD-21915CF', KS: 'DD-21107CF', D: 'DD-21137CF' } },
+    lluk: { comboPrefix: 'LLUK-CBCF-', bedPrefix: 'LLUK-CB-', mattressMap: { S: 'DDUK-2190CF', SD: 'DDUK-21120CF', D: 'DDUK-21135CF' } },
+    llna: { comboPrefix: 'LLNA-CFDS-', bedPrefix: 'LLNA-CB-', mattressMap: {} },
+    llca: { comboPrefix: 'LLNA-CFDS-', bedPrefix: 'LLNA-CB-', mattressMap: {} },
+    llsg: { comboPrefix: 'LLSG-CFDS-', bedPrefix: 'LLSG-CB-', mattressMap: {} }
+  };
+  const cfg = configs[ckId];
+  if (!cfg || !s.startsWith(cfg.comboPrefix)) return null;
+  const rest = s.slice(cfg.comboPrefix.length);
+  const parts = rest.split('-');
+  const size = parts.shift();
+  const colour = parts.join('-');
+  if (!size || !colour) return null;
+  const out = [`${cfg.bedPrefix}${size}-${colour}`];
+  if (cfg.mattressMap[size]) out.push(cfg.mattressMap[size]);
+  return out;
+}
+
+function explodeCushieSnuggleSetSku(sku, ckId) {
+  const s = String(sku || '').toUpperCase().trim();
+  let m = s.match(/^(CUSB-(TW|D|Q|K)-([A-Z0-9]+))-SET$/);
+  if (m && ckId === 'cusb-au-snuggle') return [m[1], `${m[1]}-CV`];
+
+  m = s.match(/^(CUSB-(TW|D|Q|K)-([A-Z0-9]+))-SET-UK$/);
+  if (m && ckId === 'cusb-uk') return [`${m[1]}-UK`, `${m[1]}-UK-CV`];
+
+  m = s.match(/^(V3-(TB|DB|QB|KB)-([A-Z0-9]+))-SET$/);
+  if (m && ckId === 'cusb-us') return [m[1], `${m[1]}-CV`];
+  return null;
+}
+
+function explodeCushieUsBundleSku(sku, ckId) {
+  if (ckId !== 'cusb-us') return null;
+  const s = String(sku || '').toUpperCase().trim();
+  const m = s.match(/^(V[23])-BDL-(.+)-([A-Z0-9]+)$/);
+  if (!m) return null;
+  const [, version, body, colour] = m;
+  const out = [];
+  for (const rawPart of body.split('-')) {
+    const partMatch = rawPart.match(/^(\d+)?([A-Z]+)$/);
+    if (!partMatch) return null;
+    const qty = Number(partMatch[1] || 1);
+    let code = partMatch[2];
+    if (version === 'V3' && code === 'RMST') code = 'ARM';
+    pushComponent(out, `${version}-${code}-${colour}`, qty);
+  }
+  return out.length ? out : null;
+}
+
+function explodeCaseGoodsBundleSku(sku, ckId) {
+  if (ckId !== 'case-goods') return null;
+  const s = String(sku || '').toUpperCase().trim();
+  if (s === 'RKU-SOFA-SET') return ['RKU-SOFA-2S-IVORY', 'RKU-OTM-IVORY'];
+  const m = s.match(/^RAI-AMBR-(BLK|GRN|WHT)-4S(?:-SET)?$/);
+  if (m) return ['RAI-DT100-OAK', ...Array.from({ length: 4 }, () => `AMBR-DC-${m[1]}`)];
+  return null;
+}
+
+function explodeKnownBundleSkuForCk(sku, ckId) {
+  const s = String(sku || '').toUpperCase().trim();
+  if (!s) return null;
+  const ll = explodeLittleLifelyBundleSku(s, ckId);
+  if (ll) return ll;
+  if (ckId === 'll-mattresses') {
+    const au = s.match(/^LLAU-CBCF-(S|KS|D)-/);
+    if (au) return [{ S: 'DD-21915CF', KS: 'DD-21107CF', D: 'DD-21137CF' }[au[1]]];
+    const uk = s.match(/^LLUK-CBCF-(S|SD|D)-/);
+    if (uk) return [{ S: 'DDUK-2190CF', SD: 'DDUK-21120CF', D: 'DDUK-21135CF' }[uk[1]]];
+  }
   if (ckId === 'rdnt') {
     const radiantSet = explodeRadiantSetSku(s);
     if (radiantSet) return radiantSet.components;
@@ -298,11 +381,23 @@ function explodeDemandSkuForCk(sku, ckId) {
     const cushieModular = explodeCushieModularSku(s);
     if (cushieModular) return cushieModular;
   }
+  if (ckId === 'cusb-au-snuggle' || ckId === 'cusb-uk' || ckId === 'cusb-us') {
+    const cushieSet = explodeCushieSnuggleSetSku(s, ckId);
+    if (cushieSet) return cushieSet;
+    const cushieUsBundle = explodeCushieUsBundleSku(s, ckId);
+    if (cushieUsBundle) return cushieUsBundle;
+  }
   if (ckId === 'lifely-sofa') {
     const lifelySofa = explodeLifelySofaSku(s);
     if (lifelySofa) return lifelySofa.flatMap(row => Array.from({ length: Math.max(0, Number(row.qty || 0)) }, () => row.sku));
   }
+  const caseGoods = explodeCaseGoodsBundleSku(s, ckId);
+  if (caseGoods) return caseGoods;
   return null;
+}
+
+function explodeDemandSkuForCk(sku, ckId) {
+  return explodeKnownBundleSkuForCk(sku, ckId);
 }
 
 function isCocoonComboSku(sku) {
@@ -1504,7 +1599,6 @@ function normalizeCIN7(cin7Raw) {
 // CIN7 tracks individual swatches: LLAU-CB-CS-{colour}
 // PACK SOH = min(all swatch SOH), cost = sum(all swatch costs)
 // Individual swatches inherit PACK velocity (they're only sold as a set)
-const SWATCH_COLOURS = ['DSBL', 'DGY', 'PST', 'BABL', 'CTCN', 'MSM'];
 function normalizeSwatchPack(cin7) {
   const result = { ...cin7 };
   const swatchKeys = SWATCH_COLOURS.map(c => 'LLAU-CB-CS-' + c);
@@ -1522,85 +1616,25 @@ function normalizeSwatchPack(cin7) {
   return result;
 }
 
-// Shopify sells: RDNT-{size}-{type}-SET (e.g. RDNT-Q-MF-SET)
-// CIN7 tracks: RDNT-{size}-{type} (e.g. RDNT-Q-MF) + RDNT-{size}-BASE
-// A SET = BASE + topper. Buildable = min(BASE, topper)
+// Shopify sells RDNT set/bundle SKUs, but CK rows should show the
+// underlying physical components only. Demand from SET SKUs is funneled into
+// RDNT-{size}-BASE and RDNT-{size}-{comfort} by explodeKnownBundleSkuForCk().
 function normalizeRadiant(cin7, shopifySkus) {
   const result = {};
-  // Preserve raw RDNT component SKUs so POs and drilldown can resolve them.
-  // SET keys are added alongside and used for display/reorder.
   for (const [sku, data] of Object.entries(cin7)) {
-    if (sku.startsWith('RDNT-')) result[sku] = data;
+    if (sku.startsWith('RDNT-') && !sku.endsWith('-SET')) result[sku] = data;
   }
-  const sizes = ['D', 'K', 'Q'];
-  const types = ['S', 'MF', 'F'];
-
-  for (const size of sizes) {
-    const baseKey = 'RDNT-' + size + '-BASE';
-    const baseSoh = cin7[baseKey]?.soh || cin7[baseKey] || 0;
-
-    for (const type of types) {
-      const compKey = 'RDNT-' + size + '-' + type;
-      const setKey = compKey + '-SET';
-      const compSoh = cin7[compKey]?.soh || cin7[compKey] || 0;
-
-      // Single topper set
-      const baseCost = cin7[baseKey]?.costAUD || 0;
-      const compCost = cin7[compKey]?.costAUD || 0;
-      const baseCbm = cin7[baseKey]?.cbm || 0;
-      const compCbm = cin7[compKey]?.cbm || 0;
-      result[setKey] = { soh: Math.min(baseSoh, compSoh), available: Math.min(baseSoh, compSoh), costAUD: baseCost + compCost, cbm: baseCbm + compCbm };
-
-      // Multi-topper combos (e.g. RDNT-Q-S-MF-SET = BASE + S + MF)
-      for (const type2 of types) {
-        if (type2 <= type) continue; // avoid duplicates
-        const comp2Key = 'RDNT-' + size + '-' + type2;
-        const comboSetKey = 'RDNT-' + size + '-' + type + '-' + type2 + '-SET';
-        const comp2Soh = cin7[comp2Key]?.soh || cin7[comp2Key] || 0;
-        const comp2Cost = cin7[comp2Key]?.costAUD || 0;
-        const comp2Cbm = cin7[comp2Key]?.cbm || 0;
-        result[comboSetKey] = { soh: Math.min(baseSoh, compSoh, comp2Soh), available: Math.min(baseSoh, compSoh, comp2Soh), costAUD: baseCost + compCost + comp2Cost, cbm: baseCbm + compCbm + comp2Cbm };
-      }
-    }
-
-    // Protector
-    const protKey = 'RDNT-PROT-' + size;
-    if (cin7[protKey]) {
-      result[protKey] = cin7[protKey];
-    }
-  }
-
   return result;
 }
 
-// Cushie: normalize AU SKUs
-// CIN7: CUSB-Q-LTGN-1, CUSB-Q-LTGN-2 (box split) + CUSB-ARST-SET-LTGN (armrest sets)
-// Shopify: CUSB-Q-LTGN-SET, CUSB-D-LTGN-SET etc.
+// Cushie: keep the component/base SKUs visible. Shopify bundle/set demand is
+// exploded into these rows instead of synthesizing -SET display rows.
 function normalizeCushie(cin7Normalized) {
-  const result = {};
-  for (const [sku, data] of Object.entries(cin7Normalized)) {
-    // Website sells the set SKU, so standardize dashboard display to -SET.
-    if (sku.match(/^CUSB-(TW|D|Q|K)-(LTGN|DNM|TBRN|TWHT)$/) && !sku.includes('-SET')) {
-      const setData = typeof data === 'object' ? { ...data } : { soh: data, available: data };
-      if (!setData.costAUD && typeof data === 'object') setData.costAUD = data.costAUD || 0;
-      result[sku + '-SET'] = setData;
-      continue;
-    }
-    result[sku] = data;
-  }
-  return result;
+  return { ...cin7Normalized };
 }
 
 function normalizeCushiePoItems(items) {
-  const result = {};
-  for (const [sku, qty] of Object.entries(items || {})) {
-    if (sku.match(/^CUSB-(TW|D|Q|K)-(LTGN|DNM|TBRN|TWHT)$/) && !sku.includes('-SET')) {
-      result[sku + '-SET'] = (result[sku + '-SET'] || 0) + qty;
-      continue;
-    }
-    result[sku] = (result[sku] || 0) + qty;
-  }
-  return result;
+  return { ...(items || {}) };
 }
 
 
@@ -1689,12 +1723,28 @@ function buildCKData(ckId) {
       }
   }
 
-  // Shopify inventory
+  // Shopify inventory. Bundle/config SKUs are not displayed as rows; their
+  // inventory signal is pushed down to component SKUs when a BOM is known.
   const shopify = {};
+  const panelHasSku = (sku) => cin7[sku] !== undefined || shopify[sku] !== undefined || skuMatchesDef(sku, def);
+  const addToPanelMap = (map, sku, qty) => {
+    if (!sku || !panelHasSku(sku)) return false;
+    map[sku] = (map[sku] || 0) + Number(qty || 0);
+    return true;
+  };
+  const addExplodedToPanelMap = (map, sku, qty) => {
+    const components = explodeDemandSkuForCk(sku, ckId);
+    if (!components) return false;
+    let added = false;
+    for (const componentSku of components) added = addToPanelMap(map, componentSku, qty) || added;
+    return added;
+  };
   for (const sourceStore of relatedStores) {
     const storeInv = dataCache.shopifyInventory[sourceStore] || {};
-    for (const [sku, qty] of Object.entries(storeInv)) {
-      if (ckId === 'cocoon' && isCocoonComboSku(sku)) continue;
+    for (const [rawSku, qty] of Object.entries(storeInv)) {
+      const sku = String(rawSku || '').toUpperCase().trim();
+      if (ckId === 'cocoon' && isCocoonComboSku(sku)) { addExplodedToPanelMap(shopify, sku, qty); continue; }
+      if (addExplodedToPanelMap(shopify, sku, qty)) continue;
       if (!skuMatchesDef(sku, def)) continue;
       shopify[sku] = (shopify[sku] || 0) + qty;
     }
@@ -1730,76 +1780,60 @@ function buildCKData(ckId) {
             : ckId === 'llsg'
               ? 'SG'
               : 'US';
-    for (const sku of Object.keys(cin7)) {
-      let totalOpenDemand = relatedStores.reduce((sum, sourceStore) => {
-        return sum + Number(dataCache.shopifyOpenDemand?.[sourceStore]?.[demandCountry]?.[sku] || 0);
-      }, 0);
-      if (ckId === 'llau' && sku.startsWith('DD-21')) {
-        const comboMap = { 'DD-21915CF': 'LLAU-CBCF-S-', 'DD-21107CF': 'LLAU-CBCF-KS-', 'DD-21137CF': 'LLAU-CBCF-D-' };
-        const comboPrefix = comboMap[sku];
-        if (comboPrefix) {
-          for (const sourceStore of relatedStores) {
-            const countryDemand = dataCache.shopifyOpenDemand?.[sourceStore]?.[demandCountry] || {};
-            for (const [demandSku, qty] of Object.entries(countryDemand)) {
-              if (demandSku.startsWith(comboPrefix)) totalOpenDemand += Number(qty || 0);
+    const openDemandByVisibleSku = {};
+    for (const sourceStore of relatedStores) {
+      const countryDemand = dataCache.shopifyOpenDemand?.[sourceStore]?.[demandCountry] || {};
+      for (const [rawDemandSku, qty] of Object.entries(countryDemand)) {
+        const demandSku = canonicalDemandSku(rawDemandSku, demandCountry);
+        const q = Number(qty || 0);
+        if (!q) continue;
+        const exploded = explodeDemandSkuForCk(demandSku, ckId);
+        if (exploded) {
+          for (const componentSku of exploded) {
+            if (cin7[componentSku] !== undefined || shopify[componentSku] !== undefined) {
+              openDemandByVisibleSku[componentSku] = (openDemandByVisibleSku[componentSku] || 0) + q;
             }
           }
+          continue;
+        }
+        if (cin7[demandSku] !== undefined || shopify[demandSku] !== undefined) {
+          openDemandByVisibleSku[demandSku] = (openDemandByVisibleSku[demandSku] || 0) + q;
         }
       }
-      if (ckId === 'cusb-au-lifely') totalOpenDemand += Number(cushieModularComponentDemand[sku] || 0);
-      shopify[sku] = -totalOpenDemand;
+    }
+    for (const sku of Object.keys(cin7)) {
+      shopify[sku] = -Number(openDemandByVisibleSku[sku] || 0);
     }
   }
 
   // Velocity
   const velocity = {};
-  const mergeVelocitySource = (source) => {
-    for (const [sku, vel] of Object.entries(source || {})) {
-      if (sku.startsWith('_')) continue;
+  const mergeVelocitySource = (source, country = '') => {
+    for (const [rawSku, vel] of Object.entries(source || {})) {
+      if (String(rawSku || '').startsWith('_')) continue;
+      const sku = canonicalDemandSku(rawSku, country);
+      const exploded = explodeDemandSkuForCk(sku, ckId);
+      if (exploded) {
+        for (const componentSku of exploded) {
+          if (cin7[componentSku] !== undefined || shopify[componentSku] !== undefined || velocity[componentSku] !== undefined) {
+            velocity[componentSku] = (velocity[componentSku] || 0) + Number(vel || 0);
+          }
+        }
+        continue;
+      }
       if (ckId === 'cocoon' && isCocoonComboSku(sku)) continue;
       if (!skuMatchesDef(sku, def)) continue;
-      velocity[sku] = (velocity[sku] || 0) + vel;
+      velocity[sku] = (velocity[sku] || 0) + Number(vel || 0);
     }
   };
 
   if (salesCountry) {
     for (const sourceStore of relatedStores) {
-      mergeVelocitySource(dataCache.shopifyVelocityByCountry?.[sourceStore]?.[salesCountry] || {});
+      mergeVelocitySource(dataCache.shopifyVelocityByCountry?.[sourceStore]?.[salesCountry] || {}, salesCountry);
     }
   } else {
     for (const sourceStore of relatedStores) {
-      mergeVelocitySource(dataCache.shopifyVelocity?.[sourceStore] || {});
-    }
-  }
-
-  if (ckId === 'cusb-au-lifely') {
-    for (const sourceStore of relatedStores) {
-      for (const [demandSku, vel] of Object.entries(dataCache.shopifyVelocity?.[sourceStore] || {})) {
-        if (String(demandSku || '').startsWith('_')) continue;
-        const components = explodeCushieModularSku(demandSku);
-        if (!components) continue;
-        for (const componentSku of components) {
-          if (cin7[componentSku] !== undefined || velocity[componentSku] !== undefined || shopify[componentSku] !== undefined) {
-            velocity[componentSku] = (velocity[componentSku] || 0) + Number(vel || 0);
-          }
-        }
-      }
-    }
-  }
-
-  if (ckId === 'lifely-sofa') {
-    for (const sourceStore of relatedStores) {
-      for (const [demandSku, vel] of Object.entries(dataCache.shopifyVelocity?.[sourceStore] || {})) {
-        if (String(demandSku || '').startsWith('_')) continue;
-        const components = explodeLifelySofaSku(demandSku);
-        if (!components) continue;
-        for (const row of components) {
-          const componentSku = row.sku;
-          if (cin7[componentSku] !== undefined || velocity[componentSku] !== undefined || shopify[componentSku] !== undefined) {
-            velocity[componentSku] = (velocity[componentSku] || 0) + Number(vel || 0) * Number(row.qty || 1);
-          }
-        }
-      }
+      mergeVelocitySource(dataCache.shopifyVelocity?.[sourceStore] || {}, '');
     }
   }
 
@@ -1817,15 +1851,6 @@ function buildCKData(ckId) {
       if (velocity[comboSku]) {
         velocity[sku] = (velocity[sku] || 0) + velocity[comboSku];
         velocity[comboSku] = 0;
-      }
-    }
-  }
-
-  if (ckId === 'llau') {
-    const mattressVelocityMap = { 'DD-21915CF': 'LLAU-CBCF-S-', 'DD-21107CF': 'LLAU-CBCF-KS-', 'DD-21137CF': 'LLAU-CBCF-D-' };
-    for (const [mattressSku, comboPrefix] of Object.entries(mattressVelocityMap)) {
-      for (const [sku, vel] of Object.entries({ ...velocity })) {
-        if (sku.startsWith(comboPrefix)) velocity[mattressSku] = (velocity[mattressSku] || 0) + vel;
       }
     }
   }
@@ -1898,7 +1923,14 @@ function buildCKData(ckId) {
     for (const sourceStore of relatedStores) {
       for (const [rawSku, qty] of Object.entries(dataCache.shopifyOpenDemand?.[sourceStore]?.[coverageConfig.demandCountry] || {})) {
         const sku = canonicalDemandSku(rawSku, coverageConfig.demandCountry);
-        openDemandBySku[sku] = (openDemandBySku[sku] || 0) + Number(qty || 0);
+        const q = Number(qty || 0);
+        openDemandBySku[sku] = (openDemandBySku[sku] || 0) + q;
+        const exploded = explodeDemandSkuForCk(sku, ckId);
+        if (exploded) {
+          for (const componentSku of exploded) {
+            openDemandBySku[componentSku] = (openDemandBySku[componentSku] || 0) + q;
+          }
+        }
       }
     }
     const stockBySku = {};
@@ -2249,6 +2281,18 @@ function buildCKData(ckId) {
     if (!keepInactiveForPanel && inactiveSet.has(sku)) { delete velocity[sku]; }
   }
 
+  // Final row guard: known bundle/config SKUs must not appear as CK rows.
+  // Their demand/velocity was already funneled into component SKUs above.
+  for (const sku of new Set([...Object.keys(cin7), ...Object.keys(shopify), ...Object.keys(velocity)])) {
+    if (!explodeDemandSkuForCk(sku, ckId)) continue;
+    delete cin7[sku];
+    delete cin7Available[sku];
+    delete shopify[sku];
+    delete velocity[sku];
+    delete costs[sku];
+    delete cbmMap[sku];
+  }
+
   // === Per-SKU landed cost calculation ===
   // Source 1: Excel report (SOH Stock Value / SOH Stock Qty) = actual landed cost for existing stock
   // Source 2: CBM-based freight estimation for incoming POs
@@ -2463,17 +2507,31 @@ function buildCKData(ckId) {
         let d30Qty = 0;
         let firstSeenValue = null;
         const wk = {};
+        const absorbTrend = (velSource, country = '') => {
+          const addTrendForKey = (sourceSku, multiplier = 1) => {
+            d7Qty += Number(velSource._7d?.[sourceSku] || 0) * multiplier;
+            d30Qty += Number(velSource._30d?.[sourceSku] || 0) * multiplier;
+            const fs = velSource._firstSeen?.[sourceSku] || null;
+            if (fs && (!firstSeenValue || String(fs) < String(firstSeenValue))) firstSeenValue = fs;
+            for (const [week, qty] of Object.entries(velSource._weeklyBreakdown?.[sourceSku] || {})) {
+              wk[week] = (wk[week] || 0) + Number(qty || 0) * multiplier;
+            }
+          };
+          addTrendForKey(sku, 1);
+          for (const rawSku of Object.keys(velSource || {})) {
+            if (String(rawSku || '').startsWith('_')) continue;
+            const demandSku = canonicalDemandSku(rawSku, country);
+            const exploded = explodeDemandSkuForCk(demandSku, ckId);
+            if (!exploded) continue;
+            const multiplier = exploded.filter(componentSku => componentSku === sku).length;
+            if (multiplier) addTrendForKey(rawSku, multiplier);
+          }
+        };
         for (const sourceStore of relatedStores) {
           const velSource = salesCountry
             ? dataCache.shopifyVelocityByCountry?.[sourceStore]?.[salesCountry] || {}
             : dataCache.shopifyVelocity?.[sourceStore] || {};
-          d7Qty += Number(velSource._7d?.[sku] || 0);
-          d30Qty += Number(velSource._30d?.[sku] || 0);
-          const fs = velSource._firstSeen?.[sku] || null;
-          if (fs && (!firstSeenValue || String(fs) < String(firstSeenValue))) firstSeenValue = fs;
-          for (const [week, qty] of Object.entries(velSource._weeklyBreakdown?.[sku] || {})) {
-            wk[week] = (wk[week] || 0) + Number(qty || 0);
-          }
+          absorbTrend(velSource, salesCountry || '');
         }
         const v7 = d7Qty; // already a 7-day total, shown as weekly rate
         const v30 = d30Qty / 30 * 7;
@@ -2496,12 +2554,21 @@ function buildCKData(ckId) {
     weeklyData: (() => {
       const result = {};
       const allSkus = [...new Set([...Object.keys(cin7), ...Object.keys(velocity)])];
-      const addWeekly = (weekly = {}) => {
-        for (const sku of allSkus) {
-          if (!weekly[sku]) continue;
-          if (!result[sku]) result[sku] = {};
-          for (const [week, qty] of Object.entries(weekly[sku])) {
-            result[sku][week] = (result[sku][week] || 0) + Number(qty || 0);
+      const addWeekly = (weekly = {}, country = '') => {
+        const add = (targetSku, week, qty) => {
+          if (!allSkus.includes(targetSku)) return;
+          if (!result[targetSku]) result[targetSku] = {};
+          result[targetSku][week] = (result[targetSku][week] || 0) + Number(qty || 0);
+        };
+        for (const [sourceSku, weeks] of Object.entries(weekly || {})) {
+          const demandSku = canonicalDemandSku(sourceSku, country);
+          const exploded = explodeDemandSkuForCk(demandSku, ckId);
+          for (const [week, qty] of Object.entries(weeks || {})) {
+            if (exploded) {
+              for (const componentSku of exploded) add(componentSku, week, qty);
+            } else {
+              add(demandSku, week, qty);
+            }
           }
         }
       };
@@ -2509,7 +2576,7 @@ function buildCKData(ckId) {
         const weekly = salesCountry
           ? dataCache.shopifyVelocityByCountry?.[sourceStore]?.[salesCountry]?._weeklyBreakdown
           : dataCache.shopifyVelocity?.[sourceStore]?._weeklyBreakdown;
-        addWeekly(weekly || {});
+        addWeekly(weekly || {}, salesCountry || '');
       }
       return Object.keys(result).length > 0 ? result : null;
     })(),
