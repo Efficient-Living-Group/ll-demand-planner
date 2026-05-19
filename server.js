@@ -2459,9 +2459,11 @@ function getBrandSubgroup(id, def) {
   return null;
 }
 
+const HIDDEN_CK_TABS = new Set(['llau-cbcf', 'cmss']);
+
 app.get('/api/ck-list', requireAuth, (req, res) => {
   reloadSnapshotIfNewer();
-  const list = Object.entries(CK_DEFS).filter(([id]) => id !== 'llau-cbcf').map(([id, def]) => {
+  const list = Object.entries(CK_DEFS).filter(([id]) => !HIDDEN_CK_TABS.has(id)).map(([id, def]) => {
     const data = buildCKData(id);
     const skuCount = data ? Object.keys(data.cin7).length + Object.keys(data.velocity).length : 0;
     const brand = getBrandGroup(id, def);
