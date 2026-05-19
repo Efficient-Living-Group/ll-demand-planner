@@ -669,7 +669,10 @@ function renderDashboard(){
     const otherText=otherLittleLifely?` · Other ${Math.round(otherLittleLifely).toLocaleString()}`:'';
     preorderBreakdownCard=`<div class="card red" title="Little Lifely open Shopify orders for this panel's destination country, split before stock coverage is applied."><div class="label">Preorder Breakdown</div><div class="value">${Math.round(totalPreorders).toLocaleString()}</div><div class="sub">Beds ${Math.round(standaloneBeds).toLocaleString()} · Combos ${Math.round(comboBeds).toLocaleString()} · Swatches ${Math.round(swatchPacks).toLocaleString()}${otherText}</div></div>`;
   } else {
-    openOrdersCard=`<div class="card red" title="Units already sold on Shopify but not yet shipped. These eat into your physical stock — Net after Open Orders accounts for them."><div class="label">Open Orders</div><div class="value">${Math.abs(tOver).toLocaleString()}</div><div class="sub">Pre-order commitments</div></div>`;
+    const rawOpenOrders=DATA.coverageAux?.mode==='generic'&&DATA.coverageAux.rawOpenDemandTotal!=null?Number(DATA.coverageAux.rawOpenDemandTotal):null;
+    const openOrdersValue=rawOpenOrders!=null?rawOpenOrders:Math.abs(tOver);
+    const openOrdersSub=rawOpenOrders!=null?'raw Shopify open order units':'pre-order commitments';
+    openOrdersCard=`<div class="card red" title="Units already sold on Shopify but not yet shipped. Component rows may fan bundle demand into physical parts for coverage, but this summary stays on raw Shopify open-order units."><div class="label">Open Orders</div><div class="value">${Math.round(openOrdersValue).toLocaleString()}</div><div class="sub">${openOrdersSub}</div></div>`;
   }
   let overstockVal=0,deadstockVal=0;
   skus.forEach(s=>{let vel=getVel(s),soh=DATA.cin7[s]||0,cost=(DATA.costs||{})[s]||0;

@@ -177,7 +177,10 @@ function pushLifelySofaModules(out, module, colour, qty, includeFrame, includeCo
 function explodeLifelySofaSku(sku) {
   const s = String(sku || '').toUpperCase().trim();
   if (!s || isLifelySofaComponentSku(s)) return null;
-  if (s === 'LIFELY-FS-PACK') return LIFELY_SOFA_SWATCH_COLOURS.map(colour => ({ sku: `LIFELY-FS-${colour}`, qty: 1 }));
+  // Swatch packs are fulfilment freebies/marketing stock, not sofa component
+  // preorder commitments. Do not fan one pack order into every swatch colour,
+  // otherwise the sofa preorder view is dominated by fabric-swatch backlog.
+  if (s === 'LIFELY-FS-PACK') return null;
 
   const colour = lifelySofaColourFromSku(s);
   if (!colour) return null;
@@ -1924,13 +1927,11 @@ function buildCKData(ckId) {
       for (const [rawSku, qty] of Object.entries(dataCache.shopifyOpenDemand?.[sourceStore]?.[coverageConfig.demandCountry] || {})) {
         const sku = canonicalDemandSku(rawSku, coverageConfig.demandCountry);
         const q = Number(qty || 0);
+        // Keep raw bundle/combo demand here. The frontend uses those raw combo
+        // keys to calculate component coverage without double-counting them as
+        // both combo demand and component demand. Visible rows still get their
+        // component-level open-order values from DATA.shopify above.
         openDemandBySku[sku] = (openDemandBySku[sku] || 0) + q;
-        const exploded = explodeDemandSkuForCk(sku, ckId);
-        if (exploded) {
-          for (const componentSku of exploded) {
-            openDemandBySku[componentSku] = (openDemandBySku[componentSku] || 0) + q;
-          }
-        }
       }
     }
     const stockBySku = {};
@@ -1968,10 +1969,17 @@ function buildCKData(ckId) {
   const lifelyCoverageIds = new Set(['dd', 'cocoon', 'rdnt', 'wfhcr', 'lifely-sofa', 'caterpillar']);
   if (!coverageAux && lifelyCoverageIds.has(ckId)) {
     const openDemandBySku = {};
+    const rawOpenDemandBySku = {};
+    let rawOpenDemandTotal = 0;
     const panelSkuSet = new Set([...Object.keys(cin7), ...Object.keys(velocity), ...Object.keys(shopify)]);
     const addOpenDemand = (sku, qty) => {
-      if (!sku || !panelSkuSet.has(sku)) return;
+      if (!sku || !panelSkuSet.has(sku)) return false;
       openDemandBySku[sku] = (openDemandBySku[sku] || 0) + Number(qty || 0);
+      return true;
+    };
+    const addRawOpenDemand = (sku, qty) => {
+      rawOpenDemandBySku[sku] = (rawOpenDemandBySku[sku] || 0) + Number(qty || 0);
+      rawOpenDemandTotal += Number(qty || 0);
     };
     for (const sourceStore of relatedStores) {
       const countries = dataCache.shopifyOpenDemand?.[sourceStore] || {};
@@ -1981,10 +1989,12 @@ function buildCKData(ckId) {
           if (!q) continue;
           const exploded = explodeDemandSkuForCk(sku, ckId);
           if (exploded) {
-            for (const componentSku of exploded) addOpenDemand(componentSku, q);
+            let added = false;
+            for (const componentSku of exploded) added = addOpenDemand(componentSku, q) || added;
+            if (added) addRawOpenDemand(sku, q);
             continue;
           }
-          addOpenDemand(sku, q);
+          if (addOpenDemand(sku, q)) addRawOpenDemand(sku, q);
         }
       }
     }
@@ -1998,7 +2008,7 @@ function buildCKData(ckId) {
         poRows[sku].push({ reference: po.reference, qty: Number(qty || 0), eta: etaRaw });
       }
     }
-    coverageAux = { mode: 'generic', label: def.name, place: 'Lifely', openDemandBySku, stockBySku, poRows };
+    coverageAux = { mode: 'generic', label: def.name, place: 'Lifely', openDemandBySku, rawOpenDemandBySku, rawOpenDemandTotal, stockBySku, poRows };
   }
   let bomData = null;
   if (ckId === 'llau-cbcf') {
@@ -2481,6 +2491,17 @@ function buildCKData(ckId) {
       }
       return [region, { cin7: regionCin7, shopify: regionShopify, velocity: regionVelocity, trendData: regionTrendData, weeklyData: regionWeeklyData, pos: regionPos, allPos: regionAllPos }];
     }));
+
+    // The default "All" mattress view should use real destination-country
+    // open demand from the regional combo calculation above. Shopify inventory
+    // for bundle/config SKUs can be negative for reasons unrelated to open
+    // customer preorders, which was inflating mattress preorder totals.
+    for (const sku of Object.keys(shopify)) shopify[sku] = 0;
+    for (const regionData of Object.values(mattressRegions)) {
+      for (const [sku, qty] of Object.entries(regionData.shopify || {})) {
+        shopify[sku] = (shopify[sku] || 0) + Number(qty || 0);
+      }
+    }
   }
 
   return {
