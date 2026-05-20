@@ -81,6 +81,25 @@ const COMBO_BOM = {
 const SWATCH_COLOURS = ['DSBL', 'DGY', 'PST', 'BABL', 'CTCN', 'MSM'];
 const COCOON_SIZE_WORD = { 'D': 'DOUBLE', 'Q': 'QUEEN', 'K': 'KING' };
 
+function loadCushieUsSkuMapping() {
+  try {
+    const raw = fs.readFileSync(path.join(__dirname, 'data', 'cushie-us-sku-mapping.json'), 'utf8');
+    const parsed = JSON.parse(raw);
+    return parsed.mapping || {};
+  } catch (err) {
+    console.warn('Cushie US SKU mapping unavailable:', err.message);
+    return {};
+  }
+}
+
+const CUSHIE_US_SKU_MAPPING = loadCushieUsSkuMapping();
+
+function mapCushieUsVerifiedSku(sku) {
+  const s = String(sku || '').toUpperCase().trim();
+  if (!s) return s;
+  return CUSHIE_US_SKU_MAPPING[s] || CUSHIE_US_SKU_MAPPING[s.replace(/-MULTI$/, '')] || s;
+}
+
 function getComboSize(sku) {
   if (sku.includes('-S-')) return 'S';
   if (sku.includes('-KS-')) return 'KS';
@@ -560,8 +579,9 @@ function normalizeOption1(value) {
   return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
 }
 function canonicalDemandSku(sku, country = '') {
-  const s = String(sku || '').toUpperCase().trim();
+  let s = String(sku || '').toUpperCase().trim();
   const c = String(country || '').toUpperCase().trim();
+  if (c === 'US') s = mapCushieUsVerifiedSku(s);
   if (s.startsWith('LLUK-CBDS-')) return s.replace('LLUK-CBDS-', 'LLUK-CBCF-');
   const llauCombo = s.match(/^LLAU-CBCF-(S|KS|D)-(.+)$/);
   if (llauCombo && c && c !== 'AU' && c !== 'NZ') {
@@ -1787,7 +1807,7 @@ function buildCKData(ckId) {
   for (const sourceStore of relatedStores) {
     const storeInv = dataCache.shopifyInventory[sourceStore] || {};
     for (const [rawSku, qty] of Object.entries(storeInv)) {
-      const sku = String(rawSku || '').toUpperCase().trim();
+      const sku = ckId === 'cusb-us' ? mapCushieUsVerifiedSku(rawSku) : String(rawSku || '').toUpperCase().trim();
       if (ckId === 'cocoon' && isCocoonComboSku(sku)) { addExplodedToPanelMap(shopify, sku, qty); continue; }
       if (addExplodedToPanelMap(shopify, sku, qty)) continue;
       if (!skuMatchesDef(sku, def)) continue;

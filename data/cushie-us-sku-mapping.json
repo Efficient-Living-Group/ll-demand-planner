@@ -1,0 +1,1069 @@
+{
+  "mapping": {
+    "1XDB+ARMREST-CREAM": "V2-BDL-DB-RMST-CREAM",
+    "1XDB+ARMREST-DKBL": "V2-BDL-DB-RMST-DKBL",
+    "1XDB+ARMREST-DKGY": "V2-BDL-DB-RMST-DKGY",
+    "1XDB+ARMREST-LGN": "V2-BDL-DB-RMST-LGN",
+    "1XDB+ARMREST-LIGY": "V2-BDL-DB-RMST-LIGY",
+    "1XOB-CREAM": "V2-BDL-OB-CREAM",
+    "1XOB-DKBL": "V2-BDL-OB-DKBL",
+    "1XOB-DKGY": "V2-BDL-OB-DKGY",
+    "1XOB-LGN": "V2-BDL-OB-LGN",
+    "1XOB-LIGY": "V2-BDL-OB-LIGY",
+    "1XOS-CREAM": "V2-BDL-OS-CREAM",
+    "1XOS-DKBL": "V2-BDL-OS-DKBL",
+    "1XOS-DKGY": "V2-BDL-OS-DKGY",
+    "1XOS-LGN": "V2-BDL-OS-LGN",
+    "1XOS-LIGY": "V2-BDL-OS-LIGY",
+    "1XQB+1XCH+ARMREST-CREAM": "V2-BDL-QB-CH-RMST-CREAM",
+    "1XQB+1XCH+ARMREST-DKBL": "V2-BDL-QB-CH-RMST-DKBL",
+    "1XQB+1XCH+ARMREST-DKGY": "V2-BDL-QB-CH-RMST-DKGY",
+    "1XQB+1XCH+ARMREST-LGN": "V2-BDL-QB-CH-RMST-LGN",
+    "1XQB+1XCH+ARMREST-LIGY": "V2-BDL-QB-CH-RMST-LIGY",
+    "1XQB+1XOS+ARMREST-CREAM": "V2-BDL-QB-OS-RMST-CREAM",
+    "1XQB+1XTB+1XCH+ARMREST-CREAM": "V2-BDL-QB-TB-CH-RMST-CREAM",
+    "1XQB+1XTB+1XCH+ARMREST-DKBL": "V2-BDL-QB-TB-CH-RMST-DKBL",
+    "1XQB+1XTB+1XCH+ARMREST-DKGY": "V2-BDL-QB-TB-CH-RMST-DKGY",
+    "1XQB+1XTB+1XCH+ARMREST-LGN": "V2-BDL-QB-TB-CH-RMST-LGN",
+    "1XQB+1XTB+1XCH+ARMREST-LIGY": "V2-BDL-QB-TB-CH-RMST-LIGY",
+    "1XQB+2XCH+ARMREST-CREAM": "V2-BDL-QB-2CH-RMST-CREAM",
+    "1XQB+2XCH+ARMREST-DKBL": "V2-BDL-QB-2CH-RMST-DKBL",
+    "1XQB+2XCH+ARMREST-DKGY": "V2-BDL-QB-2CH-RMST-DKGY",
+    "1XQB+2XCH+ARMREST-LGN": "V2-BDL-QB-2CH-RMST-LGN",
+    "1XQB+2XCH+ARMREST-LIGY": "V2-BDL-QB-2CH-RMST-LIGY",
+    "1XQB+2XTB+3XARMREST-CREAM": "V2-BDL-QB-2TB-3RMST-CREAM",
+    "1XQB+2XTB+3XARMREST-DKBL": "V2-BDL-QB-2TB-3RMST-DKBL",
+    "1XQB+2XTB+3XARMREST-DKGY": "V2-BDL-QB-2TB-3RMST-DKGY",
+    "1XQB+2XTB+3XARMREST-LGN": "V2-BDL-QB-2TB-3RMST-LGN",
+    "1XQB+2XTB+3XARMREST-LIGY": "V2-BDL-QB-2TB-3RMST-LIGY",
+    "1XQB+2XTB+ARMREST-CREAM": "V2-BDL-QB-2TB-RMST-CREAM",
+    "1XQB+2XTB+ARMREST-DKBL": "V2-BDL-QB-2TB-RMST-DKBL",
+    "1XQB+2XTB+ARMREST-DKGY": "V2-BDL-QB-2TB-RMST-DKGY",
+    "1XQB+2XTB+ARMREST-LGN": "V2-BDL-QB-2TB-RMST-LGN",
+    "1XQB+2XTB+ARMREST-LIGY": "V2-BDL-QB-2TB-RMST-LIGY",
+    "1XQB+4XTB+ARMREST-CREAM": "V2-BDL-QB-4TB-RMST-CREAM",
+    "1XQB+4XTB+ARMREST-DKBL": "V2-BDL-QB-4TB-RMST-DKBL",
+    "1XQB+4XTB+ARMREST-DKGY": "V2-BDL-QB-4TB-RMST-DKGY",
+    "1XQB+4XTB+ARMREST-LGN": "V2-BDL-QB-4TB-RMST-LGN",
+    "1XQB+4XTB+ARMREST-LIGY": "V2-BDL-QB-4TB-RMST-LIGY",
+    "1XQB+ARMREST-CREAM": "V2-BDL-QB-RMST-CREAM",
+    "1XQB+ARMREST-DKBL": "V2-BDL-QB-RMST-DKBL",
+    "1XQB+ARMREST-DKGY": "V2-BDL-QB-RMST-DKGY",
+    "1XQB+ARMREST-LGN": "V2-BDL-QB-RMST-LGN",
+    "1XQB+ARMREST-LIGY": "V2-BDL-QB-RMST-LIGY",
+    "1XTB-ARMREST-CREAM": "V2-BDL-TB-RMST-CREAM",
+    "1XTB-ARMREST-DKBL": "V2-BDL-TB-RMST-DKBL",
+    "1XTB-ARMREST-DKGY": "V2-BDL-TB-RMST-DKGY",
+    "1XTB-ARMREST-LGN": "V2-BDL-TB-RMST-LGN",
+    "1XTB-ARMREST-LIGY": "V2-BDL-TB-RMST-LIGY",
+    "2XQB+1XTB+ARMREST-CREAM": "V2-BDL-2QB-TB-RMST-CREAM",
+    "2XQB+1XTB+ARMREST-DKBL": "V2-BDL-2QB-TB-RMST-DKBL",
+    "2XQB+1XTB+ARMREST-DKGY": "V2-BDL-2QB-TB-RMST-DKGY",
+    "2XQB+1XTB+ARMREST-LGN": "V2-BDL-2QB-TB-RMST-LGN",
+    "2XQB+1XTB+ARMREST-LIGY": "V2-BDL-2QB-TB-RMST-LIGY",
+    "2XQB+3XTB+ARMREST-CREAM": "V2-BDL-2QB-3TB-RMST-CREAM",
+    "2XQB+3XTB+ARMREST-DKBL": "V2-BDL-2QB-3TB-RMST-DKBL",
+    "2XQB+3XTB+ARMREST-DKGY": "V2-BDL-2QB-3TB-RMST-DKGY",
+    "2XQB+3XTB+ARMREST-LGN": "V2-BDL-2QB-3TB-RMST-LGN",
+    "2XQB+3XTB+ARMREST-LIGY": "V2-BDL-2QB-3TB-RMST-LIGY",
+    "2XTB+1XCH+ARMREST-CREAM": "V2-BDL-2TB-CH-RMST-CREAM",
+    "2XTB+1XCH+ARMREST-DKBL": "V2-BDL-2TB-CH-RMST-DKBL",
+    "2XTB+1XCH+ARMREST-DKGY": "V2-BDL-2TB-CH-RMST-DKGY",
+    "2XTB+1XCH+ARMREST-LGN": "V2-BDL-2TB-CH-RMST-LGN",
+    "2XTB+1XCH+ARMREST-LIGY": "V2-BDL-2TB-CH-RMST-LIGY",
+    "2XTB+1XOS+ARMREST-DKBL": "V2-BDL-2TB-OS-RMST-DKBL",
+    "2XTB+1XOS+ARMREST-DKGY": "V2-BDL-2TB-OS-RMST-DKGY",
+    "2XTB+1XOS+ARMREST-LGN": "V2-BDL-2TB-OS-RMST-LGN",
+    "2XTB+1XQB+1XCH+ARMREST-CREAM": "V2-BDL-2TB-QB-CH-RMST-CREAM",
+    "2XTB+1XQB+1XCH+ARMREST-DKBL": "V2-BDL-2TB-QB-CH-RMST-DKBL",
+    "2XTB+1XQB+1XCH+ARMREST-DKGY": "V2-BDL-2TB-QB-CH-RMST-DKGY",
+    "2XTB+1XQB+1XCH+ARMREST-LGN": "V2-BDL-2TB-QB-CH-RMST-LGN",
+    "2XTB+1XQB+1XCH+ARMREST-LIGY": "V2-BDL-2TB-QB-CH-RMST-LIGY",
+    "2XTB+2XCH+ARMREST-CREAM": "V2-BDL-2TB-2CH-RMST-CREAM",
+    "2XTB+2XCH+ARMREST-DKBL": "V2-BDL-2TB-2CH-RMST-DKBL",
+    "2XTB+2XCH+ARMREST-DKGY": "V2-BDL-2TB-2CH-RMST-DKGY",
+    "2XTB+2XCH+ARMREST-LGN": "V2-BDL-2TB-2CH-RMST-LGN",
+    "2XTB+2XCH+ARMREST-LIGY": "V2-BDL-2TB-2CH-RMST-LIGY",
+    "2XTB+ARMREST-CREAM": "V2-BDL-2TB-RMST-CREAM",
+    "2XTB+ARMREST-DKBL": "V2-BDL-2TB-RMST-DKBL",
+    "2XTB+ARMREST-DKGY": "V2-BDL-2TB-RMST-DKGY",
+    "2XTB+ARMREST-LGN": "V2-BDL-2TB-RMST-LGN",
+    "2XTB+ARMREST-LIGY": "V2-BDL-2TB-RMST-LIGY",
+    "2XTBX1XOS+ARMREST-CREAM": "V2-BDL-2TB-OS-RMST-CREAM",
+    "3XQB+2XTB+ARMREST-CREAM": "V2-BDL-3QB-2TB-RMST-CREAM",
+    "3XQB+2XTB+ARMREST-DKBL": "V2-BDL-3QB-2TB-RMST-DKBL",
+    "3XQB+2XTB+ARMREST-DKGY": "V2-BDL-3QB-2TB-RMST-DKGY",
+    "3XQB+2XTB+ARMREST-LGN": "V2-BDL-3QB-2TB-RMST-LGN",
+    "3XQB+2XTB+ARMREST-LIGY": "V2-BDL-3QB-2TB-RMST-LIGY",
+    "3XTB+1XCH+ARMREST-CREAM": "V2-BDL-3TB-CH-RMST-CREAM",
+    "3XTB+1XCH+ARMREST-DKBL": "V2-BDL-3TB-CH-RMST-DKBL",
+    "3XTB+1XCH+ARMREST-DKGY": "V2-BDL-3TB-CH-RMST-DKGY",
+    "3XTB+1XCH+ARMREST-LGN": "V2-BDL-3TB-CH-RMST-LGN",
+    "3XTB+1XCH+ARMREST-LIGY": "V2-BDL-3TB-CH-RMST-LIGY",
+    "3XTB+2XOS+ARMREST-CREAM": "V2-BDL-3TB-2OS-RMST-CREAM",
+    "3XTB+2XOS+ARMREST-DKBL": "V2-BDL-3TB-2OS-RMST-DKBL",
+    "3XTB+2XOS+ARMREST-DKGY": "V2-BDL-3TB-2OS-RMST-DKGY",
+    "3XTB+2XOS+ARMREST-LGN": "V2-BDL-3TB-2OS-RMST-LGN",
+    "3XTB+2XOS+ARMREST-LIGY": "V2-BDL-3TB-2OS-RMST-LIGY",
+    "3XTB-ARMREST-CREAM": "V2-BDL-3TB-RMST-CREAM",
+    "3XTB-ARMREST-DKBL": "V2-BDL-3TB-RMST-DKBL",
+    "3XTB-ARMREST-DKGY": "V2-BDL-3TB-RMST-DKGY",
+    "3XTB-ARMREST-LGN": "V2-BDL-3TB-RMST-LGN",
+    "3XTB-ARMREST-LIGY": "V2-BDL-3TB-RMST-LIGY",
+    "4XTB+1XCH+ARMREST-CREAM": "V2-BDL-4TB-CH-RMST-CREAM",
+    "4XTB+1XCH+ARMREST-DKBL": "V2-BDL-4TB-CH-RMST-DKBL",
+    "4XTB+1XCH+ARMREST-DKGY": "V2-BDL-4TB-CH-RMST-DKGY",
+    "4XTB+1XCH+ARMREST-LGN": "V2-BDL-4TB-CH-RMST-LGN",
+    "4XTB+1XCH+ARMREST-LIGY": "V2-BDL-4TB-CH-RMST-LIGY",
+    "4XTB+ARMREST-CREAM": "V2-BDL-4TB-RMST-CREAM",
+    "4XTB+ARMREST-DKBL": "V2-BDL-4TB-RMST-DKBL",
+    "4XTB+ARMREST-DKGY": "V2-BDL-4TB-RMST-DKGY",
+    "4XTB+ARMREST-LGN": "V2-BDL-4TB-RMST-LGN",
+    "4XTB+ARMREST-LIGY": "V2-BDL-4TB-RMST-LIGY",
+    "5XTB+3XARMREST-CREAM": "V2-BDL-5TB-3RMST-CREAM",
+    "5XTB+3XARMREST-DKBL": "V2-BDL-5TB-3RMST-DKBL",
+    "5XTB+3XARMREST-DKGY": "V2-BDL-5TB-3RMST-DKGY",
+    "5XTB+3XARMREST-LGN": "V2-BDL-5TB-3RMST-LGN",
+    "5XTB+3XARMREST-LIGY": "V2-BDL-5TB-3RMST-LIGY",
+    "5XTB+ARMREST-CREAM": "V2-BDL-5TB-RMST-CREAM",
+    "5XTB+ARMREST-DKBL": "V2-BDL-5TB-RMST-DKBL",
+    "5XTB+ARMREST-DKGY": "V2-BDL-5TB-RMST-DKGY",
+    "5XTB+ARMREST-LGN": "V2-BDL-5TB-RMST-LGN",
+    "5XTB+ARMREST-LIGY": "V2-BDL-5TB-RMST-LIGY",
+    "6XTB+3XARMREST-CREAM": "V2-BDL-6TB-3RMST-CREAM",
+    "6XTB+3XARMREST-DKBL": "V2-BDL-6TB-3RMST-DKBL",
+    "6XTB+3XARMREST-DKGY": "V2-BDL-6TB-3RMST-DKGY",
+    "6XTB+3XARMREST-LGN": "V2-BDL-6TB-3RMST-LGN",
+    "6XTB+3XARMREST-LIGY": "V2-BDL-6TB-3RMST-LIGY",
+    "6XTB+ARMREST-CREAM": "V2-BDL-6TB-RMST-CREAM",
+    "6XTB+ARMREST-DKBL": "V2-BDL-6TB-RMST-DKBL",
+    "6XTB+ARMREST-DKGY": "V2-BDL-6TB-RMST-DKGY",
+    "6XTB+ARMREST-LGN": "V2-BDL-6TB-RMST-LGN",
+    "6XTB+ARMREST-LIGY": "V2-BDL-6TB-RMST-LIGY",
+    "7XTB+ARMREST-CREAM": "V2-BDL-7TB-RMST-CREAM",
+    "7XTB+ARMREST-CREAM-160": "V2-BDL-7TB-RMST-CREAM-160",
+    "7XTB+ARMREST-DKBL": "V2-BDL-7TB-RMST-DKBL",
+    "7XTB+ARMREST-DKBL-160": "V2-BDL-7TB-RMST-DKBL-160",
+    "7XTB+ARMREST-DKGY": "V2-BDL-7TB-RMST-DKGY",
+    "7XTB+ARMREST-DKGY-160": "V2-BDL-7TB-RMST-DKGY-160",
+    "7XTB+ARMREST-LGN": "V2-BDL-7TB-RMST-LGN",
+    "7XTB+ARMREST-LGN-160": "V2-BDL-7TB-RMST-LGN-160",
+    "7XTB+ARMREST-LIGY": "V2-BDL-7TB-RMST-LIGY",
+    "7XTB+ARMREST-LIGY-160": "V2-BDL-7TB-RMST-LIGY-160",
+    "8XTB +ARMREST-LGN": "V2-BDL-8TB-RMST-LGN",
+    "8XTB+ARMREST-CREAM": "V2-BDL-8TB-RMST-CREAM",
+    "8XTB+ARMREST-DKBL": "V2-BDL-8TB-RMST-DKBL",
+    "8XTB+ARMREST-DKGY": "V2-BDL-8TB-RMST-DKGY",
+    "8XTB+ARMREST-LIGY": "V2-BDL-8TB-RMST-LIGY",
+    "9XTB+ARMREST-CREAM": "V2-BDL-9TB-RMST-CREAM",
+    "9XTB+ARMREST-DKBL": "V2-BDL-9TB-RMST-DKBL",
+    "9XTB+ARMREST-DKGY": "V2-BDL-9TB-RMST-DKGY",
+    "9XTB+ARMREST-LGN": "V2-BDL-9TB-RMST-LGN",
+    "9XTB+ARMREST-LIGY": "V2-BDL-9TB-RMST-LIGY",
+    "Q-TOPPER": "V2-MOD-Q-TOPPER",
+    "V3-1XDB+ARMREST-DKBL": "V3-BDL-DB-RMST-DKBL",
+    "V3-1XDB+ARMREST-LGN": "V3-BDL-DB-RMST-LGN",
+    "V3-1XDB+ARMREST-TBRN": "V3-BDL-DB-RMST-TBRN",
+    "V3-1XDB+ARMREST-TWHT": "V3-BDL-DB-RMST-TWHT",
+    "V3-1XKB+ARMREST-DKBL": "V3-BDL-KB-RMST-DKBL",
+    "V3-1XKB+ARMREST-LGN": "V3-BDL-KB-RMST-LGN",
+    "V3-1XKB+ARMREST-TBRN": "V3-BDL-KB-RMST-TBRN",
+    "V3-1XKB+ARMREST-TWHT": "V3-BDL-KB-RMST-TWHT",
+    "V3-1XQB+ARMREST-DKBL": "V3-BDL-QB-RMST-DKBL",
+    "V3-1XQB+ARMREST-LGN": "V3-BDL-QB-RMST-LGN",
+    "V3-1XQB+ARMREST-TBRN": "V3-BDL-QB-RMST-TBRN",
+    "V3-1XQB+ARMREST-TWHT": "V3-BDL-QB-RMST-TWHT",
+    "V3-1XTB+ARMREST-DKBL": "V3-BDL-TB-RMST-DKBL",
+    "V3-1XTB+ARMREST-LGN": "V3-BDL-TB-RMST-LGN",
+    "V3-1XTB+ARMREST-TBRN": "V3-BDL-TB-RMST-TBRN",
+    "V3-1XTB+ARMREST-TWHT": "V3-BDL-TB-RMST-TWHT"
+  },
+  "rows": [
+    {
+      "current_sku": "1XDB+ARMREST-CREAM",
+      "product": "cushie-2-seater-modular-sleeper-sofa",
+      "verified_sku": "V2-BDL-DB-RMST-CREAM"
+    },
+    {
+      "current_sku": "1XDB+ARMREST-DKBL",
+      "product": "cushie-2-seater-modular-sleeper-sofa",
+      "verified_sku": "V2-BDL-DB-RMST-DKBL"
+    },
+    {
+      "current_sku": "1XDB+ARMREST-DKGY",
+      "product": "cushie-2-seater-modular-sleeper-sofa",
+      "verified_sku": "V2-BDL-DB-RMST-DKGY"
+    },
+    {
+      "current_sku": "1XDB+ARMREST-LGN",
+      "product": "cushie-2-seater-modular-sleeper-sofa",
+      "verified_sku": "V2-BDL-DB-RMST-LGN"
+    },
+    {
+      "current_sku": "1XDB+ARMREST-LIGY",
+      "product": "cushie-2-seater-modular-sleeper-sofa",
+      "verified_sku": "V2-BDL-DB-RMST-LIGY"
+    },
+    {
+      "current_sku": "1XOB-CREAM",
+      "product": "cushie-ottoman-sleeper",
+      "verified_sku": "V2-BDL-OB-CREAM"
+    },
+    {
+      "current_sku": "1XOB-DKBL",
+      "product": "cushie-ottoman-sleeper",
+      "verified_sku": "V2-BDL-OB-DKBL"
+    },
+    {
+      "current_sku": "1XOB-DKGY",
+      "product": "cushie-ottoman-sleeper",
+      "verified_sku": "V2-BDL-OB-DKGY"
+    },
+    {
+      "current_sku": "1XOB-LGN",
+      "product": "cushie-ottoman-sleeper",
+      "verified_sku": "V2-BDL-OB-LGN"
+    },
+    {
+      "current_sku": "1XOB-LIGY",
+      "product": "cushie-ottoman-sleeper",
+      "verified_sku": "V2-BDL-OB-LIGY"
+    },
+    {
+      "current_sku": "1XOS-CREAM",
+      "product": "cushie-storage-ottoman",
+      "verified_sku": "V2-BDL-OS-CREAM"
+    },
+    {
+      "current_sku": "1XOS-DKBL",
+      "product": "cushie-storage-ottoman",
+      "verified_sku": "V2-BDL-OS-DKBL"
+    },
+    {
+      "current_sku": "1XOS-DKGY",
+      "product": "cushie-storage-ottoman",
+      "verified_sku": "V2-BDL-OS-DKGY"
+    },
+    {
+      "current_sku": "1XOS-LGN",
+      "product": "cushie-storage-ottoman",
+      "verified_sku": "V2-BDL-OS-LGN"
+    },
+    {
+      "current_sku": "1XOS-LIGY",
+      "product": "cushie-storage-ottoman",
+      "verified_sku": "V2-BDL-OS-LIGY"
+    },
+    {
+      "current_sku": "1XQB+1XCH+ARMREST-CREAM",
+      "product": "cushie-3-seater-sectional-sleeper-sofa-w-chaise",
+      "verified_sku": "V2-BDL-QB-CH-RMST-CREAM"
+    },
+    {
+      "current_sku": "1XQB+1XCH+ARMREST-DKBL",
+      "product": "cushie-3-seater-sectional-sleeper-sofa-w-chaise",
+      "verified_sku": "V2-BDL-QB-CH-RMST-DKBL"
+    },
+    {
+      "current_sku": "1XQB+1XCH+ARMREST-DKGY",
+      "product": "cushie-3-seater-sectional-sleeper-sofa-w-chaise",
+      "verified_sku": "V2-BDL-QB-CH-RMST-DKGY"
+    },
+    {
+      "current_sku": "1XQB+1XCH+ARMREST-LGN",
+      "product": "cushie-3-seater-sectional-sleeper-sofa-w-chaise",
+      "verified_sku": "V2-BDL-QB-CH-RMST-LGN"
+    },
+    {
+      "current_sku": "1XQB+1XCH+ARMREST-LIGY",
+      "product": "cushie-3-seater-sectional-sleeper-sofa-w-chaise",
+      "verified_sku": "V2-BDL-QB-CH-RMST-LIGY"
+    },
+    {
+      "current_sku": "1XQB+1XOS+ARMREST-CREAM",
+      "product": "cushie-2-seater-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-QB-OS-RMST-CREAM"
+    },
+    {
+      "current_sku": "1XQB+1XTB+1XCH+ARMREST-CREAM",
+      "product": "4-seater-sectional-sleeper-sofa-w-chaise",
+      "verified_sku": "V2-BDL-QB-TB-CH-RMST-CREAM"
+    },
+    {
+      "current_sku": "1XQB+1XTB+1XCH+ARMREST-DKBL",
+      "product": "4-seater-sectional-sleeper-sofa-w-chaise",
+      "verified_sku": "V2-BDL-QB-TB-CH-RMST-DKBL"
+    },
+    {
+      "current_sku": "1XQB+1XTB+1XCH+ARMREST-DKGY",
+      "product": "4-seater-sectional-sleeper-sofa-w-chaise",
+      "verified_sku": "V2-BDL-QB-TB-CH-RMST-DKGY"
+    },
+    {
+      "current_sku": "1XQB+1XTB+1XCH+ARMREST-LGN",
+      "product": "4-seater-sectional-sleeper-sofa-w-chaise",
+      "verified_sku": "V2-BDL-QB-TB-CH-RMST-LGN"
+    },
+    {
+      "current_sku": "1XQB+1XTB+1XCH+ARMREST-LIGY",
+      "product": "4-seater-sectional-sleeper-sofa-w-chaise",
+      "verified_sku": "V2-BDL-QB-TB-CH-RMST-LIGY"
+    },
+    {
+      "current_sku": "1XQB+2XCH+ARMREST-CREAM",
+      "product": "cushie-4-seater-u-shaped-sectional-sleeper-sofa-w-double-chaise",
+      "verified_sku": "V2-BDL-QB-2CH-RMST-CREAM"
+    },
+    {
+      "current_sku": "1XQB+2XCH+ARMREST-DKBL",
+      "product": "cushie-4-seater-u-shaped-sectional-sleeper-sofa-w-double-chaise",
+      "verified_sku": "V2-BDL-QB-2CH-RMST-DKBL"
+    },
+    {
+      "current_sku": "1XQB+2XCH+ARMREST-DKGY",
+      "product": "cushie-4-seater-u-shaped-sectional-sleeper-sofa-w-double-chaise",
+      "verified_sku": "V2-BDL-QB-2CH-RMST-DKGY"
+    },
+    {
+      "current_sku": "1XQB+2XCH+ARMREST-LGN",
+      "product": "cushie-4-seater-u-shaped-sectional-sleeper-sofa-w-double-chaise",
+      "verified_sku": "V2-BDL-QB-2CH-RMST-LGN"
+    },
+    {
+      "current_sku": "1XQB+2XCH+ARMREST-LIGY",
+      "product": "cushie-4-seater-u-shaped-sectional-sleeper-sofa-w-double-chaise",
+      "verified_sku": "V2-BDL-QB-2CH-RMST-LIGY"
+    },
+    {
+      "current_sku": "1XQB+2XTB+3XARMREST-CREAM",
+      "product": "cushie-sofa-set-2-2",
+      "verified_sku": "V2-BDL-QB-2TB-3RMST-CREAM"
+    },
+    {
+      "current_sku": "1XQB+2XTB+3XARMREST-DKBL",
+      "product": "cushie-sofa-set-2-2",
+      "verified_sku": "V2-BDL-QB-2TB-3RMST-DKBL"
+    },
+    {
+      "current_sku": "1XQB+2XTB+3XARMREST-DKGY",
+      "product": "cushie-sofa-set-2-2",
+      "verified_sku": "V2-BDL-QB-2TB-3RMST-DKGY"
+    },
+    {
+      "current_sku": "1XQB+2XTB+3XARMREST-LGN",
+      "product": "cushie-sofa-set-2-2",
+      "verified_sku": "V2-BDL-QB-2TB-3RMST-LGN"
+    },
+    {
+      "current_sku": "1XQB+2XTB+3XARMREST-LIGY",
+      "product": "cushie-sofa-set-2-2",
+      "verified_sku": "V2-BDL-QB-2TB-3RMST-LIGY"
+    },
+    {
+      "current_sku": "1XQB+2XTB+ARMREST-CREAM",
+      "product": "cushie-4-seater-l-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-QB-2TB-RMST-CREAM"
+    },
+    {
+      "current_sku": "1XQB+2XTB+ARMREST-DKBL",
+      "product": "cushie-4-seater-l-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-QB-2TB-RMST-DKBL"
+    },
+    {
+      "current_sku": "1XQB+2XTB+ARMREST-DKGY",
+      "product": "cushie-4-seater-l-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-QB-2TB-RMST-DKGY"
+    },
+    {
+      "current_sku": "1XQB+2XTB+ARMREST-LGN",
+      "product": "cushie-4-seater-l-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-QB-2TB-RMST-LGN"
+    },
+    {
+      "current_sku": "1XQB+2XTB+ARMREST-LIGY",
+      "product": "cushie-4-seater-l-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-QB-2TB-RMST-LIGY"
+    },
+    {
+      "current_sku": "1XQB+4XTB+ARMREST-CREAM",
+      "product": "cushie-6-seater-u-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-QB-4TB-RMST-CREAM"
+    },
+    {
+      "current_sku": "1XQB+4XTB+ARMREST-DKBL",
+      "product": "cushie-6-seater-u-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-QB-4TB-RMST-DKBL"
+    },
+    {
+      "current_sku": "1XQB+4XTB+ARMREST-DKGY",
+      "product": "cushie-6-seater-u-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-QB-4TB-RMST-DKGY"
+    },
+    {
+      "current_sku": "1XQB+4XTB+ARMREST-LGN",
+      "product": "cushie-6-seater-u-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-QB-4TB-RMST-LGN"
+    },
+    {
+      "current_sku": "1XQB+4XTB+ARMREST-LIGY",
+      "product": "cushie-6-seater-u-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-QB-4TB-RMST-LIGY"
+    },
+    {
+      "current_sku": "1XQB+ARMREST-CREAM",
+      "product": "cushie-2-seater-modular-sleeper-sofa",
+      "verified_sku": "V2-BDL-QB-RMST-CREAM"
+    },
+    {
+      "current_sku": "1XQB+ARMREST-DKBL",
+      "product": "cushie-2-seater-modular-sleeper-sofa",
+      "verified_sku": "V2-BDL-QB-RMST-DKBL"
+    },
+    {
+      "current_sku": "1XQB+ARMREST-DKGY",
+      "product": "cushie-2-seater-modular-sleeper-sofa",
+      "verified_sku": "V2-BDL-QB-RMST-DKGY"
+    },
+    {
+      "current_sku": "1XQB+ARMREST-LGN",
+      "product": "cushie-2-seater-modular-sleeper-sofa",
+      "verified_sku": "V2-BDL-QB-RMST-LGN"
+    },
+    {
+      "current_sku": "1XQB+ARMREST-LIGY",
+      "product": "cushie-2-seater-modular-sleeper-sofa",
+      "verified_sku": "V2-BDL-QB-RMST-LIGY"
+    },
+    {
+      "current_sku": "1XTB-ARMREST-CREAM",
+      "product": "cushie-sleeper-chair-bed",
+      "verified_sku": "V2-BDL-TB-RMST-CREAM"
+    },
+    {
+      "current_sku": "1XTB-ARMREST-DKBL",
+      "product": "cushie-sleeper-chair-bed",
+      "verified_sku": "V2-BDL-TB-RMST-DKBL"
+    },
+    {
+      "current_sku": "1XTB-ARMREST-DKGY",
+      "product": "cushie-sleeper-chair-bed",
+      "verified_sku": "V2-BDL-TB-RMST-DKGY"
+    },
+    {
+      "current_sku": "1XTB-ARMREST-LGN",
+      "product": "cushie-sleeper-chair-bed",
+      "verified_sku": "V2-BDL-TB-RMST-LGN"
+    },
+    {
+      "current_sku": "1XTB-ARMREST-LIGY",
+      "product": "cushie-sleeper-chair-bed",
+      "verified_sku": "V2-BDL-TB-RMST-LIGY"
+    },
+    {
+      "current_sku": "2XQB+1XTB+ARMREST-CREAM",
+      "product": "cushie-5-seater-l-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-2QB-TB-RMST-CREAM"
+    },
+    {
+      "current_sku": "2XQB+1XTB+ARMREST-DKBL",
+      "product": "cushie-5-seater-l-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-2QB-TB-RMST-DKBL"
+    },
+    {
+      "current_sku": "2XQB+1XTB+ARMREST-DKGY",
+      "product": "cushie-5-seater-l-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-2QB-TB-RMST-DKGY"
+    },
+    {
+      "current_sku": "2XQB+1XTB+ARMREST-LGN",
+      "product": "cushie-5-seater-l-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-2QB-TB-RMST-LGN"
+    },
+    {
+      "current_sku": "2XQB+1XTB+ARMREST-LIGY",
+      "product": "cushie-5-seater-l-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-2QB-TB-RMST-LIGY"
+    },
+    {
+      "current_sku": "2XQB+3XTB+ARMREST-CREAM",
+      "product": "cushie-7-seater-l-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-2QB-3TB-RMST-CREAM"
+    },
+    {
+      "current_sku": "2XQB+3XTB+ARMREST-DKBL",
+      "product": "cushie-7-seater-l-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-2QB-3TB-RMST-DKBL"
+    },
+    {
+      "current_sku": "2XQB+3XTB+ARMREST-DKGY",
+      "product": "cushie-7-seater-l-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-2QB-3TB-RMST-DKGY"
+    },
+    {
+      "current_sku": "2XQB+3XTB+ARMREST-LGN",
+      "product": "cushie-7-seater-l-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-2QB-3TB-RMST-LGN"
+    },
+    {
+      "current_sku": "2XQB+3XTB+ARMREST-LIGY",
+      "product": "cushie-7-seater-l-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-2QB-3TB-RMST-LIGY"
+    },
+    {
+      "current_sku": "2XTB+1XCH+ARMREST-CREAM",
+      "product": "cushie-3-seater-sectional-sleeper-sofa-w-chaise",
+      "verified_sku": "V2-BDL-2TB-CH-RMST-CREAM"
+    },
+    {
+      "current_sku": "2XTB+1XCH+ARMREST-DKBL",
+      "product": "cushie-3-seater-sectional-sleeper-sofa-w-chaise",
+      "verified_sku": "V2-BDL-2TB-CH-RMST-DKBL"
+    },
+    {
+      "current_sku": "2XTB+1XCH+ARMREST-DKGY",
+      "product": "cushie-3-seater-sectional-sleeper-sofa-w-chaise",
+      "verified_sku": "V2-BDL-2TB-CH-RMST-DKGY"
+    },
+    {
+      "current_sku": "2XTB+1XCH+ARMREST-LGN",
+      "product": "cushie-3-seater-sectional-sleeper-sofa-w-chaise",
+      "verified_sku": "V2-BDL-2TB-CH-RMST-LGN"
+    },
+    {
+      "current_sku": "2XTB+1XCH+ARMREST-LIGY",
+      "product": "cushie-3-seater-sectional-sleeper-sofa-w-chaise",
+      "verified_sku": "V2-BDL-2TB-CH-RMST-LIGY"
+    },
+    {
+      "current_sku": "2XTB+1XOS+ARMREST-DKBL",
+      "product": "cushie-2-seater-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-2TB-OS-RMST-DKBL"
+    },
+    {
+      "current_sku": "2XTB+1XOS+ARMREST-DKGY",
+      "product": "cushie-2-seater-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-2TB-OS-RMST-DKGY"
+    },
+    {
+      "current_sku": "2XTB+1XOS+ARMREST-LGN",
+      "product": "cushie-2-seater-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-2TB-OS-RMST-LGN"
+    },
+    {
+      "current_sku": "2XTB+1XQB+1XCH+ARMREST-CREAM",
+      "product": "cushie-5-seater-u-shaped-sectional-sleeper-sofa-w-chaise",
+      "verified_sku": "V2-BDL-2TB-QB-CH-RMST-CREAM"
+    },
+    {
+      "current_sku": "2XTB+1XQB+1XCH+ARMREST-DKBL",
+      "product": "cushie-5-seater-u-shaped-sectional-sleeper-sofa-w-chaise",
+      "verified_sku": "V2-BDL-2TB-QB-CH-RMST-DKBL"
+    },
+    {
+      "current_sku": "2XTB+1XQB+1XCH+ARMREST-DKGY",
+      "product": "cushie-5-seater-u-shaped-sectional-sleeper-sofa-w-chaise",
+      "verified_sku": "V2-BDL-2TB-QB-CH-RMST-DKGY"
+    },
+    {
+      "current_sku": "2XTB+1XQB+1XCH+ARMREST-LGN",
+      "product": "cushie-5-seater-u-shaped-sectional-sleeper-sofa-w-chaise",
+      "verified_sku": "V2-BDL-2TB-QB-CH-RMST-LGN"
+    },
+    {
+      "current_sku": "2XTB+1XQB+1XCH+ARMREST-LIGY",
+      "product": "cushie-5-seater-u-shaped-sectional-sleeper-sofa-w-chaise",
+      "verified_sku": "V2-BDL-2TB-QB-CH-RMST-LIGY"
+    },
+    {
+      "current_sku": "2XTB+2XCH+ARMREST-CREAM",
+      "product": "cushie-4-seater-u-shaped-sectional-sleeper-sofa-w-double-chaise",
+      "verified_sku": "V2-BDL-2TB-2CH-RMST-CREAM"
+    },
+    {
+      "current_sku": "2XTB+2XCH+ARMREST-DKBL",
+      "product": "cushie-4-seater-u-shaped-sectional-sleeper-sofa-w-double-chaise",
+      "verified_sku": "V2-BDL-2TB-2CH-RMST-DKBL"
+    },
+    {
+      "current_sku": "2XTB+2XCH+ARMREST-DKGY",
+      "product": "cushie-4-seater-u-shaped-sectional-sleeper-sofa-w-double-chaise",
+      "verified_sku": "V2-BDL-2TB-2CH-RMST-DKGY"
+    },
+    {
+      "current_sku": "2XTB+2XCH+ARMREST-LGN",
+      "product": "cushie-4-seater-u-shaped-sectional-sleeper-sofa-w-double-chaise",
+      "verified_sku": "V2-BDL-2TB-2CH-RMST-LGN"
+    },
+    {
+      "current_sku": "2XTB+2XCH+ARMREST-LIGY",
+      "product": "cushie-4-seater-u-shaped-sectional-sleeper-sofa-w-double-chaise",
+      "verified_sku": "V2-BDL-2TB-2CH-RMST-LIGY"
+    },
+    {
+      "current_sku": "2XTB+ARMREST-CREAM",
+      "product": "cushie-2-seater-modular-sleeper-sofa",
+      "verified_sku": "V2-BDL-2TB-RMST-CREAM"
+    },
+    {
+      "current_sku": "2XTB+ARMREST-DKBL",
+      "product": "cushie-2-seater-modular-sleeper-sofa",
+      "verified_sku": "V2-BDL-2TB-RMST-DKBL"
+    },
+    {
+      "current_sku": "2XTB+ARMREST-DKGY",
+      "product": "cushie-2-seater-modular-sleeper-sofa",
+      "verified_sku": "V2-BDL-2TB-RMST-DKGY"
+    },
+    {
+      "current_sku": "2XTB+ARMREST-LGN",
+      "product": "cushie-2-seater-modular-sleeper-sofa",
+      "verified_sku": "V2-BDL-2TB-RMST-LGN"
+    },
+    {
+      "current_sku": "2XTB+ARMREST-LIGY",
+      "product": "cushie-2-seater-modular-sleeper-sofa",
+      "verified_sku": "V2-BDL-2TB-RMST-LIGY"
+    },
+    {
+      "current_sku": "2XTBX1XOS+ARMREST-CREAM",
+      "product": "cushie-2-seater-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-2TB-OS-RMST-CREAM"
+    },
+    {
+      "current_sku": "3XQB+2XTB+ARMREST-CREAM",
+      "product": "cushie-8-seater-u-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-3QB-2TB-RMST-CREAM"
+    },
+    {
+      "current_sku": "3XQB+2XTB+ARMREST-DKBL",
+      "product": "cushie-8-seater-u-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-3QB-2TB-RMST-DKBL"
+    },
+    {
+      "current_sku": "3XQB+2XTB+ARMREST-DKGY",
+      "product": "cushie-8-seater-u-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-3QB-2TB-RMST-DKGY"
+    },
+    {
+      "current_sku": "3XQB+2XTB+ARMREST-LGN",
+      "product": "cushie-8-seater-u-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-3QB-2TB-RMST-LGN"
+    },
+    {
+      "current_sku": "3XQB+2XTB+ARMREST-LIGY",
+      "product": "cushie-8-seater-u-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-3QB-2TB-RMST-LIGY"
+    },
+    {
+      "current_sku": "3XTB-ARMREST-CREAM",
+      "product": "cushie-3-seater-sleeper-sofa-120",
+      "verified_sku": "V2-BDL-3TB-RMST-CREAM"
+    },
+    {
+      "current_sku": "3XTB-ARMREST-DKBL",
+      "product": "cushie-3-seater-sleeper-sofa-120",
+      "verified_sku": "V2-BDL-3TB-RMST-DKBL"
+    },
+    {
+      "current_sku": "3XTB-ARMREST-DKGY",
+      "product": "cushie-3-seater-sleeper-sofa-120",
+      "verified_sku": "V2-BDL-3TB-RMST-DKGY"
+    },
+    {
+      "current_sku": "3XTB-ARMREST-LGN",
+      "product": "cushie-3-seater-sleeper-sofa-120",
+      "verified_sku": "V2-BDL-3TB-RMST-LGN"
+    },
+    {
+      "current_sku": "3XTB-ARMREST-LIGY",
+      "product": "cushie-3-seater-sleeper-sofa-120",
+      "verified_sku": "V2-BDL-3TB-RMST-LIGY"
+    },
+    {
+      "current_sku": "3XTB+1XCH+ARMREST-CREAM",
+      "product": "4-seater-sectional-sleeper-sofa-w-chaise",
+      "verified_sku": "V2-BDL-3TB-CH-RMST-CREAM"
+    },
+    {
+      "current_sku": "3XTB+1XCH+ARMREST-DKBL",
+      "product": "4-seater-sectional-sleeper-sofa-w-chaise",
+      "verified_sku": "V2-BDL-3TB-CH-RMST-DKBL"
+    },
+    {
+      "current_sku": "3XTB+1XCH+ARMREST-DKGY",
+      "product": "4-seater-sectional-sleeper-sofa-w-chaise",
+      "verified_sku": "V2-BDL-3TB-CH-RMST-DKGY"
+    },
+    {
+      "current_sku": "3XTB+1XCH+ARMREST-LGN",
+      "product": "4-seater-sectional-sleeper-sofa-w-chaise",
+      "verified_sku": "V2-BDL-3TB-CH-RMST-LGN"
+    },
+    {
+      "current_sku": "3XTB+1XCH+ARMREST-LIGY",
+      "product": "4-seater-sectional-sleeper-sofa-w-chaise",
+      "verified_sku": "V2-BDL-3TB-CH-RMST-LIGY"
+    },
+    {
+      "current_sku": "3XTB+2XOS+ARMREST-CREAM",
+      "product": "cushie-3-seater-u-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-3TB-2OS-RMST-CREAM"
+    },
+    {
+      "current_sku": "3XTB+2XOS+ARMREST-DKBL",
+      "product": "cushie-3-seater-u-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-3TB-2OS-RMST-DKBL"
+    },
+    {
+      "current_sku": "3XTB+2XOS+ARMREST-DKGY",
+      "product": "cushie-3-seater-u-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-3TB-2OS-RMST-DKGY"
+    },
+    {
+      "current_sku": "3XTB+2XOS+ARMREST-LGN",
+      "product": "cushie-3-seater-u-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-3TB-2OS-RMST-LGN"
+    },
+    {
+      "current_sku": "3XTB+2XOS+ARMREST-LIGY",
+      "product": "cushie-3-seater-u-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-3TB-2OS-RMST-LIGY"
+    },
+    {
+      "current_sku": "4XTB+1XCH+ARMREST-CREAM",
+      "product": "cushie-5-seater-u-shaped-sectional-sleeper-sofa-w-chaise",
+      "verified_sku": "V2-BDL-4TB-CH-RMST-CREAM"
+    },
+    {
+      "current_sku": "4XTB+1XCH+ARMREST-DKBL",
+      "product": "cushie-5-seater-u-shaped-sectional-sleeper-sofa-w-chaise",
+      "verified_sku": "V2-BDL-4TB-CH-RMST-DKBL"
+    },
+    {
+      "current_sku": "4XTB+1XCH+ARMREST-DKGY",
+      "product": "cushie-5-seater-u-shaped-sectional-sleeper-sofa-w-chaise",
+      "verified_sku": "V2-BDL-4TB-CH-RMST-DKGY"
+    },
+    {
+      "current_sku": "4XTB+1XCH+ARMREST-LGN",
+      "product": "cushie-5-seater-u-shaped-sectional-sleeper-sofa-w-chaise",
+      "verified_sku": "V2-BDL-4TB-CH-RMST-LGN"
+    },
+    {
+      "current_sku": "4XTB+1XCH+ARMREST-LIGY",
+      "product": "cushie-5-seater-u-shaped-sectional-sleeper-sofa-w-chaise",
+      "verified_sku": "V2-BDL-4TB-CH-RMST-LIGY"
+    },
+    {
+      "current_sku": "4XTB+ARMREST-CREAM",
+      "product": "cushie-4-seater-l-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-4TB-RMST-CREAM"
+    },
+    {
+      "current_sku": "4XTB+ARMREST-DKBL",
+      "product": "cushie-4-seater-l-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-4TB-RMST-DKBL"
+    },
+    {
+      "current_sku": "4XTB+ARMREST-DKGY",
+      "product": "cushie-4-seater-l-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-4TB-RMST-DKGY"
+    },
+    {
+      "current_sku": "4XTB+ARMREST-LGN",
+      "product": "cushie-4-seater-l-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-4TB-RMST-LGN"
+    },
+    {
+      "current_sku": "4XTB+ARMREST-LIGY",
+      "product": "cushie-4-seater-l-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-4TB-RMST-LIGY"
+    },
+    {
+      "current_sku": "5XTB+3XARMREST-CREAM",
+      "product": "cushie-sofa-set-3-2",
+      "verified_sku": "V2-BDL-5TB-3RMST-CREAM"
+    },
+    {
+      "current_sku": "5XTB+3XARMREST-DKBL",
+      "product": "cushie-sofa-set-3-2",
+      "verified_sku": "V2-BDL-5TB-3RMST-DKBL"
+    },
+    {
+      "current_sku": "5XTB+3XARMREST-DKGY",
+      "product": "cushie-sofa-set-3-2",
+      "verified_sku": "V2-BDL-5TB-3RMST-DKGY"
+    },
+    {
+      "current_sku": "5XTB+3XARMREST-LGN",
+      "product": "cushie-sofa-set-3-2",
+      "verified_sku": "V2-BDL-5TB-3RMST-LGN"
+    },
+    {
+      "current_sku": "5XTB+3XARMREST-LIGY",
+      "product": "cushie-sofa-set-3-2",
+      "verified_sku": "V2-BDL-5TB-3RMST-LIGY"
+    },
+    {
+      "current_sku": "5XTB+ARMREST-CREAM",
+      "product": "cushie-5-seater-l-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-5TB-RMST-CREAM"
+    },
+    {
+      "current_sku": "5XTB+ARMREST-DKBL",
+      "product": "cushie-5-seater-l-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-5TB-RMST-DKBL"
+    },
+    {
+      "current_sku": "5XTB+ARMREST-DKGY",
+      "product": "cushie-5-seater-l-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-5TB-RMST-DKGY"
+    },
+    {
+      "current_sku": "5XTB+ARMREST-LGN",
+      "product": "cushie-5-seater-l-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-5TB-RMST-LGN"
+    },
+    {
+      "current_sku": "5XTB+ARMREST-LIGY",
+      "product": "cushie-5-seater-l-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-5TB-RMST-LIGY"
+    },
+    {
+      "current_sku": "6XTB+3XARMREST-CREAM",
+      "product": "cushie-sofa-set-4-2",
+      "verified_sku": "V2-BDL-6TB-3RMST-CREAM"
+    },
+    {
+      "current_sku": "6XTB+3XARMREST-DKBL",
+      "product": "cushie-sofa-set-4-2",
+      "verified_sku": "V2-BDL-6TB-3RMST-DKBL"
+    },
+    {
+      "current_sku": "6XTB+3XARMREST-DKGY",
+      "product": "cushie-sofa-set-4-2",
+      "verified_sku": "V2-BDL-6TB-3RMST-DKGY"
+    },
+    {
+      "current_sku": "6XTB+3XARMREST-LGN",
+      "product": "cushie-sofa-set-4-2",
+      "verified_sku": "V2-BDL-6TB-3RMST-LGN"
+    },
+    {
+      "current_sku": "6XTB+3XARMREST-LIGY",
+      "product": "cushie-sofa-set-4-2",
+      "verified_sku": "V2-BDL-6TB-3RMST-LIGY"
+    },
+    {
+      "current_sku": "6XTB+ARMREST-CREAM",
+      "product": "cushie-6-seater-u-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-6TB-RMST-CREAM"
+    },
+    {
+      "current_sku": "6XTB+ARMREST-DKBL",
+      "product": "cushie-6-seater-u-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-6TB-RMST-DKBL"
+    },
+    {
+      "current_sku": "6XTB+ARMREST-DKGY",
+      "product": "cushie-6-seater-u-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-6TB-RMST-DKGY"
+    },
+    {
+      "current_sku": "6XTB+ARMREST-LGN",
+      "product": "cushie-6-seater-u-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-6TB-RMST-LGN"
+    },
+    {
+      "current_sku": "6XTB+ARMREST-LIGY",
+      "product": "cushie-6-seater-u-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-6TB-RMST-LIGY"
+    },
+    {
+      "current_sku": "7XTB+ARMREST-CREAM",
+      "product": "cushie-7-seater-u-shaped-sectional-sleeper-sofa-200",
+      "verified_sku": "V2-BDL-7TB-RMST-CREAM"
+    },
+    {
+      "current_sku": "7XTB+ARMREST-CREAM-160",
+      "product": "cushie-7-seater-l-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-7TB-RMST-CREAM-160"
+    },
+    {
+      "current_sku": "7XTB+ARMREST-DKBL",
+      "product": "cushie-7-seater-u-shaped-sectional-sleeper-sofa-200",
+      "verified_sku": "V2-BDL-7TB-RMST-DKBL"
+    },
+    {
+      "current_sku": "7XTB+ARMREST-DKBL-160",
+      "product": "cushie-7-seater-l-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-7TB-RMST-DKBL-160"
+    },
+    {
+      "current_sku": "7XTB+ARMREST-DKGY",
+      "product": "cushie-7-seater-u-shaped-sectional-sleeper-sofa-200",
+      "verified_sku": "V2-BDL-7TB-RMST-DKGY"
+    },
+    {
+      "current_sku": "7XTB+ARMREST-DKGY-160",
+      "product": "cushie-7-seater-l-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-7TB-RMST-DKGY-160"
+    },
+    {
+      "current_sku": "7XTB+ARMREST-LGN",
+      "product": "cushie-7-seater-u-shaped-sectional-sleeper-sofa-200",
+      "verified_sku": "V2-BDL-7TB-RMST-LGN"
+    },
+    {
+      "current_sku": "7XTB+ARMREST-LGN-160",
+      "product": "cushie-7-seater-l-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-7TB-RMST-LGN-160"
+    },
+    {
+      "current_sku": "7XTB+ARMREST-LIGY",
+      "product": "cushie-7-seater-u-shaped-sectional-sleeper-sofa-200",
+      "verified_sku": "V2-BDL-7TB-RMST-LIGY"
+    },
+    {
+      "current_sku": "7XTB+ARMREST-LIGY-160",
+      "product": "cushie-7-seater-l-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-7TB-RMST-LIGY-160"
+    },
+    {
+      "current_sku": "8XTB +ARMREST-LGN",
+      "product": "cushie-8-seater-u-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-8TB-RMST-LGN"
+    },
+    {
+      "current_sku": "8XTB+ARMREST-CREAM",
+      "product": "cushie-8-seater-u-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-8TB-RMST-CREAM"
+    },
+    {
+      "current_sku": "8XTB+ARMREST-DKBL",
+      "product": "cushie-8-seater-u-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-8TB-RMST-DKBL"
+    },
+    {
+      "current_sku": "8XTB+ARMREST-DKGY",
+      "product": "cushie-8-seater-u-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-8TB-RMST-DKGY"
+    },
+    {
+      "current_sku": "8XTB+ARMREST-LIGY",
+      "product": "cushie-8-seater-u-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-8TB-RMST-LIGY"
+    },
+    {
+      "current_sku": "9XTB+ARMREST-CREAM",
+      "product": "cushie-9-seater-u-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-9TB-RMST-CREAM"
+    },
+    {
+      "current_sku": "9XTB+ARMREST-DKBL",
+      "product": "cushie-9-seater-u-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-9TB-RMST-DKBL"
+    },
+    {
+      "current_sku": "9XTB+ARMREST-DKGY",
+      "product": "cushie-9-seater-u-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-9TB-RMST-DKGY"
+    },
+    {
+      "current_sku": "9XTB+ARMREST-LGN",
+      "product": "cushie-9-seater-u-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-9TB-RMST-LGN"
+    },
+    {
+      "current_sku": "9XTB+ARMREST-LIGY",
+      "product": "cushie-9-seater-u-shaped-sectional-sleeper-sofa",
+      "verified_sku": "V2-BDL-9TB-RMST-LIGY"
+    },
+    {
+      "current_sku": "Q-TOPPER",
+      "product": "mattress-topper",
+      "verified_sku": "V2-MOD-Q-TOPPER"
+    },
+    {
+      "current_sku": "V3-1XDB+ARMREST-DKBL",
+      "product": "cushie-snuggle-sleeper-sofa",
+      "verified_sku": "V3-BDL-DB-RMST-DKBL"
+    },
+    {
+      "current_sku": "V3-1XDB+ARMREST-LGN",
+      "product": "cushie-snuggle-sleeper-sofa",
+      "verified_sku": "V3-BDL-DB-RMST-LGN"
+    },
+    {
+      "current_sku": "V3-1XDB+ARMREST-TBRN",
+      "product": "cushie-snuggle-sleeper-sofa",
+      "verified_sku": "V3-BDL-DB-RMST-TBRN"
+    },
+    {
+      "current_sku": "V3-1XDB+ARMREST-TWHT",
+      "product": "cushie-snuggle-sleeper-sofa",
+      "verified_sku": "V3-BDL-DB-RMST-TWHT"
+    },
+    {
+      "current_sku": "V3-1XKB+ARMREST-DKBL",
+      "product": "cushie-snuggle-sleeper-sofa",
+      "verified_sku": "V3-BDL-KB-RMST-DKBL"
+    },
+    {
+      "current_sku": "V3-1XKB+ARMREST-LGN",
+      "product": "cushie-snuggle-sleeper-sofa",
+      "verified_sku": "V3-BDL-KB-RMST-LGN"
+    },
+    {
+      "current_sku": "V3-1XKB+ARMREST-TBRN",
+      "product": "cushie-snuggle-sleeper-sofa",
+      "verified_sku": "V3-BDL-KB-RMST-TBRN"
+    },
+    {
+      "current_sku": "V3-1XKB+ARMREST-TWHT",
+      "product": "cushie-snuggle-sleeper-sofa",
+      "verified_sku": "V3-BDL-KB-RMST-TWHT"
+    },
+    {
+      "current_sku": "V3-1XQB+ARMREST-DKBL",
+      "product": "cushie-snuggle-sleeper-sofa",
+      "verified_sku": "V3-BDL-QB-RMST-DKBL"
+    },
+    {
+      "current_sku": "V3-1XQB+ARMREST-LGN",
+      "product": "cushie-snuggle-sleeper-sofa",
+      "verified_sku": "V3-BDL-QB-RMST-LGN"
+    },
+    {
+      "current_sku": "V3-1XQB+ARMREST-TBRN",
+      "product": "cushie-snuggle-sleeper-sofa",
+      "verified_sku": "V3-BDL-QB-RMST-TBRN"
+    },
+    {
+      "current_sku": "V3-1XQB+ARMREST-TWHT",
+      "product": "cushie-snuggle-sleeper-sofa",
+      "verified_sku": "V3-BDL-QB-RMST-TWHT"
+    },
+    {
+      "current_sku": "V3-1XTB+ARMREST-DKBL",
+      "product": "cushie-snuggle-sleeper-sofa",
+      "verified_sku": "V3-BDL-TB-RMST-DKBL"
+    },
+    {
+      "current_sku": "V3-1XTB+ARMREST-LGN",
+      "product": "cushie-snuggle-sleeper-sofa",
+      "verified_sku": "V3-BDL-TB-RMST-LGN"
+    },
+    {
+      "current_sku": "V3-1XTB+ARMREST-TBRN",
+      "product": "cushie-snuggle-sleeper-sofa",
+      "verified_sku": "V3-BDL-TB-RMST-TBRN"
+    },
+    {
+      "current_sku": "V3-1XTB+ARMREST-TWHT",
+      "product": "cushie-snuggle-sleeper-sofa",
+      "verified_sku": "V3-BDL-TB-RMST-TWHT"
+    }
+  ],
+  "source": "Google Sheet 12pdXe2t37iPz2tcJoX7ICogONmAIq_7myYER5DIuoPo / Mapping tab"
+}
