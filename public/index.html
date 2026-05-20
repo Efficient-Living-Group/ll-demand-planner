@@ -1142,6 +1142,19 @@ function poIsOverdue(po) {
   return false;
 }
 
+function poStageText(po) {
+  if (poIsReceived(po)) return 'RECEIVED';
+  if (poIsOverdue(po)) return 'OVERDUE';
+  if (poIsInTransit(po)) return 'IN TRANSIT';
+  return 'OPEN';
+}
+function poStageBadge(po) {
+  if (poIsReceived(po)) return '<span class="badge healthy">RECEIVED</span>';
+  if (poIsOverdue(po)) return '<span class="badge" style="background:#FEE2E2;color:#991B1B">⚠️ OVERDUE</span>';
+  if (poIsInTransit(po)) return '<span class="badge ok">IN TRANSIT</span>';
+  return '<span class="badge low">OPEN</span>';
+}
+
 function renderPurchaseOrders(allPOs) {
   const search = (document.getElementById('poSearch')?.value || '').toLowerCase().trim();
   let pos = (allPOs || []).filter(po => {
@@ -1198,12 +1211,6 @@ function renderPurchaseOrders(allPOs) {
   const container = document.getElementById('poList');
   if (!pos.length) { container.innerHTML = '<p style="color:var(--text-dim);text-align:center;padding:40px">No purchase orders found</p>'; return; }
   const fmt = d => { if (!d) return '—'; try { return new Date(d).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}); } catch(e) { return d; } };
-  const stageBadge = po => {
-    if (poIsReceived(po)) return '<span class="badge healthy">RECEIVED</span>';
-    if (poIsOverdue(po)) return '<span class="badge" style="background:#FEE2E2;color:#991B1B">⚠️ OVERDUE</span>';
-    if (poIsInTransit(po)) return '<span class="badge ok">IN TRANSIT</span>';
-    return '<span class="badge low">OPEN</span>';
-  };
   const qualityBadge = po => {
     const q = po.quality;
     if (!q) return '';
@@ -1299,7 +1306,7 @@ function renderPurchaseOrders(allPOs) {
     return `<div style="${delayCardStyle};border-radius:12px;margin-bottom:8px;overflow:hidden" title="${hasAta ? 'ATA recorded — row marked received' : (etaDelay ? etaDelay.title : '')}">
       <div class="po-row" onclick="this.parentElement.querySelector('.po-items').classList.toggle('open')" style="display:grid;grid-template-columns:${poGridCols};align-items:center;padding:12px 18px;cursor:pointer;user-select:none;font-size:11px;gap:6px">
         <span data-label="PO" style="font-family:monospace;font-weight:700;font-size:12px;color:var(--blue);white-space:nowrap;display:flex;align-items:center;gap:5px" title="${escapeHtml(cleanPoRef(po.reference))}"><span style="white-space:nowrap">${escapeHtml(cleanPoRef(po.reference))}</span><a href="${poCin7Url(po)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" style="font-family:system-ui;text-decoration:none;color:#2563EB;font-size:12px;line-height:1;flex:0 0 auto" title="Open PO in Cin7">↗</a></span>
-        <span data-label="Status" style="text-align:center">${stageBadge(po)}</span>
+        <span data-label="Status" style="text-align:center">${poStageBadge(po)}</span>
         <span data-label="Quality" style="text-align:center">${qualityBadge(po)}</span>
         <span data-label="Supplier" style="color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${po.company || ''}</span>
         <span data-label="Container" style="font-family:monospace;font-size:10px;color:${containerNumber ? 'var(--text)' : 'var(--text-dim)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(containerTitle)}">${escapeHtml(containerNumber || '—')}</span>
@@ -1493,8 +1500,9 @@ function toggleInboundDrilldown() {
           eta: etaDate ? etaDate.toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}) : 'No ETA',
           etaTime: etaDate ? etaDate.getTime() : 8640000000000000,
           supplier: (po.company || 'Unknown').substring(0, 30),
-          status: po.stage || 'In Transit',
-          container: po.trackingCode || '—'
+          status: poStageText(po),
+          statusHtml: poStageBadge(po),
+          container: poContainerNumber(po) || po.trackingCode || '—'
         });
       }
     }
@@ -1536,7 +1544,7 @@ function renderIncomingTable() {
   } else {
     html += '<table><thead><tr><th style="'+thStyle+'" onclick="sortIncoming(\'po\')">PO'+arrow('po')+'</th><th style="'+thStyle+'" onclick="sortIncoming(\'sku\')">SKU'+arrow('sku')+'</th><th style="'+thStyle+'" onclick="sortIncoming(\'qty\')">Qty'+arrow('qty')+'</th><th style="'+thStyle+'" onclick="sortIncoming(\'eta\')">ETA'+arrow('eta')+'</th><th style="'+thStyle+'" onclick="sortIncoming(\'supplier\')">Supplier'+arrow('supplier')+'</th><th style="'+thStyle+'" onclick="sortIncoming(\'container\')">Container'+arrow('container')+'</th><th style="'+thStyle+'" onclick="sortIncoming(\'status\')">Status'+arrow('status')+'</th></tr></thead><tbody>';
     html += sorted.map(r => 
-      '<tr><td style="font-weight:600">' + r.po + '</td><td style="font-family:monospace;font-size:10px">' + r.sku + '</td><td style="font-weight:700">' + r.qty + '</td><td>' + r.eta + '</td><td style="font-size:10px">' + r.supplier + '</td><td style="font-family:monospace;font-size:10px">' + r.container + '</td><td>' + r.status + '</td></tr>'
+      '<tr><td style="font-weight:600">' + r.po + '</td><td style="font-family:monospace;font-size:10px">' + r.sku + '</td><td style="font-weight:700">' + r.qty + '</td><td>' + r.eta + '</td><td style="font-size:10px">' + r.supplier + '</td><td style="font-family:monospace;font-size:10px">' + r.container + '</td><td>' + (r.statusHtml || r.status) + '</td></tr>'
     ).join('');
     html += '</tbody></table>';
     html += '<div style="font-size:11px;color:var(--text-dim);margin-top:8px">Total: ' + sorted.reduce((t,r) => t + r.qty, 0) + ' units across ' + new Set(sorted.map(r=>r.po)).size + ' POs</div>';
