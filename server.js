@@ -3404,7 +3404,7 @@ function buildHealthStatus() {
   if (checks.productsMissingOption1 > 0) warnings.push(`${checks.productsMissingOption1} Cin7 products/options have blank Option1`);
   if (checks.missingRequiredOption1.length) warnings.push(`Required Option1 categories missing: ${checks.missingRequiredOption1.join(', ')}`);
   if (checks.purchaseOrdersWithoutLineItems > 0) warnings.push(`${checks.purchaseOrdersWithoutLineItems} purchase orders currently have no line items`);
-  if (checks.staleDemandSkuAliases.length) warnings.push(`${checks.staleDemandSkuAliases.length} Shopify open-demand rows use stale/cross-market SKU aliases and are being canonicalized`);
+  if (checks.staleDemandSkuAliases.length) warnings.push(`${checks.staleDemandSkuAliases.length} Shopify open-demand rows use current/alias SKUs and are being canonicalized to verified SKUs`);
   const badFixtures = fixtureRoutes.filter(row => row.actual !== row.expected);
   if (badFixtures.length) critical.push(`SKU route fixture mismatch: ${badFixtures.map(row => `${row.sku} expected ${row.expected}, got ${row.actual}`).join('; ')}`);
   const zeroPanels = Object.entries(ckPanelSkuCounts).filter(([, count]) => count === 0).map(([id]) => id);
