@@ -326,20 +326,62 @@ function explodeCushieSnuggleSetSku(sku, ckId) {
   return null;
 }
 
+function cushieUsComponentCode(version, rawCode) {
+  const code = String(rawCode || '').toUpperCase().trim();
+  if (!code) return null;
+  if (code === 'ARMREST' || code === 'RMST') return version === 'V3' ? 'ARM' : 'RMST';
+  return code;
+}
+
+function parseCushieUsBundleParts(body) {
+  const parts = [];
+  for (const rawPart of String(body || '').toUpperCase().split(/[+-]/).filter(Boolean)) {
+    const partMatch = rawPart.match(/^(?:(\d+)X?|X)?([A-Z]+)$/);
+    if (!partMatch) return null;
+    parts.push({ qty: Number(partMatch[1] || 1), code: partMatch[2] });
+  }
+  return parts.length ? parts : null;
+}
+
+function inferCushieUsBundleVersion(parts, colour) {
+  const codes = new Set((parts || []).map(part => part.code));
+  // Unprefixed Cushie US Shopify SKUs are legacy V2 in current order data,
+  // except when they use V3-only module codes such as KB. Explicit V3-* SKUs
+  // are handled before this inference.
+  if (codes.has('KB')) return 'V3';
+  return 'V2';
+}
+
 function explodeCushieUsBundleSku(sku, ckId) {
   if (ckId !== 'cusb-us') return null;
-  const s = String(sku || '').toUpperCase().trim();
-  const m = s.match(/^(V[23])-BDL-(.+)-([A-Z0-9]+)$/);
-  if (!m) return null;
-  const [, version, body, colour] = m;
+  const s = String(sku || '').toUpperCase().trim().replace(/-MULTI$/, '');
+  let version, body, colour;
+
+  // Canonical Cin7/Shopify bundle form, e.g. V2-BDL-2TB-CH-RMST-LGN.
+  let m = s.match(/^(V[23])-BDL-(.+)-([A-Z0-9]+)$/);
+  if (m) {
+    [, version, body, colour] = m;
+  } else {
+    // Current Cushie US Shopify bundle form, e.g. V3-1XQB+ARMREST-LGN.
+    // Some historical exports omit the V2/V3 prefix, e.g. 1XTB-ARMREST-CREAM
+    // or direct module quantities such as 1XOS-CREAM.
+    m = s.match(/^(?:(V[23])-)?(.+)-([A-Z0-9]+)$/);
+    if (!m) return null;
+    [, version, body, colour] = m;
+    if (!/(?:\d+X|ARMREST|RMST)/.test(body)) return null;
+    // Do not treat real component SKUs such as V2-RMST-CREAM as bundles.
+    if (version && !/\d+X/.test(body) && !body.includes('+') && !body.includes('ARMREST')) return null;
+  }
+
+  const parts = parseCushieUsBundleParts(body);
+  if (!parts) return null;
+  version = version || inferCushieUsBundleVersion(parts, colour);
+
   const out = [];
-  for (const rawPart of body.split('-')) {
-    const partMatch = rawPart.match(/^(\d+)?([A-Z]+)$/);
-    if (!partMatch) return null;
-    const qty = Number(partMatch[1] || 1);
-    let code = partMatch[2];
-    if (version === 'V3' && code === 'RMST') code = 'ARM';
-    pushComponent(out, `${version}-${code}-${colour}`, qty);
+  for (const part of parts) {
+    const code = cushieUsComponentCode(version, part.code);
+    if (!code) return null;
+    pushComponent(out, `${version}-${code}-${colour}`, part.qty);
   }
   return out.length ? out : null;
 }
@@ -1771,7 +1813,7 @@ function buildCKData(ckId) {
 
   // Country panels should use Shopify open demand split by shipping destination as the preorder source of truth.
   // CIN7 SOH stays branch-filtered from /Stock above, oversold comes from Shopify destination-country demand.
-  if (ckId === 'llau' || ckId === 'llau-cbcf' || ckId === 'llnz' || ckId === 'llna' || ckId === 'llca' || ckId === 'lluk' || ckId === 'llsg' || ckId === 'cusb-au' || ckId.startsWith('cusb-au-')) {
+  if (ckId === 'llau' || ckId === 'llau-cbcf' || ckId === 'llnz' || ckId === 'llna' || ckId === 'llca' || ckId === 'lluk' || ckId === 'llsg' || ckId === 'cusb-au' || ckId.startsWith('cusb-au-') || ckId === 'cusb-us' || ckId === 'cusb-uk') {
     const demandCountry = ckId === 'llau' || ckId === 'llau-cbcf' || ckId === 'cusb-au' || ckId.startsWith('cusb-au-')
       ? 'AU'
       : ckId === 'llca'
