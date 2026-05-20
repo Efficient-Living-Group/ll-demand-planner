@@ -651,6 +651,47 @@ function isOpenPO(po) {
   return !!po && !isReceivedPO(po) && !isVoidPO(po);
 }
 
+function parsePoDateValue(raw) {
+  const key = parsePoDateKey(raw);
+  if (!key || !/^\d{4}-\d{2}-\d{2}$/.test(String(key))) return null;
+  const d = new Date(`${key}T00:00:00Z`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function poTabCrdDate(po) {
+  return parsePoDateValue(po?.crd || po?.etd);
+}
+
+function poTabEtaDate(po) {
+  return parsePoDateValue(po?.arrival || po?.estimatedArrivalDate);
+}
+
+function poTabOriginalEtaDate(po) {
+  return parsePoDateValue(po?.customFields?.orders_1000);
+}
+
+function isPoInTransitForPoTab(po, now = new Date()) {
+  if (!isOpenPO(po)) return false;
+  const crd = poTabCrdDate(po);
+  return !!(crd && crd <= now && hasContainerNumber(po));
+}
+
+function isPoOverdueForPoTab(po, now = new Date()) {
+  if (!isOpenPO(po)) return false;
+  const eta = poTabEtaDate(po);
+  const originalEta = poTabOriginalEtaDate(po);
+  if (eta) return eta <= now;
+  if (originalEta) return originalEta <= now;
+  return false;
+}
+
+function poTabStageLabel(po, now = new Date()) {
+  if (isReceivedPO(po)) return 'RECEIVED';
+  if (isPoOverdueForPoTab(po, now)) return 'OVERDUE';
+  if (isPoInTransitForPoTab(po, now)) return 'IN TRANSIT';
+  return 'OPEN';
+}
+
 function ckCategoryForSku(sku) {
   const s = String(sku || '').toUpperCase().trim();
   if (!s) return 'Uncategorised';
@@ -3639,7 +3680,8 @@ app.get('/api/incoming-pos', requireAuth, (req, res) => {
       freightEst,
       tariffEst,
       landedTotal,
-      stage: po.stage || 'Open',
+      stage: poTabStageLabel(po),
+      rawStage: po.stage || '',
       totalUnits,
       ckGroups: [...poGroups].sort(),
       lineItems

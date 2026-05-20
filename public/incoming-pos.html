@@ -140,9 +140,12 @@ function etaBadge(eta) {
 }
 
 function stageBadge(s) {
-  if (!s || s === 'None' || s === 'Open') return '<span class="badge badge-blue">OPEN</span>';
-  if (s === 'Received') return '<span class="badge badge-green">RECEIVED</span>';
-  return `<span class="badge badge-yellow">${s.toUpperCase()}</span>`;
+  const status = String(s || 'OPEN').trim().toUpperCase();
+  if (status === 'RECEIVED') return '<span class="badge badge-green">RECEIVED</span>';
+  if (status === 'OVERDUE') return '<span class="badge badge-red">⚠️ OVERDUE</span>';
+  if (status === 'IN TRANSIT') return '<span class="badge badge-green">IN TRANSIT</span>';
+  if (status === 'NONE' || status === 'OPEN') return '<span class="badge badge-blue">OPEN</span>';
+  return `<span class="badge badge-yellow">${status}</span>`;
 }
 
 function applyFilters() {
