@@ -2728,6 +2728,17 @@ app.get('/sso/masterhub', (req, res) => {
 
 app.get('/login', (req, res) => res.redirect(MASTERHUB_URL));
 
+function setNoStoreHtmlHeaders(res) {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+}
+
+function sendNoStoreHtml(res, filename) {
+  setNoStoreHtmlHeaders(res);
+  return res.sendFile(path.join(__dirname, 'public', filename));
+}
+
 // Public assets
 app.use('/logos', express.static(path.join(__dirname, 'public', 'logos')));
 
@@ -3481,8 +3492,12 @@ app.get('/api/health', (req, res) => {
 
 // Main app shell is public; all data APIs remain protected by requireAuth.
 // This lets the browser reuse a 30-day localStorage token after direct visits, restarts, or deploys.
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-app.use(express.static(path.join(__dirname, 'public')));
+app.get('/', (req, res) => sendNoStoreHtml(res, 'index.html'));
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders: (res, filePath) => {
+    if (String(filePath).endsWith('.html')) setNoStoreHtmlHeaders(res);
+  }
+}));
 
 // ===== START =====
 app.listen(PORT, () => {
@@ -3717,5 +3732,5 @@ app.get('/api/incoming-pos', requireAuth, (req, res) => {
 
 // Serve incoming-pos page
 app.get('/incoming-pos', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'incoming-pos.html'));
+  sendNoStoreHtml(res, 'incoming-pos.html');
 });
