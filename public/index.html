@@ -8,7 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 <style>
 :root{--bg-primary:#F6F8F4;--bg-secondary:#2C474B;--bg-accent:#3A5A5E;--bg-card:#FFFFFF;--alert:#C33252;--green:#5BAB31;--yellow:#D4930D;--blue:#2C474B;--text:#282828;--text-dim:#758068;--border:#DDE3D5;--sidebar-w:220px;--content-pad:20px}
-*{margin:0;padding:0;box-sizing:border-box}html{overscroll-behavior:none}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg-primary);color:var(--text);min-height:100vh;display:flex;overflow-x:hidden;overscroll-behavior:none}body.sidebar-collapsed{--sidebar-w:0px}
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg-primary);color:var(--text);min-height:100vh;display:flex;overflow-x:hidden}body.sidebar-collapsed{--sidebar-w:0px}
 .sidebar{width:var(--sidebar-w);position:fixed;top:0;left:0;bottom:0;background:var(--bg-secondary);color:#F6F8F4;display:flex;flex-direction:column;z-index:100;overflow:hidden;transition:width .2s ease,opacity .2s ease;opacity:1}
 body.sidebar-collapsed .sidebar{overflow:hidden;opacity:0}
 .sidebar-main{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
@@ -1726,20 +1726,6 @@ selectCK = async function(ckId) {
   closeMobileMenu();
   return origSelectCK(ckId);
 };
-// Prevent nested scroll areas from pushing the whole page when they hit top/bottom
-function scrollContainerFor(el){return el?.closest?.('.table-wrap,.sidebar-main,.drilldown,.modal,.chat-messages,.po-items')}
-document.addEventListener('wheel', function(e){
-  const scroller=scrollContainerFor(e.target);
-  if(!scroller) return;
-  const dy=e.deltaY;
-  if(!dy) return;
-  const canScrollY=scroller.scrollHeight>scroller.clientHeight+1;
-  if(!canScrollY) return;
-  const atTop=scroller.scrollTop<=0;
-  const atBottom=Math.ceil(scroller.scrollTop+scroller.clientHeight)>=scroller.scrollHeight;
-  if((dy<0&&atTop)||(dy>0&&atBottom)) e.preventDefault();
-},{passive:false});
-
 // Sticky header fix: clone thead on vertical scroll
 document.addEventListener('scroll', function(e) {
   if (e.target.classList && e.target.classList.contains('table-wrap')) {
