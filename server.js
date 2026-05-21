@@ -62,8 +62,7 @@ const CK_DEFS = {
   'rdnt':     { name: 'Radiant',                prefix: 'RDNT',   logo: 'radiant.png',       store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Radiant', sizes: {'-D-':'Double','-Q-':'Queen','-K-':'King'} },
   'wfhcr':    { name: 'WFH Chair',              prefix: 'WFHCR',  logo: 'wfh-chair.png',     store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - WFH Chair', sizes: {} },
   'caterpillar': { name: 'Caterpillar Dining',    prefix: 'MULTI',  logo: 'lifely-sofa.png',  store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Caterpillar', sizes: {'EDT':'Dining Table','EDB':'Dining Chair'} },
-  'cusb-au-snuggle': { name: 'Cushie Snuggle Bed',    prefix: 'MULTI',  logo: 'cushie.png',        store: 'lifely', poDestination: 'Australia', salesCountry: 'AU', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Cushie V3 Snuggle', filter: sku => sku.startsWith('CUSB') && !sku.includes('-UK') && !sku.includes('SGE'), excludeCV: true, sizes: {'ARST':'Armrest','-TW-':'Twin','-D-':'Double','-Q-':'Queen','-K-':'King'} },
-  'cusb-au-lifely':  { name: 'Lifely Sofabed',         prefix: 'MULTI',  logo: 'cushie.png',        store: 'lifely', poDestination: 'Australia', salesCountry: 'AU', stockBranches: LL_AU_BRANCH_IDS, option1: ['Category Killer - Cushie V2', 'Category Killer - Lifely Sofa'], filter: sku => sku.startsWith('LFSB') && !sku.includes('-UK'), excludeCV: true, sizes: {'-TW-':'Twin','-S-':'Single','-D-':'Double','-Q-':'Queen','-CHS-':'Chaise','-SOTM-':'Ottoman','-AMST-':'Armrest'} },
+  'cusb-au':  { name: 'Cushie AU',              prefix: 'MULTI',  logo: 'cushie.png',        store: 'lifely', poDestination: 'Australia', salesCountry: 'AU', stockBranches: LL_AU_BRANCH_IDS, option1: ['Category Killer - Cushie V3 Snuggle', 'Category Killer - Cushie V2', 'Category Killer - Lifely Sofa'], filter: sku => ((sku.startsWith('CUSB') && !sku.includes('-UK') && !sku.includes('SGE')) || (sku.startsWith('LFSB') && !sku.includes('-UK'))), excludeCV: true, sizes: {'ARST':'Armrest','-TW-':'Twin','-S-':'Single','-D-':'Double','-Q-':'Queen','-K-':'King','-CHS-':'Chaise','-SOTM-':'Ottoman','-AMST-':'Armrest'} },
   'cusb-us':  { name: 'Cushie US',              prefix: 'MULTI',  logo: 'cushie.png',        store: 'lifely', salesCountry: 'US', stockBranches: [60701], option1: ['Category Killer - Cushie V2', 'Category Killer - Cushie V3 Snuggle'], filter: sku => sku.startsWith('V2-') || sku.startsWith('V3-'), excludeCV: true, sizes: {'-TB-':'Twin','-DB-':'Full','-QB-':'Queen','-KB-':'King','-CH-':'Chaise','-OS-':'Ottoman','-OB-':'Ottoman Bed','-RMST-':'Armrest','-ARM-':'Armrest'} },
   'cusb-uk':  { name: 'Cushie UK',              prefix: 'MULTI',  logo: 'cushie.png',        store: 'lifely', salesCountry: 'GB', stockBranches: [62444], option1: ['Category Killer - Cushie V2', 'Category Killer - Cushie V3 Snuggle'], filter: sku => (sku.startsWith('CUSB') || sku.startsWith('LFSB')) && sku.includes('-UK'), excludeCV: true, sizes: {'-TW-':'Twin','-S-':'Single','-D-':'Double','-Q-':'Queen','-K-':'King','-CHS-':'Chaise','-SOTM-':'Ottoman','-AMST-':'Armrest'} },
 
@@ -335,7 +334,7 @@ function explodeLittleLifelyBundleSku(sku, ckId) {
 function explodeCushieSnuggleSetSku(sku, ckId) {
   const s = String(sku || '').toUpperCase().trim();
   let m = s.match(/^(CUSB-(TW|D|Q|K)-([A-Z0-9]+))-SET$/);
-  if (m && ckId === 'cusb-au-snuggle') return [m[1], `${m[1]}-CV`];
+  if (m && (ckId === 'cusb-au' || ckId === 'cusb-au-snuggle')) return [m[1], `${m[1]}-CV`];
 
   m = s.match(/^(CUSB-(TW|D|Q|K)-([A-Z0-9]+))-SET-UK$/);
   if (m && ckId === 'cusb-uk') return [`${m[1]}-UK`, `${m[1]}-UK-CV`];
@@ -441,11 +440,11 @@ function explodeKnownBundleSkuForCk(sku, ckId) {
     const cocoonDream = explodeCocoonDeepDreamCombo(s);
     if (cocoonDream) return [cocoonDream.mattress];
   }
-  if (ckId === 'cusb-au-lifely') {
+  if (ckId === 'cusb-au' || ckId === 'cusb-au-lifely') {
     const cushieModular = explodeCushieModularSku(s);
     if (cushieModular) return cushieModular;
   }
-  if (ckId === 'cusb-au-snuggle' || ckId === 'cusb-uk' || ckId === 'cusb-us') {
+  if (ckId === 'cusb-au' || ckId === 'cusb-au-snuggle' || ckId === 'cusb-uk' || ckId === 'cusb-us') {
     const cushieSet = explodeCushieSnuggleSetSku(s, ckId);
     if (cushieSet) return cushieSet;
     const cushieUsBundle = explodeCushieUsBundleSku(s, ckId);
@@ -1857,7 +1856,7 @@ function buildCKData(ckId) {
   }
 
   const cushieModularComponentDemand = {};
-  if (ckId === 'cusb-au-lifely') {
+  if (ckId === 'cusb-au' || ckId === 'cusb-au-lifely') {
     for (const sourceStore of relatedStores) {
       const countries = dataCache.shopifyOpenDemand?.[sourceStore] || {};
       for (const countryDemand of Object.values(countries)) {
@@ -2752,7 +2751,7 @@ function getBrandGroup(id, def) {
 }
 
 function getBrandSubgroup(id, def) {
-  if (id === 'cusb-au-snuggle' || id === 'cusb-au-lifely' || id === 'cmss') return { id: 'cushie-au', name: 'Cushie AU' };
+  if (id === 'cusb-au' || id === 'cmss') return { id: 'cushie-au', name: 'Cushie AU' };
   if (id === 'cusb-us') return { id: 'cushie-us', name: 'Cushie US' };
   if (id === 'cusb-uk') return { id: 'cushie-uk', name: 'Cushie UK' };
   return null;
