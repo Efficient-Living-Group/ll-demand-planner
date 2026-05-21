@@ -261,6 +261,9 @@ async function fetchJsonNoCache(path, attempts=2){
   throw lastErr||new Error('Load failed');
 }
 let DATA={cin7:{},shopify:{},openOrders:{},available:{},velocity:{},pos:[],allPos:[],names:{},sizes:{},cbmMap:{},suppliers:{},landedCosts:{},mattressRegions:null,_base:null},currentCK=null,charts={},dashFilter={size:'All',region:'All',productType:'All'},heatmapSortMode='sku';
+const LOGO_VERSION='20260521b';
+function logoSrc(logo){return '/logos/'+encodeURIComponent(logo||'')+'?v='+LOGO_VERSION}
+function logoFallback(img){img.style.display='none'}
 let brandOpenState={};
 let subgroupOpenState={};
 const TODAY=new Date();
@@ -485,8 +488,8 @@ async function loadSidebar(){
         <span class="sidebar-brand-caret">${brandOpenState[group.brand.id]===false?'▸':'▾'}</span>
       </div>
       <div class="sidebar-brand-children">
-        ${group.subgroupOrder.map(subId=>{const sub=group.subgroups[subId];if(sub.items.length===1){const ck=sub.items[0];return `<div class="sidebar-item" data-ck="${ck.id}" onclick="selectCK('${ck.id}')"><img src="/logos/${ck.logo}" alt=""><span>${sub.meta.name}</span></div>`;}return `<div class="sidebar-subgroup ${subgroupOpenState[subId]===false?'collapsed':''}" data-subgroup="${subId}"><div class="sidebar-subgroup-toggle" onclick="toggleSubgroup('${subId}')"><span>${sub.meta.name}</span><span class="sidebar-subgroup-caret">${subgroupOpenState[subId]===false?'▸':'▾'}</span></div><div class="sidebar-subgroup-children">${sub.items.map(ck=>`<div class="sidebar-item" data-ck="${ck.id}" onclick="selectCK('${ck.id}')"><img src="/logos/${ck.logo}" alt=""><span>${ck.name}</span></div>`).join('')}</div></div>`}).join('')}
-        ${group.items.map(ck=>`<div class="sidebar-item" data-ck="${ck.id}" onclick="selectCK('${ck.id}')"><img src="/logos/${ck.logo}" alt=""><span>${ck.name}</span></div>`).join('')}
+        ${group.subgroupOrder.map(subId=>{const sub=group.subgroups[subId];if(sub.items.length===1){const ck=sub.items[0];return `<div class="sidebar-item" data-ck="${ck.id}" onclick="selectCK('${ck.id}')"><img src="${logoSrc(ck.logo)}" alt="${ck.name||'logo'}" onerror="logoFallback(this)"><span>${sub.meta.name}</span></div>`;}return `<div class="sidebar-subgroup ${subgroupOpenState[subId]===false?'collapsed':''}" data-subgroup="${subId}"><div class="sidebar-subgroup-toggle" onclick="toggleSubgroup('${subId}')"><span>${sub.meta.name}</span><span class="sidebar-subgroup-caret">${subgroupOpenState[subId]===false?'▸':'▾'}</span></div><div class="sidebar-subgroup-children">${sub.items.map(ck=>`<div class="sidebar-item" data-ck="${ck.id}" onclick="selectCK('${ck.id}')"><img src="${logoSrc(ck.logo)}" alt="${ck.name||'logo'}" onerror="logoFallback(this)"><span>${ck.name}</span></div>`).join('')}</div></div>`}).join('')}
+        ${group.items.map(ck=>`<div class="sidebar-item" data-ck="${ck.id}" onclick="selectCK('${ck.id}')"><img src="${logoSrc(ck.logo)}" alt="${ck.name||'logo'}" onerror="logoFallback(this)"><span>${ck.name}</span></div>`).join('')}
       </div>
     </div>`).join('');
   document.getElementById('sidebarFooter').textContent=d.lastRefresh?'Updated: '+new Date(d.lastRefresh).toLocaleTimeString():'Loading...';
@@ -501,7 +504,7 @@ async function selectCK(ckId){
   try{const d=await fetchJsonNoCache(`/api/ck/${ckId}`);if(!d)return;
   DATA={cin7:d.cin7||{},shopify:d.shopify||{},openOrders:d.openOrders||{},available:d.available||{},velocity:d.velocity||{},pos:d.pos||[],allPos:d.allPos||d.pos||[],names:d.names||{},sizes:d.sizes||{},bomData:d.bomData||null,reorderBomData:d.reorderBomData||null,costs:d.costs||{},trendData:d.trendData||{},weeklyData:d.weeklyData||null,cbmMap:d.cbmMap||{},suppliers:d.suppliers||{},landedCosts:d.landedCosts||{},coverageAux:d.coverageAux||null,mattressRegions:d.mattressRegions||null,fx:d.fx||null,lastRefresh:d.lastRefresh||null,lastCin7Refresh:d.lastCin7Refresh||null,lastPoRefresh:d.lastPoRefresh||null,lastShopifyRefresh:d.lastShopifyRefresh||null};
   DATA._base={cin7:DATA.cin7,shopify:DATA.shopify,openOrders:DATA.openOrders,available:DATA.available,velocity:DATA.velocity,trendData:DATA.trendData,weeklyData:DATA.weeklyData,pos:DATA.pos,allPos:DATA.allPos};
-  document.getElementById('headerTitle').innerHTML=`<img src="/logos/${d.ck.logo}" style="height:32px;filter:brightness(0) invert(1)"> ${d.ck.name}`;
+  document.getElementById('headerTitle').innerHTML=`<img src="${logoSrc(d.ck.logo)}" style="height:32px;filter:brightness(0) invert(1)" alt="${d.ck.name||'logo'}" onerror="logoFallback(this)"> ${d.ck.name}`;
   Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}});charts={};dashFilter.size='All';dashFilter.region='All';dashFilter.productType='All';dashFilter.reorderType='All';applyMattressRegion();updateHeaderSub();
   document.getElementById('headerMeta').textContent=d.lastRefresh?'Last refresh: '+new Date(d.lastRefresh).toLocaleString():'';renderFreshnessWarning();
   document.getElementById('loadingScreen').style.display='none';document.getElementById('dashboard').classList.add('active');
