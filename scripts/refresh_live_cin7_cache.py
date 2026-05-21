@@ -425,6 +425,8 @@ def build_products_and_stock(products_raw: list[dict[str, Any]], product_options
         stock_by_branch.setdefault(sku, {})[branch_key] = {
             "soh": float(row.get("stockOnHand") or 0),
             "available": float(row.get("available") or 0),
+            "openSales": float(row.get("openSales") or 0),
+            "incoming": float(row.get("incoming") or 0),
             "branchName": row.get("branchName") or "",
         }
 
