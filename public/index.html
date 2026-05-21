@@ -720,13 +720,13 @@ function renderDashboard(){
       const totalPreorders=standaloneBeds+comboBeds+covers+swatchPacks;
       const coversText=covers?` · Covers ${Math.round(covers).toLocaleString()}`:'';
       const otherText=otherLittleLifely?` · Excluded other-market ${Math.round(otherLittleLifely).toLocaleString()}`:'';
-      preorderBreakdownCard=`<div class="card red" title="Little Lifely Cin7 open orders for this panel's warehouse/market, split before stock coverage is applied. Only SKUs matching this market's bed/combo prefixes are counted."><div class="label">Preorder Breakdown</div><div class="value">${Math.round(totalPreorders).toLocaleString()}</div><div class="sub">Beds ${Math.round(standaloneBeds).toLocaleString()} · Combos ${Math.round(comboBeds).toLocaleString()}${coversText} · Swatches ${Math.round(swatchPacks).toLocaleString()}${otherText}</div></div>`;
+      preorderBreakdownCard=`<div class="card red" title="Preorder/backorder units are calculated from Cin7 Stock Available by warehouse/market. Formula: max(-stockAvailable, 0). Only SKUs matching this market's bed/combo prefixes are counted."><div class="label">Preorder Breakdown</div><div class="value">${Math.round(totalPreorders).toLocaleString()}</div><div class="sub">Beds ${Math.round(standaloneBeds).toLocaleString()} · Combos ${Math.round(comboBeds).toLocaleString()}${coversText} · Swatches ${Math.round(swatchPacks).toLocaleString()}${otherText}</div></div>`;
     }
   } else {
     const rawOpenOrders=DATA.coverageAux?.mode==='generic'&&DATA.coverageAux.rawOpenDemandTotal!=null?Number(DATA.coverageAux.rawOpenDemandTotal):null;
     const openOrdersValue=rawOpenOrders!=null?rawOpenOrders:Math.abs(tOver);
-    const openOrdersSub=rawOpenOrders!=null?'raw Cin7 open-order units':'pre-order commitments';
-    openOrdersCard=`<div class="card red" title="Units in Cin7 open orders and not yet fulfilled. Component rows may fan bundle demand into physical parts for coverage, but this summary stays on raw Cin7 open-order units."><div class="label">Open Orders</div><div class="value">${Math.round(openOrdersValue).toLocaleString()}</div><div class="sub">${openOrdersSub}</div></div>`;
+    const openOrdersSub=rawOpenOrders!=null?'stock available deficit':'pre-order commitments';
+    openOrdersCard=`<div class="card red" title="Preorder/backorder units are calculated from Cin7 Stock Available. Formula: max(-stockAvailable, 0). Raw Cin7 open orders may be higher when existing SOH can cover part of demand."><div class="label">Preorders</div><div class="value">${Math.round(openOrdersValue).toLocaleString()}</div><div class="sub">${openOrdersSub}</div></div>`;
   }
   let overstockVal=0,deadstockVal=0;
   skus.forEach(s=>{let vel=getVel(s),soh=DATA.cin7[s]||0,cost=(DATA.costs||{})[s]||0;
