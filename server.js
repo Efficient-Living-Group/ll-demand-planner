@@ -685,21 +685,31 @@ function isOpenPO(po) {
   return !!po && !isReceivedPO(po) && !isVoidPO(po);
 }
 
-function getCin7OpenSalesBySku(branchIds = null, country = '') {
+function getCin7StockMetricBySku(branchIds = null, country = '', metric = 'openSales') {
   const branchSet = Array.isArray(branchIds) ? new Set(branchIds.map(id => String(id))) : null;
   const result = {};
   for (const [rawSku, branches] of Object.entries(dataCache.cin7StockByBranch || {})) {
     let qty = 0;
     for (const [branchId, row] of Object.entries(branches || {})) {
       if (branchSet && !branchSet.has(String(branchId))) continue;
-      qty += Number(row.openSales || 0);
+      if (metric === 'preorder') qty += Math.max(-Number(row.available || 0), 0);
+      else if (metric === 'available') qty += Number(row.available || 0);
+      else qty += Number(row.openSales || 0);
     }
-    if (qty <= 0) continue;
+    if (metric !== 'available' && qty <= 0) continue;
     const sku = canonicalDemandSku(rawSku, country);
     if (!sku) continue;
     result[sku] = (result[sku] || 0) + qty;
   }
   return result;
+}
+
+function getCin7OpenSalesBySku(branchIds = null, country = '') {
+  return getCin7StockMetricBySku(branchIds, country, 'openSales');
+}
+
+function getCin7PreordersBySku(branchIds = null, country = '') {
+  return getCin7StockMetricBySku(branchIds, country, 'preorder');
 }
 
 function parsePoDateValue(raw) {
@@ -1825,9 +1835,10 @@ function buildCKData(ckId) {
           if (!row) return acc;
           acc.soh += Number(row.soh || 0);
           acc.available += Number(row.available || 0);
+          acc.openSales += Number(row.openSales || 0);
           acc.matched += 1;
           return acc;
-        }, { soh: 0, available: 0, matched: 0 });
+        }, { soh: 0, available: 0, openSales: 0, matched: 0 });
         cin7Raw[sku] = branchData.matched > 0
           ? { ...data, soh: branchData.soh, available: branchData.available }
           : { ...data, soh: 0, available: 0 };
@@ -1885,6 +1896,7 @@ function buildCKData(ckId) {
   // Shopify inventory. Bundle/config SKUs are not displayed as rows; their
   // inventory signal is pushed down to component SKUs when a BOM is known.
   const shopify = {};
+  const openOrders = {};
   const panelHasSku = (sku) => cin7[sku] !== undefined || shopify[sku] !== undefined || skuMatchesDef(sku, def);
   const addToPanelMap = (map, sku, qty) => {
     if (!sku || !panelHasSku(sku)) return false;
@@ -1909,6 +1921,22 @@ function buildCKData(ckId) {
     }
   }
 
+  const addCin7DemandToVisibleMap = (source, target, country = '') => {
+    for (const [rawDemandSku, qty] of Object.entries(source || {})) {
+      const demandSku = canonicalDemandSku(rawDemandSku, country);
+      const q = Number(qty || 0);
+      if (!q) continue;
+      const exploded = explodeDemandSkuForCk(demandSku, ckId);
+      if (exploded) {
+        for (const componentSku of exploded) {
+          if (panelHasSku(componentSku)) target[componentSku] = (target[componentSku] || 0) + q;
+        }
+        continue;
+      }
+      if (panelHasSku(demandSku)) target[demandSku] = (target[demandSku] || 0) + q;
+    }
+  };
+
   const usesMarketOpenOrders = ckId === 'llau' || ckId === 'llau-cbcf' || ckId === 'llnz' || ckId === 'llna' || ckId === 'llca' || ckId === 'lluk' || ckId === 'llsg' || ckId === 'cusb-au' || ckId.startsWith('cusb-au-') || ckId === 'cusb-us' || ckId === 'cusb-uk';
 
   // Country panels use Cin7 open sales/open orders as the preorder source of truth.
@@ -1926,50 +1954,21 @@ function buildCKData(ckId) {
               ? 'SG'
               : 'US';
     const openDemandByVisibleSku = {};
-    const countryDemand = getCin7OpenSalesBySku(stockBranches, demandCountry);
-    for (const [rawDemandSku, qty] of Object.entries(countryDemand)) {
-      const demandSku = canonicalDemandSku(rawDemandSku, demandCountry);
-      const q = Number(qty || 0);
-      if (!q) continue;
-      const exploded = explodeDemandSkuForCk(demandSku, ckId);
-      if (exploded) {
-        for (const componentSku of exploded) {
-          if (cin7[componentSku] !== undefined || shopify[componentSku] !== undefined) {
-            openDemandByVisibleSku[componentSku] = (openDemandByVisibleSku[componentSku] || 0) + q;
-          }
-        }
-        continue;
-      }
-      if (cin7[demandSku] !== undefined || shopify[demandSku] !== undefined) {
-        openDemandByVisibleSku[demandSku] = (openDemandByVisibleSku[demandSku] || 0) + q;
-      }
-    }
+    addCin7DemandToVisibleMap(getCin7PreordersBySku(stockBranches, demandCountry), openDemandByVisibleSku, demandCountry);
+    addCin7DemandToVisibleMap(getCin7OpenSalesBySku(stockBranches, demandCountry), openOrders, demandCountry);
     for (const sku of Object.keys(cin7)) {
       shopify[sku] = -Number(openDemandByVisibleSku[sku] || 0);
+      openOrders[sku] = Number(openOrders[sku] || 0);
     }
   }
 
   if (!usesMarketOpenOrders) {
     const openDemandByVisibleSku = {};
-    for (const [rawDemandSku, qty] of Object.entries(getCin7OpenSalesBySku(stockBranches, salesCountry || ''))) {
-      const demandSku = canonicalDemandSku(rawDemandSku, salesCountry || '');
-      const q = Number(qty || 0);
-      if (!q) continue;
-      const exploded = explodeDemandSkuForCk(demandSku, ckId);
-      if (exploded) {
-        for (const componentSku of exploded) {
-          if (cin7[componentSku] !== undefined || shopify[componentSku] !== undefined) {
-            openDemandByVisibleSku[componentSku] = (openDemandByVisibleSku[componentSku] || 0) + q;
-          }
-        }
-        continue;
-      }
-      if (cin7[demandSku] !== undefined || shopify[demandSku] !== undefined || skuMatchesDef(demandSku, def)) {
-        openDemandByVisibleSku[demandSku] = (openDemandByVisibleSku[demandSku] || 0) + q;
-      }
-    }
+    addCin7DemandToVisibleMap(getCin7PreordersBySku(stockBranches, salesCountry || ''), openDemandByVisibleSku, salesCountry || '');
+    addCin7DemandToVisibleMap(getCin7OpenSalesBySku(stockBranches, salesCountry || ''), openOrders, salesCountry || '');
     for (const sku of Object.keys(cin7)) {
       shopify[sku] = -Number(openDemandByVisibleSku[sku] || 0);
+      openOrders[sku] = Number(openOrders[sku] || 0);
     }
   }
 
@@ -2087,7 +2086,7 @@ function buildCKData(ckId) {
   const coverageConfig = littleLifelyCoverageConfigs[ckId];
   if (coverageConfig) {
     const openDemandBySku = {};
-    for (const [rawSku, qty] of Object.entries(getCin7OpenSalesBySku(stockBranches, coverageConfig.demandCountry))) {
+    for (const [rawSku, qty] of Object.entries(getCin7PreordersBySku(stockBranches, coverageConfig.demandCountry))) {
       const sku = canonicalDemandSku(rawSku, coverageConfig.demandCountry);
       const q = Number(qty || 0);
       // Keep raw bundle/combo demand here. The frontend uses those raw combo
@@ -2143,7 +2142,7 @@ function buildCKData(ckId) {
       rawOpenDemandBySku[sku] = (rawOpenDemandBySku[sku] || 0) + Number(qty || 0);
       rawOpenDemandTotal += Number(qty || 0);
     };
-    for (const [sku, qty] of Object.entries(getCin7OpenSalesBySku(stockBranches, salesCountry || ''))) {
+    for (const [sku, qty] of Object.entries(getCin7PreordersBySku(stockBranches, salesCountry || ''))) {
       const q = Number(qty || 0);
       if (!q) continue;
       const exploded = explodeDemandSkuForCk(sku, ckId);
@@ -2184,7 +2183,7 @@ function buildCKData(ckId) {
       // Open orders are sourced from Cin7 open sales below, not Shopify.
     }
 
-    for (const [sku, qty] of Object.entries(getCin7OpenSalesBySku(stockBranches || LL_AU_BRANCH_IDS, 'AU'))) {
+    for (const [sku, qty] of Object.entries(getCin7PreordersBySku(stockBranches || LL_AU_BRANCH_IDS, 'AU'))) {
       aggregatedOpenDemand[sku] = (aggregatedOpenDemand[sku] || 0) + Number(qty || 0);
     }
 
@@ -2560,6 +2559,8 @@ function buildCKData(ckId) {
     mattressRegions = Object.fromEntries(Object.entries(mattressRegionConfigs).map(([region, cfg]) => {
       const regionCin7 = {};
       const regionShopify = {};
+      const regionOpenOrders = {};
+      const regionAvailable = {};
       const regionVelocity = { _7d: {}, _30d: {}, _weeklyBreakdown: {}, _firstSeen: {} };
       const regionTrendData = {};
       const regionWeeklyData = {};
@@ -2572,17 +2573,20 @@ function buildCKData(ckId) {
           if (!row) return acc;
           acc.soh += Number(row.soh || 0);
           acc.available += Number(row.available || 0);
+          acc.openSales += Number(row.openSales || 0);
           acc.matched += 1;
           return acc;
-        }, { soh: 0, available: 0, matched: 0 });
+        }, { soh: 0, available: 0, openSales: 0, matched: 0 });
         regionCin7[sku] = branchData.matched > 0 ? branchData.soh : 0;
+        regionAvailable[sku] = branchData.matched > 0 ? branchData.available : 0;
+        regionOpenOrders[sku] = branchData.matched > 0 ? branchData.openSales : 0;
         regionShopify[sku] = 0;
       }
 
       // Little Lifely mattresses are not sold as standalone Shopify SKUs.
       // Each Little Lifely bed + mattress combo consumes one matching mattress.
       // Open demand now comes from Cin7 open sales; velocity still comes from Shopify sales history.
-      const demandSource = getCin7OpenSalesBySku(cfg.branchIds, cfg.salesCountry);
+      const demandSource = getCin7PreordersBySku(cfg.branchIds, cfg.salesCountry);
       for (const [rawComboSku, qty] of Object.entries(demandSource)) {
         const comboSku = canonicalDemandSku(rawComboSku, cfg.salesCountry);
         const mattressSku = Object.entries(cfg.comboMap).find(([prefix]) => comboSku.startsWith(prefix))?.[1];
@@ -2648,7 +2652,7 @@ function buildCKData(ckId) {
         regionAllPos.push(row);
         if (isOpenPO(po)) regionPos.push(row);
       }
-      return [region, { cin7: regionCin7, shopify: regionShopify, velocity: regionVelocity, trendData: regionTrendData, weeklyData: regionWeeklyData, pos: regionPos, allPos: regionAllPos }];
+      return [region, { cin7: regionCin7, shopify: regionShopify, openOrders: regionOpenOrders, available: regionAvailable, velocity: regionVelocity, trendData: regionTrendData, weeklyData: regionWeeklyData, pos: regionPos, allPos: regionAllPos }];
     }));
 
     // The default "All" mattress view should use real destination-country
@@ -2660,6 +2664,12 @@ function buildCKData(ckId) {
       for (const [sku, qty] of Object.entries(regionData.shopify || {})) {
         shopify[sku] = (shopify[sku] || 0) + Number(qty || 0);
       }
+      for (const [sku, qty] of Object.entries(regionData.openOrders || {})) {
+        openOrders[sku] = (openOrders[sku] || 0) + Number(qty || 0);
+      }
+      for (const [sku, qty] of Object.entries(regionData.available || {})) {
+        cin7Available[sku] = (cin7Available[sku] || 0) + Number(qty || 0);
+      }
     }
   }
 
@@ -2667,6 +2677,8 @@ function buildCKData(ckId) {
     ck: def,
     cin7,
     shopify,
+    openOrders,
+    available: cin7Available,
     velocity,
     pos,
     allPos,

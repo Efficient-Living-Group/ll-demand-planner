@@ -244,20 +244,20 @@ else{if(window.location.search)history.replaceState({},'','/');
   const tl=document.getElementById('trackerLink');if(tl)tl.href='/tracker';
   const il=document.getElementById('incomingLink');if(il)il.href='/incoming-pos';}
 const H=()=>({'Content-Type':'application/json','X-Session':SESSION});
-let DATA={cin7:{},shopify:{},velocity:{},pos:[],allPos:[],names:{},sizes:{},cbmMap:{},suppliers:{},landedCosts:{},mattressRegions:null,_base:null},currentCK=null,charts={},dashFilter={size:'All',region:'All',productType:'All'},heatmapSortMode='sku';
+let DATA={cin7:{},shopify:{},openOrders:{},available:{},velocity:{},pos:[],allPos:[],names:{},sizes:{},cbmMap:{},suppliers:{},landedCosts:{},mattressRegions:null,_base:null},currentCK=null,charts={},dashFilter={size:'All',region:'All',productType:'All'},heatmapSortMode='sku';
 let brandOpenState={};
 let subgroupOpenState={};
 const TODAY=new Date();
 function getSkus(){return[...new Set([...Object.keys(DATA.cin7),...Object.keys(DATA.velocity)])].filter(s=>s&&!s.startsWith('_')&&!(s.includes('-CS-')&&!s.includes('PACK')))}
 function updateHeaderSub(){const el=document.getElementById('headerSub');if(el)el.textContent=`${Object.keys(DATA.cin7).length} CIN7 SKUs · ${Object.keys(DATA.velocity).filter(k=>!k.startsWith('_')).length} with velocity · ${uniquePoCount(DATA.pos)} open POs`;}
-function applyMattressRegion(){if(currentCK!=='ll-mattresses'||!DATA.mattressRegions)return;const base=DATA._base||{};const region=dashFilter.region||'All';const src=region==='All'?base:DATA.mattressRegions[region];if(!src)return;DATA.cin7=src.cin7||{};DATA.shopify=src.shopify||{};DATA.velocity=src.velocity||{};DATA.trendData=src.trendData||{};DATA.weeklyData=src.weeklyData||null;DATA.pos=src.pos||[];DATA.allPos=src.allPos||src.pos||[];updateHeaderSub();}
+function applyMattressRegion(){if(currentCK!=='ll-mattresses'||!DATA.mattressRegions)return;const base=DATA._base||{};const region=dashFilter.region||'All';const src=region==='All'?base:DATA.mattressRegions[region];if(!src)return;DATA.cin7=src.cin7||{};DATA.shopify=src.shopify||{};DATA.openOrders=src.openOrders||{};DATA.available=src.available||{};DATA.velocity=src.velocity||{};DATA.trendData=src.trendData||{};DATA.weeklyData=src.weeklyData||null;DATA.pos=src.pos||[];DATA.allPos=src.allPos||src.pos||[];updateHeaderSub();}
 function setMattressRegion(region){dashFilter.region=region;dashFilter.size='All';applyMattressRegion();renderDashboard()}
 function getGenericOpenDemand(s){return DATA.coverageAux?.mode==='generic'?Number((DATA.coverageAux.openDemandBySku||{})[s]||0):null}
-function getNet(s){const genericOpen=getGenericOpenDemand(s);return genericOpen!==null?(DATA.cin7[s]||0)-genericOpen:(DATA.cin7[s]||0)+Math.min(DATA.shopify[s]||0,0)}
+function getNet(s){if(DATA.available&&Object.prototype.hasOwnProperty.call(DATA.available,s))return Number(DATA.available[s]||0);const genericOpen=getGenericOpenDemand(s);return genericOpen!==null?(DATA.cin7[s]||0)-genericOpen:(DATA.cin7[s]||0)+Math.min(DATA.shopify[s]||0,0)}
 function getIncoming(s){return(DATA.pos||[]).reduce((t,po)=>((po.analyticsItems||po.items)?.[s]||0)+t,0)}
-function getOpenSales(s){const genericOpen=getGenericOpenDemand(s);return genericOpen!==null?genericOpen:Math.max(-Number(DATA.shopify[s]||0),0)}
-function getOpenOrdersDisplay(s){const genericOpen=getGenericOpenDemand(s);return genericOpen!==null?genericOpen:Math.max(-Number(DATA.shopify[s]||0),0)}
-function getOversoldChartValue(s){const genericOpen=getGenericOpenDemand(s);return genericOpen!==null?-genericOpen:Math.min(DATA.shopify[s]||0,0)}
+function getOpenSales(s){const genericOpen=getGenericOpenDemand(s);return genericOpen!==null?genericOpen:Math.max(-getNet(s),0)}
+function getOpenOrdersDisplay(s){if(DATA.openOrders&&Object.prototype.hasOwnProperty.call(DATA.openOrders,s))return Number(DATA.openOrders[s]||0);const genericOpen=getGenericOpenDemand(s);return genericOpen!==null?genericOpen:Math.max(-Number(DATA.shopify[s]||0),0)}
+function getOversoldChartValue(s){return -getOpenSales(s)}
 function fmtEtaShort(v){if(!v)return'—';const d=new Date(v);return Number.isNaN(d.getTime())?'—':d.toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'})}
 function buildPreorderCoverage(s){
   const computeFromRows=(preorderUnits, rows=[])=>{
@@ -484,8 +484,8 @@ async function selectCK(ckId){
   const activeItem=document.querySelector(`.sidebar-item[data-ck="${ckId}"]`);const groupEl=activeItem?.closest('.sidebar-brand-group');if(groupEl){groupEl.classList.remove('collapsed');brandOpenState[groupEl.dataset.brandGroup]=true;const caret=groupEl.querySelector('.sidebar-brand-caret');if(caret)caret.textContent='▾';}const subgroupEl=activeItem?.closest('.sidebar-subgroup');if(subgroupEl){subgroupEl.classList.remove('collapsed');subgroupOpenState[subgroupEl.dataset.subgroup]=true;const subCaret=subgroupEl.querySelector('.sidebar-subgroup-caret');if(subCaret)subCaret.textContent='▾';}
   document.getElementById('loadingScreen').style.display='block';document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
   try{const r=await fetch(`/api/ck/${ckId}`,{headers:H()});if(r.status===401)return window.location.href='/login';const d=await r.json();
-  DATA={cin7:d.cin7||{},shopify:d.shopify||{},velocity:d.velocity||{},pos:d.pos||[],allPos:d.allPos||d.pos||[],names:d.names||{},sizes:d.sizes||{},bomData:d.bomData||null,reorderBomData:d.reorderBomData||null,costs:d.costs||{},trendData:d.trendData||{},weeklyData:d.weeklyData||null,cbmMap:d.cbmMap||{},suppliers:d.suppliers||{},landedCosts:d.landedCosts||{},coverageAux:d.coverageAux||null,mattressRegions:d.mattressRegions||null,fx:d.fx||null,lastRefresh:d.lastRefresh||null,lastCin7Refresh:d.lastCin7Refresh||null,lastPoRefresh:d.lastPoRefresh||null,lastShopifyRefresh:d.lastShopifyRefresh||null};
-  DATA._base={cin7:DATA.cin7,shopify:DATA.shopify,velocity:DATA.velocity,trendData:DATA.trendData,weeklyData:DATA.weeklyData,pos:DATA.pos,allPos:DATA.allPos};
+  DATA={cin7:d.cin7||{},shopify:d.shopify||{},openOrders:d.openOrders||{},available:d.available||{},velocity:d.velocity||{},pos:d.pos||[],allPos:d.allPos||d.pos||[],names:d.names||{},sizes:d.sizes||{},bomData:d.bomData||null,reorderBomData:d.reorderBomData||null,costs:d.costs||{},trendData:d.trendData||{},weeklyData:d.weeklyData||null,cbmMap:d.cbmMap||{},suppliers:d.suppliers||{},landedCosts:d.landedCosts||{},coverageAux:d.coverageAux||null,mattressRegions:d.mattressRegions||null,fx:d.fx||null,lastRefresh:d.lastRefresh||null,lastCin7Refresh:d.lastCin7Refresh||null,lastPoRefresh:d.lastPoRefresh||null,lastShopifyRefresh:d.lastShopifyRefresh||null};
+  DATA._base={cin7:DATA.cin7,shopify:DATA.shopify,openOrders:DATA.openOrders,available:DATA.available,velocity:DATA.velocity,trendData:DATA.trendData,weeklyData:DATA.weeklyData,pos:DATA.pos,allPos:DATA.allPos};
   document.getElementById('headerTitle').innerHTML=`<img src="/logos/${d.ck.logo}" style="height:32px;filter:brightness(0) invert(1)"> ${d.ck.name}`;
   Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}});charts={};dashFilter.size='All';dashFilter.region='All';dashFilter.productType='All';dashFilter.reorderType='All';applyMattressRegion();updateHeaderSub();
   document.getElementById('headerMeta').textContent=d.lastRefresh?'Last refresh: '+new Date(d.lastRefresh).toLocaleString():'';renderFreshnessWarning();
