@@ -54,7 +54,7 @@ const CK_DEFS = {
   'llau-cbcf': { name: 'LL AU Combos',            prefix: 'LLAU-CBCF-', logo: 'little-lifely.png', store: 'lifely', excludeCV: true, salesCountry: 'AU', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Little Lifely', sizes: {'-S-':'Single','-KS-':'King Single','-D-':'Double'} },
   'llna':     { name: 'Little Lifely NA',       prefix: 'LLNA',   logo: 'little-lifely.png', store: 'lifely', excludeCV: false, poDestination: 'United States', salesCountry: 'US', stockBranches: [60701], option1: 'Category Killer - Little Lifely', sizes: {'-TWX-':'Twin XL','-TW-':'Twin','-F-':'Full'} },
   'llca':     { name: 'Little Lifely CA',       prefix: 'LLNA',   logo: 'little-lifely.png', store: 'lifely', excludeCV: false, poDestination: 'Canada', salesCountry: 'CA', stockBranches: [61831], option1: 'Category Killer - Little Lifely', sizes: {'-TWX-':'Twin XL','-TW-':'Twin','-F-':'Full'} },
-  'lluk':     { name: 'Little Lifely UK',       prefix: 'LLUK',   logo: 'little-lifely.png', store: 'lifely', excludeCV: false, salesCountry: 'GB', stockBranches: [62444], option1: 'Category Killer - Little Lifely', sizes: {'-S-':'Single','-SD-':'Small Double','-D-':'Double'} },
+  'lluk':     { name: 'Little Lifely UK',       prefix: 'LLUK-CB-',   logo: 'little-lifely.png', store: 'lifely', excludeCV: false, salesCountry: 'GB', stockBranches: [62444], option1: 'Category Killer - Little Lifely', filter: isLittleLifelyUkComponentSku, sizes: {'-S-':'Single','-SD-':'Small Double','-D-':'Double'} },
   'llsg':     { name: 'Little Lifely SG',       prefix: 'LLSG',   logo: 'little-lifely.png', store: 'lifely', excludeCV: false, salesCountry: 'SG', stockBranches: [57843], strictStockBranches: true, option1: 'Category Killer - Little Lifely', sizes: {'-SS-':'Super Single','-S-':'Single','-Q-':'Queen'} },
   'll-mattresses': { name: 'LL Mattresses',     prefix: 'MULTI',  logo: 'little-lifely.png', store: 'lifely', option1: ['Category Killer - 21cm Mattress', 'Category Killer - Deep Dream'], option1Bypass: sku => sku.startsWith('DDUK'), filter: sku => ['DD-21915CF','DD-21107CF','DD-21137CF'].includes(sku) || sku.startsWith('DDUK'), sizes: {'21915':'Single','21107':'King Single','21137':'Double','2190':'Single UK','21120':'Small Double UK','21135':'Double UK'} },
   'dd':       { name: 'Deep Dream',             prefix: 'MULTI',  logo: 'deep-dream.png',    store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Deepdream', sizes: {'915':'Single','107':'King Single','137':'Double','153':'Queen','183':'King'} },
@@ -92,6 +92,32 @@ function loadCushieUsSkuMapping() {
 }
 
 const CUSHIE_US_SKU_MAPPING = loadCushieUsSkuMapping();
+
+function parseLittleLifelyUkSetSku(sku) {
+  const s = String(sku || '').toUpperCase().trim();
+  const m = s.match(/^LLUK-CB-(S|SD|D)-([A-Z0-9]+)$/);
+  if (!m || m[2] === 'FRM') return null;
+  return { size: m[1], colour: m[2] };
+}
+
+function isLittleLifelyUkFrameSku(sku) {
+  return /^LLUK-CB-(S|SD|D)-FRM$/.test(String(sku || '').toUpperCase().trim());
+}
+
+function isLittleLifelyUkCoverSku(sku) {
+  return /^LLUK-CB-(S|SD|D)-[A-Z0-9]+-CV$/.test(String(sku || '').toUpperCase().trim());
+}
+
+function isLittleLifelyUkComponentSku(sku) {
+  return isLittleLifelyUkFrameSku(sku) || isLittleLifelyUkCoverSku(sku);
+}
+
+function mapLittleLifelyUkSetToComponents(size, colour, includeMattress = false) {
+  const mattressMap = { S: 'DDUK-2190CF', SD: 'DDUK-21120CF', D: 'DDUK-21135CF' };
+  const components = [`LLUK-CB-${size}-FRM`, `LLUK-CB-${size}-${colour}-CV`];
+  if (includeMattress && mattressMap[size]) components.push(mattressMap[size]);
+  return components;
+}
 
 function mapCushieUsVerifiedSku(sku) {
   const s = String(sku || '').toUpperCase().trim();
@@ -310,11 +336,20 @@ function explodeLittleLifelyBundleSku(sku, ckId) {
     return SWATCH_COLOURS.map(colour => `LLAU-CB-CS-${colour}`);
   }
 
+  // UK does not stock/display colour-specific bed SET rows in the planner.
+  // Funnel SET and combo demand into the real component SKUs: one size-level
+  // frame plus one colour/size cover. Mattress demand remains on LL Mattresses.
+  if (ckId === 'lluk') {
+    const set = parseLittleLifelyUkSetSku(s);
+    if (set) return mapLittleLifelyUkSetToComponents(set.size, set.colour);
+    const combo = s.match(/^LLUK-CBCF-(S|SD|D)-([A-Z0-9]+)$/);
+    if (combo) return mapLittleLifelyUkSetToComponents(combo[1], combo[2], true);
+  }
+
   const configs = {
     llau: { comboPrefix: 'LLAU-CBCF-', bedPrefix: 'LLAU-CB-', mattressMap: { S: 'DD-21915CF', KS: 'DD-21107CF', D: 'DD-21137CF' } },
     llnz: { comboPrefix: 'LLAU-CBCF-', bedPrefix: 'LLAU-CB-', mattressMap: { S: 'DD-21915CF', KS: 'DD-21107CF', D: 'DD-21137CF' } },
     'llau-cbcf': { comboPrefix: 'LLAU-CBCF-', bedPrefix: 'LLAU-CB-', mattressMap: { S: 'DD-21915CF', KS: 'DD-21107CF', D: 'DD-21137CF' } },
-    lluk: { comboPrefix: 'LLUK-CBCF-', bedPrefix: 'LLUK-CB-', mattressMap: { S: 'DDUK-2190CF', SD: 'DDUK-21120CF', D: 'DDUK-21135CF' } },
     llna: { comboPrefix: 'LLNA-CFDS-', bedPrefix: 'LLNA-CB-', mattressMap: {} },
     llca: { comboPrefix: 'LLNA-CFDS-', bedPrefix: 'LLNA-CB-', mattressMap: {} },
     llsg: { comboPrefix: 'LLSG-CFDS-', bedPrefix: 'LLSG-CB-', mattressMap: {} }
@@ -2019,7 +2054,7 @@ function buildCKData(ckId) {
     llnz: { demandCountry: 'NZ', bedPrefix: 'LLAU-CB-', comboPrefix: 'LLAU-CBCF-', mattressMap: { S: 'DD-21915CF', KS: 'DD-21107CF', D: 'DD-21137CF' }, mattressSkus: ['DD-21915CF', 'DD-21107CF', 'DD-21137CF'] },
     llna: { demandCountry: 'US', bedPrefix: 'LLNA-CB-', comboPrefix: 'LLNA-CFDS-', mattressMap: {}, mattressSkus: [] },
     llca: { demandCountry: 'CA', bedPrefix: 'LLNA-CB-', comboPrefix: 'LLNA-CFDS-', mattressMap: {}, mattressSkus: [] },
-    lluk: { demandCountry: 'GB', bedPrefix: 'LLUK-CB-', comboPrefix: 'LLUK-CBCF-', mattressMap: { S: 'DDUK-2190CF', SD: 'DDUK-21120CF', D: 'DDUK-21135CF' }, mattressSkus: ['DDUK-2190CF', 'DDUK-21120CF', 'DDUK-21135CF'] },
+    lluk: { demandCountry: 'GB', bedPrefix: 'LLUK-CB-', comboPrefix: 'LLUK-CBCF-', componentMode: 'frame-cover', mattressMap: { S: 'DDUK-2190CF', SD: 'DDUK-21120CF', D: 'DDUK-21135CF' }, mattressSkus: ['DDUK-2190CF', 'DDUK-21120CF', 'DDUK-21135CF'] },
     llsg: { demandCountry: 'SG', bedPrefix: 'LLSG-CB-', comboPrefix: 'LLSG-CFDS-', mattressMap: {}, mattressSkus: [] }
   };
   const coverageConfig = littleLifelyCoverageConfigs[ckId];
