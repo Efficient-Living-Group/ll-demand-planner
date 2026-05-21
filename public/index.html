@@ -244,6 +244,22 @@ else{if(window.location.search)history.replaceState({},'','/');
   const tl=document.getElementById('trackerLink');if(tl)tl.href='/tracker';
   const il=document.getElementById('incomingLink');if(il)il.href='/incoming-pos';}
 const H=()=>({'Content-Type':'application/json','X-Session':SESSION});
+function apiUrl(path){const sep=path.includes('?')?'&':'?';return path+sep+'_='+Date.now()}
+async function fetchJsonNoCache(path, attempts=2){
+  let lastErr;
+  for(let i=0;i<attempts;i++){
+    try{
+      const r=await fetch(apiUrl(path),{headers:H(),cache:'no-store'});
+      if(r.status===401){window.location.href='/login';return null}
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      return await r.json();
+    }catch(e){
+      lastErr=e;
+      if(i<attempts-1)await new Promise(res=>setTimeout(res,500));
+    }
+  }
+  throw lastErr||new Error('Load failed');
+}
 let DATA={cin7:{},shopify:{},openOrders:{},available:{},velocity:{},pos:[],allPos:[],names:{},sizes:{},cbmMap:{},suppliers:{},landedCosts:{},mattressRegions:null,_base:null},currentCK=null,charts={},dashFilter={size:'All',region:'All',productType:'All'},heatmapSortMode='sku';
 let brandOpenState={};
 let subgroupOpenState={};
@@ -459,8 +475,7 @@ function toggleSubgroup(subgroupId){
 }
 
 async function loadSidebar(){
-  try{const r=await fetch('/api/ck-list',{headers:H()});if(r.status===401)return window.location.href='/login';
-  const d=await r.json();
+  try{const d=await fetchJsonNoCache('/api/ck-list');if(!d)return;
   const groups=[];const byBrand={};
   d.list.forEach(ck=>{const b=ck.brand||{id:'other',name:'Other',logo:ck.logo};if(!byBrand[b.id]){byBrand[b.id]={brand:b,items:[],subgroups:{},subgroupOrder:[]};groups.push(byBrand[b.id]);if(!(b.id in brandOpenState)) brandOpenState[b.id]=false;}const group=byBrand[b.id];if(ck.subgroup){if(!group.subgroups[ck.subgroup.id]){group.subgroups[ck.subgroup.id]={meta:ck.subgroup,items:[]};group.subgroupOrder.push(ck.subgroup.id);if(!(ck.subgroup.id in subgroupOpenState)) subgroupOpenState[ck.subgroup.id]=false;}group.subgroups[ck.subgroup.id].items.push(ck);}else{group.items.push(ck);}});
   document.getElementById('sidebarNav').innerHTML=groups.map(group=>`
@@ -483,7 +498,7 @@ async function selectCK(ckId){
   currentCK=ckId;document.querySelectorAll('.sidebar-item').forEach(el=>el.classList.toggle('active',el.dataset.ck===ckId));
   const activeItem=document.querySelector(`.sidebar-item[data-ck="${ckId}"]`);const groupEl=activeItem?.closest('.sidebar-brand-group');if(groupEl){groupEl.classList.remove('collapsed');brandOpenState[groupEl.dataset.brandGroup]=true;const caret=groupEl.querySelector('.sidebar-brand-caret');if(caret)caret.textContent='▾';}const subgroupEl=activeItem?.closest('.sidebar-subgroup');if(subgroupEl){subgroupEl.classList.remove('collapsed');subgroupOpenState[subgroupEl.dataset.subgroup]=true;const subCaret=subgroupEl.querySelector('.sidebar-subgroup-caret');if(subCaret)subCaret.textContent='▾';}
   document.getElementById('loadingScreen').style.display='block';document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
-  try{const r=await fetch(`/api/ck/${ckId}`,{headers:H()});if(r.status===401)return window.location.href='/login';const d=await r.json();
+  try{const d=await fetchJsonNoCache(`/api/ck/${ckId}`);if(!d)return;
   DATA={cin7:d.cin7||{},shopify:d.shopify||{},openOrders:d.openOrders||{},available:d.available||{},velocity:d.velocity||{},pos:d.pos||[],allPos:d.allPos||d.pos||[],names:d.names||{},sizes:d.sizes||{},bomData:d.bomData||null,reorderBomData:d.reorderBomData||null,costs:d.costs||{},trendData:d.trendData||{},weeklyData:d.weeklyData||null,cbmMap:d.cbmMap||{},suppliers:d.suppliers||{},landedCosts:d.landedCosts||{},coverageAux:d.coverageAux||null,mattressRegions:d.mattressRegions||null,fx:d.fx||null,lastRefresh:d.lastRefresh||null,lastCin7Refresh:d.lastCin7Refresh||null,lastPoRefresh:d.lastPoRefresh||null,lastShopifyRefresh:d.lastShopifyRefresh||null};
   DATA._base={cin7:DATA.cin7,shopify:DATA.shopify,openOrders:DATA.openOrders,available:DATA.available,velocity:DATA.velocity,trendData:DATA.trendData,weeklyData:DATA.weeklyData,pos:DATA.pos,allPos:DATA.allPos};
   document.getElementById('headerTitle').innerHTML=`<img src="/logos/${d.ck.logo}" style="height:32px;filter:brightness(0) invert(1)"> ${d.ck.name}`;
@@ -491,7 +506,7 @@ async function selectCK(ckId){
   document.getElementById('headerMeta').textContent=d.lastRefresh?'Last refresh: '+new Date(d.lastRefresh).toLocaleString():'';renderFreshnessWarning();
   document.getElementById('loadingScreen').style.display='none';document.getElementById('dashboard').classList.add('active');
   document.querySelector('.tab.active')?.classList.remove('active');document.querySelector('[data-view="dashboard"]').classList.add('active');
-  try{renderDashboard()}catch(e){console.error('Dashboard error:',e);document.getElementById('summary-cards').innerHTML='<div class="card red"><div class="label">Dashboard Error</div><div class="value">'+e.message+'</div></div>'};if(DATA.bomData&&!DATA.bomData._separateFromMain){try{renderBOM()}catch(e){console.error('BOM error:',e);document.getElementById('summary-cards').innerHTML='<div class="card red"><div class="label">BOM Error</div><div class="value">'+e.message+'</div></div>'}}}catch(e){document.getElementById('loadingScreen').innerHTML=`<div style="color:var(--alert)">Error: ${e.message}</div>`}}
+  try{renderDashboard()}catch(e){console.error('Dashboard error:',e);document.getElementById('summary-cards').innerHTML='<div class="card red"><div class="label">Dashboard Error</div><div class="value">'+e.message+'</div></div>'};if(DATA.bomData&&!DATA.bomData._separateFromMain){try{renderBOM()}catch(e){console.error('BOM error:',e);document.getElementById('summary-cards').innerHTML='<div class="card red"><div class="label">BOM Error</div><div class="value">'+e.message+'</div></div>'}}}catch(e){console.error('Load failed:',e);document.getElementById('loadingScreen').innerHTML=`<div style="color:var(--alert);text-align:center;padding:24px"><div style="font-weight:800;margin-bottom:8px">Error: ${e.message||'Load failed'}</div><button onclick="selectCK(currentCK||'${ckId}')" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:8px 14px;cursor:pointer;font-weight:700">Retry</button></div>`}}
 
 
 function refreshAgeHours(ts){const t=ts?new Date(ts).getTime():0;return t?((Date.now()-t)/36e5):null}
