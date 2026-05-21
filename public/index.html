@@ -658,18 +658,24 @@ function renderDashboard(){
   let preorderBreakdownCard='', openOrdersCard='';
   const littleLifelyPanels=['llau','llnz','llna','llca','lluk','llsg'];
   if(littleLifelyPanels.includes(currentCK)){
-    let standaloneBeds=0,comboBeds=0,swatchPacks=0,otherLittleLifely=0;
+    let standaloneBeds=0,comboBeds=0,covers=0,swatchPacks=0,otherLittleLifely=0;
     const openBySku=DATA.coverageAux?.openDemandBySku||{};
+    const bedPrefix=DATA.coverageAux?.bedPrefix||'';
+    const comboPrefixes=[DATA.coverageAux?.comboPrefix, ...(DATA.coverageAux?.comboPrefixes||[])].filter(Boolean);
+    const hasPrefix=(sku,prefixes)=>prefixes.some(prefix=>sku.startsWith(prefix));
     Object.entries(openBySku).forEach(([sku,qty])=>{
       const q=Number(qty||0); if(!q || !sku.startsWith('LL'))return;
-      if(sku.includes('-CS-PACK'))swatchPacks+=q;
-      else if(sku.includes('-CBCF-')||sku.includes('-CFDS-')||sku.includes('-CBDS-'))comboBeds+=q;
-      else if(/^LL[A-Z]+-CB-/.test(sku))standaloneBeds+=q;
+      if(hasPrefix(sku,comboPrefixes))comboBeds+=q;
+      else if(bedPrefix && sku.startsWith(bedPrefix) && sku.includes('-CS-PACK'))swatchPacks+=q;
+      else if(bedPrefix && sku.startsWith(bedPrefix) && sku.includes('-CV'))covers+=q;
+      else if(bedPrefix && sku.startsWith(bedPrefix) && !sku.includes('-CS-'))standaloneBeds+=q;
+      else if(!bedPrefix && /^LL[A-Z]+-CB-/.test(sku))standaloneBeds+=q;
       else otherLittleLifely+=q;
     });
-    const totalPreorders=standaloneBeds+comboBeds+swatchPacks+otherLittleLifely;
-    const otherText=otherLittleLifely?` · Other ${Math.round(otherLittleLifely).toLocaleString()}`:'';
-    preorderBreakdownCard=`<div class="card red" title="Little Lifely open Shopify orders for this panel's destination country, split before stock coverage is applied."><div class="label">Preorder Breakdown</div><div class="value">${Math.round(totalPreorders).toLocaleString()}</div><div class="sub">Beds ${Math.round(standaloneBeds).toLocaleString()} · Combos ${Math.round(comboBeds).toLocaleString()} · Swatches ${Math.round(swatchPacks).toLocaleString()}${otherText}</div></div>`;
+    const totalPreorders=standaloneBeds+comboBeds+covers+swatchPacks;
+    const coversText=covers?` · Covers ${Math.round(covers).toLocaleString()}`:'';
+    const otherText=otherLittleLifely?` · Excluded other-market ${Math.round(otherLittleLifely).toLocaleString()}`:'';
+    preorderBreakdownCard=`<div class="card red" title="Little Lifely open Shopify orders for this panel's destination country, split before stock coverage is applied. Only SKUs matching this market's bed/combo prefixes are counted."><div class="label">Preorder Breakdown</div><div class="value">${Math.round(totalPreorders).toLocaleString()}</div><div class="sub">Beds ${Math.round(standaloneBeds).toLocaleString()} · Combos ${Math.round(comboBeds).toLocaleString()}${coversText} · Swatches ${Math.round(swatchPacks).toLocaleString()}${otherText}</div></div>`;
   } else {
     const rawOpenOrders=DATA.coverageAux?.mode==='generic'&&DATA.coverageAux.rawOpenDemandTotal!=null?Number(DATA.coverageAux.rawOpenDemandTotal):null;
     const openOrdersValue=rawOpenOrders!=null?rawOpenOrders:Math.abs(tOver);
