@@ -2660,6 +2660,8 @@ function buildCKData(ckId) {
     // for bundle/config SKUs can be negative for reasons unrelated to open
     // customer preorders, which was inflating mattress preorder totals.
     for (const sku of Object.keys(shopify)) shopify[sku] = 0;
+    for (const sku of Object.keys(openOrders)) openOrders[sku] = 0;
+    for (const sku of Object.keys(cin7Available)) cin7Available[sku] = 0;
     for (const regionData of Object.values(mattressRegions)) {
       for (const [sku, qty] of Object.entries(regionData.shopify || {})) {
         shopify[sku] = (shopify[sku] || 0) + Number(qty || 0);
