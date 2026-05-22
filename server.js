@@ -1609,7 +1609,7 @@ async function fetchShopifyInventory(storeKey) {
 }
 
 // ===== FULL DATA REFRESH =====
-async function refreshAllData(forceCin7 = false) {
+async function refreshAllData(forceCin7 = false, pushReason = null) {
   if (refreshPromise) {
     console.log('Refresh already in progress - reusing existing run');
     return refreshPromise;
@@ -1709,7 +1709,7 @@ async function refreshAllData(forceCin7 = false) {
       if (cin7Updated || shopifyUpdated) {
         nextCache.error = Object.keys(nextCache.cin7Products || {}).length > 0 ? null : 'CIN7 data unavailable (likely rate limited)';
         dataCache = nextCache;
-        saveCacheSnapshot(true, cin7Updated ? 'daily-cin7-refresh' : 'shopify-refresh');
+        saveCacheSnapshot(true, pushReason || (cin7Updated ? 'daily-cin7-refresh' : 'shopify-refresh'));
         loadCacheSnapshot(true);
         if (cin7Updated) refreshAIS();
       }
@@ -3025,10 +3025,11 @@ app.post('/api/refresh', requireAuth, async (req, res) => {
     return res.json({ ok: false, error: `Please wait ${waitMin} min before refreshing again`, lastRefresh: dataCache.lastRefresh });
   }
   _lastManualRefresh = now;
-  // Manual refresh should update Shopify/open demand and reuse the durable CIN7
-  // cache when it is already fresh, instead of burning the Cin7 key on every click.
-  await refreshAllData(false);
-  res.json({ ok: true, lastRefresh: dataCache.lastRefresh });
+  // Manual dashboard refresh is intentionally a force-live refresh: fetch Cin7
+  // Products/Stock/PurchaseOrders plus Shopify, then write the cache snapshot.
+  // Keep the cooldown above so the button cannot spam Cin7's daily quota.
+  await refreshAllData(true, 'manual-live-cin7-refresh');
+  res.json({ ok: true, forcedCin7: true, lastRefresh: dataCache.lastRefresh, lastCin7Refresh: dataCache.lastCin7Refresh, lastPoRefresh: dataCache.lastPoRefresh, lastShopifyRefresh: dataCache.lastShopifyRefresh });
 });
 
 // Chat endpoint
