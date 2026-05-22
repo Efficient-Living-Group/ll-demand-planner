@@ -190,11 +190,6 @@ def ensure_country_bucket(by_country: dict[str, Any], country: str) -> dict[str,
     return by_country[country]
 
 
-def is_preorder_tagged_order(order: dict[str, Any]) -> bool:
-    tags = [tag.strip().lower() for tag in str(order.get("tags") or "").split(",") if tag.strip()]
-    return any(tag in {"pre-order", "preorder", "backorder"} or "pre-order" in tag for tag in tags)
-
-
 def fetch_shopify_velocity(store_key: str, store: dict[str, str], api_version: str) -> dict[str, Any]:
     sku_units: dict[str, float] = {}
     sku_weekly: dict[str, dict[str, float]] = {}
@@ -210,7 +205,7 @@ def fetch_shopify_velocity(store_key: str, store: dict[str, str], api_version: s
         "status": "any",
         "limit": 250,
         "created_at_min": since,
-        "fields": "id,created_at,line_items,financial_status,shipping_address,tags",
+        "fields": "id,created_at,line_items,financial_status,shipping_address",
     }
     path = f"/admin/api/{api_version}/orders.json?{urlencode(params)}"
     orders_seen = 0
@@ -224,11 +219,6 @@ def fetch_shopify_velocity(store_key: str, store: dict[str, str], api_version: s
         orders_seen += len(orders)
         for order in orders:
             if order.get("financial_status") in {"refunded", "voided"}:
-                continue
-            # Velocity should represent sell-through from live/available stock.
-            # Shopify preorder/backorder orders stay in demand/open-order logic,
-            # but they must not inflate Units/wk before stock has landed.
-            if is_preorder_tagged_order(order):
                 continue
             dt = parse_shopify_datetime(order.get("created_at"))
             if not dt:

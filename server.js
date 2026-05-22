@@ -1409,15 +1409,6 @@ async function fetchCin7POs() {
 }
 
 // ===== SHOPIFY: FETCH ORDERS & CALCULATE VELOCITY =====
-function isPreorderTaggedOrder(order) {
-  const tags = String(order?.tags || '')
-    .toLowerCase()
-    .split(',')
-    .map(t => t.trim())
-    .filter(Boolean);
-  return tags.some(tag => tag === 'pre-order' || tag === 'preorder' || tag === 'backorder' || tag.includes('pre-order'));
-}
-
 async function fetchShopifyVelocity(storeKey) {
   const store = SHOPIFY_STORES[storeKey];
   if (!store || !store.token) return { ok: false, data: {} };
@@ -1433,7 +1424,7 @@ async function fetchShopifyVelocity(storeKey) {
   const days = 30;
   const historyDays = 90; // longer window for weekly breakdown + last in-stock velocity
   const since = new Date(Date.now() - historyDays * 86400000).toISOString();
-  let url = `/admin/api/2026-01/orders.json?status=any&limit=250&created_at_min=${since}&fields=id,created_at,line_items,financial_status,shipping_address,tags`;
+  let url = `/admin/api/2026-01/orders.json?status=any&limit=250&created_at_min=${since}&fields=id,created_at,line_items,financial_status,shipping_address`;
 
   const ensureCountry = (country) => {
     if (!byCountry[country]) {
@@ -1454,10 +1445,6 @@ async function fetchShopifyVelocity(storeKey) {
 
       for (const o of orders) {
         if (o.financial_status === 'refunded' || o.financial_status === 'voided') continue;
-        // Velocity should represent sell-through from live/available stock.
-        // Shopify preorder/backorder orders stay in demand/open-order logic, but
-        // they must not inflate Units/wk before stock has landed.
-        if (isPreorderTaggedOrder(o)) continue;
         const dt = new Date(o.created_at);
         const jan4 = new Date(dt.getFullYear(), 0, 4);
         const dayOfYear = Math.floor((dt - new Date(dt.getFullYear(), 0, 1)) / 86400000);
