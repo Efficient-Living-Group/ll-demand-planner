@@ -30,6 +30,7 @@ const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.createHash('sha256').update(`${APP_PASSWORD}|ll-demand-planner-session-v1`).digest('hex');
 const LL_AU_BRANCH_IDS = [3, 60976];
 const LL_NZ_BRANCH_IDS = [48391];
+const LL_US_BRANCH_IDS = [60701, 63764, 65158];
 
 // Shopify stores
 const SHOPIFY_STORES = {
@@ -52,7 +53,7 @@ const CK_DEFS = {
   'llau':      { name: 'Little Lifely AU',              prefix: 'LLAU-CB-', logo: 'little-lifely.png', store: 'lifely', excludeCV: false, poDestination: 'Australia', salesCountry: 'AU', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Little Lifely', filter: sku => !sku.includes('CBCF'), sizes: {'PACK':'Swatch Packs','-S-':'Single','-KS-':'King Single','-D-':'Double'} },
   'llnz':      { name: 'Little Lifely NZ',              prefix: 'LLAU-CB-', logo: 'little-lifely.png', store: 'lifely', excludeCV: false, poDestination: 'New Zealand', salesCountry: 'NZ', stockBranches: LL_NZ_BRANCH_IDS, strictStockBranches: true, option1: 'Category Killer - Little Lifely', filter: sku => !sku.includes('CBCF'), sizes: {'PACK':'Swatch Packs','-S-':'Single','-KS-':'King Single','-D-':'Double'} },
   'llau-cbcf': { name: 'LL AU Combos',            prefix: 'LLAU-CBCF-', logo: 'little-lifely.png', store: 'lifely', excludeCV: true, salesCountry: 'AU', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Little Lifely', sizes: {'-S-':'Single','-KS-':'King Single','-D-':'Double'} },
-  'llna':     { name: 'Little Lifely NA',       prefix: 'LLNA',   logo: 'little-lifely.png', store: 'lifely', excludeCV: false, poDestination: 'United States', salesCountry: 'US', stockBranches: [60701], option1: 'Category Killer - Little Lifely', sizes: {'-TWX-':'Twin XL','-TW-':'Twin','-F-':'Full'} },
+  'llna':     { name: 'Little Lifely NA',       prefix: 'LLNA',   logo: 'little-lifely.png', store: 'lifely', excludeCV: false, poDestination: 'United States', salesCountry: 'US', stockBranches: LL_US_BRANCH_IDS, option1: 'Category Killer - Little Lifely', sizes: {'-TWX-':'Twin XL','-TW-':'Twin','-F-':'Full'} },
   'llca':     { name: 'Little Lifely CA',       prefix: 'LLNA',   logo: 'little-lifely.png', store: 'lifely', excludeCV: false, poDestination: 'Canada', salesCountry: 'CA', stockBranches: [61831], option1: 'Category Killer - Little Lifely', sizes: {'-TWX-':'Twin XL','-TW-':'Twin','-F-':'Full'} },
   'lluk':     { name: 'Little Lifely UK',       prefix: 'LLUK-CB-',   logo: 'little-lifely.png', store: 'lifely', excludeCV: false, salesCountry: 'GB', stockBranches: [62444], option1: 'Category Killer - Little Lifely', filter: isLittleLifelyUkComponentSku, sizes: {'-S-':'Single','-SD-':'Small Double','-D-':'Double'} },
   'llsg':     { name: 'Little Lifely SG',       prefix: 'LLSG',   logo: 'little-lifely.png', store: 'lifely', excludeCV: false, salesCountry: 'SG', stockBranches: [57843], strictStockBranches: true, option1: 'Category Killer - Little Lifely', sizes: {'-SS-':'Super Single','-S-':'Single','-Q-':'Queen'} },
@@ -2182,6 +2183,91 @@ function buildCKData(ckId) {
     }
     coverageAux = { mode: 'generic', label: def.name, place: 'Lifely', openDemandBySku, rawOpenDemandBySku, rawOpenDemandTotal, stockBySku, poRows };
   }
+  let warehouseOptions = null;
+  let warehouseViews = null;
+  const warehouseBranchConfigs = {
+    llau: LL_AU_BRANCH_IDS,
+    llna: LL_US_BRANCH_IDS
+  };
+  if (warehouseBranchConfigs[ckId]) {
+    const branchIds = warehouseBranchConfigs[ckId];
+    const branchName = branchId => {
+      for (const rows of Object.values(dataCache.cin7StockByBranch || {})) {
+        const row = rows?.[branchId];
+        if (row?.branchName) return row.branchName;
+      }
+      return `Warehouse ${branchId}`;
+    };
+    warehouseOptions = [
+      { id: 'All', name: 'All warehouses' },
+      ...branchIds.map(id => ({ id: String(id), name: branchName(String(id)) }))
+    ];
+    warehouseViews = {};
+    const buildCin7ForBranchIds = ids => {
+      const branchRaw = {};
+      for (const [sku, data] of Object.entries(dataCache.cin7Products || {})) {
+        if (!skuMatchesDef(sku, def)) continue;
+        const branchRows = dataCache.cin7StockByBranch?.[sku] || {};
+        const branchData = ids.reduce((acc, branchId) => {
+          const row = branchRows[branchId];
+          if (!row) return acc;
+          acc.soh += Number(row.soh || 0);
+          acc.available += Number(row.available || 0);
+          acc.openSales += Number(row.openSales || 0);
+          acc.matched += 1;
+          return acc;
+        }, { soh: 0, available: 0, openSales: 0, matched: 0 });
+        branchRaw[sku] = branchData.matched > 0 ? { ...data, soh: branchData.soh, available: branchData.available } : { ...data, soh: 0, available: 0 };
+      }
+      let normalized = normalizeCIN7(branchRaw);
+      if (ckId === 'llau') normalized = normalizeSwatchPack(normalized);
+      return normalized;
+    };
+    const buildBranchView = ids => {
+      const viewCin7 = {};
+      const viewAvailable = {};
+      const viewOpenOrders = {};
+      const viewShopify = {};
+      const viewCoverageOpenDemandBySku = {};
+      const viewCoverageStockBySku = {};
+      const branchNormalized = buildCin7ForBranchIds(ids);
+      for (const [sku, data] of Object.entries(branchNormalized)) {
+        viewCin7[sku] = typeof data === 'object' ? Number(data.soh || 0) : Number(data || 0);
+        viewAvailable[sku] = typeof data === 'object' ? Number(data.available || 0) : viewCin7[sku];
+        viewOpenOrders[sku] = 0;
+        viewShopify[sku] = 0;
+        viewCoverageStockBySku[sku] = { soh: viewCin7[sku], available: viewAvailable[sku] };
+      }
+      if (ckId === 'llau') {
+        for (const sku of ['DD-21915CF', 'DD-21107CF', 'DD-21137CF']) {
+          const branchRows = dataCache.cin7StockByBranch?.[sku] || {};
+          const branchData = ids.reduce((acc, branchId) => {
+            const row = branchRows[branchId];
+            if (!row) return acc;
+            acc.soh += Number(row.soh || 0);
+            acc.available += Number(row.available || 0);
+            return acc;
+          }, { soh: 0, available: 0 });
+          viewCoverageStockBySku[sku] = { soh: branchData.soh, available: branchData.available };
+        }
+      }
+      const branchOpenDemand = getCin7PreordersBySku(ids, salesCountry || '');
+      const branchOpenSales = getCin7OpenSalesBySku(ids, salesCountry || '');
+      for (const [rawSku, qty] of Object.entries(branchOpenDemand)) {
+        const sku = canonicalDemandSku(rawSku, salesCountry || '');
+        viewCoverageOpenDemandBySku[sku] = (viewCoverageOpenDemandBySku[sku] || 0) + Number(qty || 0);
+      }
+      addCin7DemandToVisibleMap(branchOpenDemand, viewShopify, salesCountry || '');
+      addCin7DemandToVisibleMap(branchOpenSales, viewOpenOrders, salesCountry || '');
+      for (const sku of Object.keys(viewCin7)) {
+        viewShopify[sku] = -Number(viewShopify[sku] || 0);
+        viewOpenOrders[sku] = Number(viewOpenOrders[sku] || 0);
+      }
+      return { cin7: viewCin7, available: viewAvailable, openOrders: viewOpenOrders, shopify: viewShopify, coverageOpenDemandBySku: viewCoverageOpenDemandBySku, coverageStockBySku: viewCoverageStockBySku };
+    };
+    for (const branchId of branchIds) warehouseViews[String(branchId)] = buildBranchView([branchId]);
+  }
+
   let bomData = null;
   if (ckId === 'llau-cbcf') {
     bomData = {};
@@ -2704,6 +2790,8 @@ function buildCKData(ckId) {
     suppliers,
     landedCosts,
     coverageAux,
+    warehouseOptions,
+    warehouseViews,
     mattressRegions,
     fx: { USDAUD: fxRate.USDAUD, lastFetch: fxRate.lastFetch },
     trendData: (() => {
