@@ -2655,23 +2655,20 @@ function buildCKData(ckId) {
       return [region, { cin7: regionCin7, shopify: regionShopify, openOrders: regionOpenOrders, available: regionAvailable, velocity: regionVelocity, trendData: regionTrendData, weeklyData: regionWeeklyData, pos: regionPos, allPos: regionAllPos }];
     }));
 
-    // The default "All" mattress view should use real destination-country
-    // open demand from the regional combo calculation above. Shopify inventory
-    // for bundle/config SKUs can be negative for reasons unrelated to open
-    // customer preorders, which was inflating mattress preorder totals.
+    // The default "All" mattress view should use Cin7 open sales by SKU
+    // across all mattress branches once. Do not add regional aggregates on top
+    // or the All view double-counts. Keep branch/source anomalies visible here
+    // until the source data is corrected; e.g. DD-21107CF currently includes
+    // 3 UK open sales even though they should be fixed at source.
     for (const sku of Object.keys(shopify)) shopify[sku] = 0;
+    const mattressAllBranchIds = [...new Set(Object.values(mattressRegionConfigs).flatMap(cfg => cfg.branchIds || []))];
+    const allOpenOrders = getCin7OpenSalesBySku(mattressAllBranchIds, '');
+    const allAvailable = getCin7StockMetricBySku(mattressAllBranchIds, '', 'available');
     for (const sku of Object.keys(openOrders)) openOrders[sku] = 0;
     for (const sku of Object.keys(cin7Available)) cin7Available[sku] = 0;
-    for (const regionData of Object.values(mattressRegions)) {
-      for (const [sku, qty] of Object.entries(regionData.shopify || {})) {
-        shopify[sku] = (shopify[sku] || 0) + Number(qty || 0);
-      }
-      for (const [sku, qty] of Object.entries(regionData.openOrders || {})) {
-        openOrders[sku] = (openOrders[sku] || 0) + Number(qty || 0);
-      }
-      for (const [sku, qty] of Object.entries(regionData.available || {})) {
-        cin7Available[sku] = (cin7Available[sku] || 0) + Number(qty || 0);
-      }
+    for (const sku of Object.keys(cin7)) {
+      openOrders[sku] = Number(allOpenOrders[sku] || 0);
+      cin7Available[sku] = Number(allAvailable[sku] || 0);
     }
   }
 
