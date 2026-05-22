@@ -959,29 +959,39 @@ function loadSnapshotPushState() {
   }
 }
 
-function maybePushCacheSnapshotToGit(reason = 'cin7-refresh') {
+function maybePushCacheSnapshotToGit(reason = 'cin7-refresh', options = {}) {
+  const force = !!options.force;
   const now = Date.now();
   const state = loadSnapshotPushState();
-  // Every successful scheduled CIN7 refresh should persist a repo cache, but avoid
-  // duplicate commits when a manual refresh and scheduled refresh happen close together.
-  if (cacheSnapshotPushInFlight || (state.cacheLastSuccessAtMs && now - state.cacheLastSuccessAtMs < 30 * 60 * 1000)) return;
+  // Scheduled refreshes avoid duplicate commits when runs happen close together.
+  // Manual dashboard refreshes force this push so the refresh button persists the
+  // new cache to GitHub immediately instead of only updating Render's ephemeral disk.
+  if (cacheSnapshotPushInFlight) return Promise.resolve({ ok: false, pushed: false, skipped: 'push-in-flight' });
+  if (!force && state.cacheLastSuccessAtMs && now - state.cacheLastSuccessAtMs < 30 * 60 * 1000) {
+    return Promise.resolve({ ok: true, pushed: false, skipped: 'recent-cache-push' });
+  }
   cacheSnapshotPushInFlight = true;
   const command = [
     'git add data/cache-snapshot.json data/po-eta-history.json data/po-eta-history.last-good.json',
-    'git diff --cached --quiet && exit 0',
+    'if git diff --cached --quiet; then echo "No cache snapshot changes to commit"; exit 0; fi',
     `git commit -m "Update cache snapshot (${reason})"`,
     'git push'
   ].join(' && ');
-  exec(command, { cwd: __dirname }, (error, stdout, stderr) => {
-    cacheSnapshotPushInFlight = false;
-    if (stdout) console.log(stdout.trim());
-    if (stderr) console.log(stderr.trim());
-    if (error) {
-      if (error.code !== 0) console.error('Cache snapshot git push failed:', error.message);
-      return;
-    }
-    saveSnapshotPushState({ ...state, cacheLastSuccessAtMs: Date.now(), cacheLastReason: reason, cachePushedAt: new Date().toISOString() });
-    console.log('Cache snapshot pushed to GitHub');
+  return new Promise(resolve => {
+    exec(command, { cwd: __dirname }, (error, stdout, stderr) => {
+      cacheSnapshotPushInFlight = false;
+      if (stdout) console.log(stdout.trim());
+      if (stderr) console.log(stderr.trim());
+      if (error) {
+        if (error.code !== 0) console.error('Cache snapshot git push failed:', error.message);
+        resolve({ ok: false, pushed: false, error: error.message });
+        return;
+      }
+      saveSnapshotPushState({ ...state, cacheLastSuccessAtMs: Date.now(), cacheLastReason: reason, cachePushedAt: new Date().toISOString() });
+      const pushed = !(stdout || '').includes('No cache snapshot changes to commit');
+      console.log(pushed ? 'Cache snapshot pushed to GitHub' : 'Cache snapshot unchanged; no GitHub push needed');
+      resolve({ ok: true, pushed, skipped: pushed ? null : 'no-cache-diff' });
+    });
   });
 }
 
@@ -1017,7 +1027,7 @@ function reloadSnapshotIfNewer() {
   loadCacheSnapshot(true);
 }
 
-function saveCacheSnapshot(pushToGit = false, pushReason = 'cin7-refresh') {
+async function saveCacheSnapshot(pushToGit = false, pushReason = 'cin7-refresh', options = {}) {
   try {
     const snapshotTs = new Date().toISOString();
     dataCache.lastSnapshotWrite = snapshotTs;
@@ -1042,7 +1052,7 @@ function saveCacheSnapshot(pushToGit = false, pushReason = 'cin7-refresh') {
 
     if (!snapshotHasCin7Data(snapshot)) {
       console.warn('Refusing to save empty Cin7 snapshot - keeping last good cache on disk');
-      return;
+      return { ok: false, wrote: false, pushed: false, error: 'empty-cin7-snapshot' };
     }
 
     updatePoEtaHistory(snapshot.cin7POs || [], snapshotTs);
@@ -1050,9 +1060,11 @@ function saveCacheSnapshot(pushToGit = false, pushReason = 'cin7-refresh') {
     const payload = JSON.stringify(snapshot);
     fs.writeFileSync(CACHE_SNAPSHOT_PATH, payload);
     console.log('Saved cache snapshot');
-    if (pushToGit) maybePushCacheSnapshotToGit(pushReason);
+    const pushResult = pushToGit ? await maybePushCacheSnapshotToGit(pushReason, { force: !!options.forceGitPush }) : { ok: true, pushed: false, skipped: 'push-disabled' };
+    return { ok: pushResult.ok !== false, wrote: true, pushed: !!pushResult.pushed, skipped: pushResult.skipped || null, error: pushResult.error || null };
   } catch (e) {
     console.error('Cache snapshot save failed:', e.message);
+    return { ok: false, wrote: false, pushed: false, error: e.message };
   }
 }
 
@@ -1706,10 +1718,12 @@ async function refreshAllData(forceCin7 = false, pushReason = null) {
       }
       if (shopifyUpdated) nextCache.lastShopifyRefresh = nowIso;
 
+      let cacheSaveResult = { ok: true, wrote: false, pushed: false, skipped: 'no-source-updates' };
       if (cin7Updated || shopifyUpdated) {
         nextCache.error = Object.keys(nextCache.cin7Products || {}).length > 0 ? null : 'CIN7 data unavailable (likely rate limited)';
         dataCache = nextCache;
-        saveCacheSnapshot(true, pushReason || (cin7Updated ? 'daily-cin7-refresh' : 'shopify-refresh'));
+        const effectivePushReason = pushReason || (cin7Updated ? 'daily-cin7-refresh' : 'shopify-refresh');
+        cacheSaveResult = await saveCacheSnapshot(true, effectivePushReason, { forceGitPush: effectivePushReason === 'manual-live-cin7-refresh' });
         loadCacheSnapshot(true);
         if (cin7Updated) refreshAIS();
       }
@@ -1717,10 +1731,12 @@ async function refreshAllData(forceCin7 = false, pushReason = null) {
       const elapsed = ((Date.now() - start) / 1000).toFixed(1);
       const liveCin7Count = Object.keys(dataCache.cin7Products).length;
       const livePoCount = dataCache.cin7POs.length;
-      console.log(`Data refresh complete in ${elapsed}s. Fetched CIN7: ${fetchedCin7Count} SKUs, ${fetchedPoCount} POs. Live cache: ${liveCin7Count} SKUs, ${livePoCount} POs.`);
+      console.log(`Data refresh complete in ${elapsed}s. Fetched CIN7: ${fetchedCin7Count} SKUs, ${fetchedPoCount} POs. Live cache: ${liveCin7Count} SKUs, ${livePoCount} POs. Cache wrote=${cacheSaveResult.wrote} pushed=${cacheSaveResult.pushed} skipped=${cacheSaveResult.skipped || 'none'}.`);
+      return { ok: true, cin7Updated, shopifyUpdated, cacheSaveResult, fetchedCin7Count, fetchedPoCount, lastRefresh: dataCache.lastRefresh };
     } catch (e) {
       console.error('Data refresh failed:', e.message);
       dataCache.error = e.message;
+      return { ok: false, error: e.message, cacheSaveResult: { ok: false, wrote: false, pushed: false, error: e.message } };
     } finally {
       refreshPromise = null;
     }
@@ -3028,8 +3044,19 @@ app.post('/api/refresh', requireAuth, async (req, res) => {
   // Manual dashboard refresh is intentionally a force-live refresh: fetch Cin7
   // Products/Stock/PurchaseOrders plus Shopify, then write the cache snapshot.
   // Keep the cooldown above so the button cannot spam Cin7's daily quota.
-  await refreshAllData(true, 'manual-live-cin7-refresh');
-  res.json({ ok: true, forcedCin7: true, lastRefresh: dataCache.lastRefresh, lastCin7Refresh: dataCache.lastCin7Refresh, lastPoRefresh: dataCache.lastPoRefresh, lastShopifyRefresh: dataCache.lastShopifyRefresh });
+  const refreshResult = await refreshAllData(true, 'manual-live-cin7-refresh');
+  res.json({
+    ok: refreshResult?.ok !== false && refreshResult?.cacheSaveResult?.ok !== false,
+    forcedCin7: true,
+    cacheSaved: !!refreshResult?.cacheSaveResult?.wrote,
+    cachePushed: !!refreshResult?.cacheSaveResult?.pushed,
+    cachePushSkipped: refreshResult?.cacheSaveResult?.skipped || null,
+    cacheError: refreshResult?.cacheSaveResult?.error || null,
+    lastRefresh: dataCache.lastRefresh,
+    lastCin7Refresh: dataCache.lastCin7Refresh,
+    lastPoRefresh: dataCache.lastPoRefresh,
+    lastShopifyRefresh: dataCache.lastShopifyRefresh
+  });
 });
 
 // Chat endpoint
