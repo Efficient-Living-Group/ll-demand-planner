@@ -44,7 +44,7 @@ body.sidebar-collapsed .sidebar{overflow:hidden;opacity:0}
 .tabs{display:flex;gap:0;background:var(--bg-secondary);padding:0 var(--content-pad);border-bottom:1px solid var(--border);overflow-x:auto}
 .tab{padding:10px 20px;cursor:pointer;font-size:13px;font-weight:500;color:#A8C5C8;border-bottom:3px solid transparent;transition:all 0.2s}
 .tab:hover{color:#FFF;background:rgba(255,255,255,0.1)}.tab.active{color:#FFF;border-bottom-color:#FFF}
-.container{max-width:none;width:100%;margin:0 auto;padding:20px var(--content-pad);min-width:0}.view{display:none}.view.active{display:block}.po-items.open{max-height:2000px!important}#allPOsView{flex:1;width:100%;min-width:0;overflow-x:hidden}.po-page{padding:24px 32px;min-width:0}.po-page-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:16px;min-width:0}.po-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;min-width:0}.po-grid-header,.po-row{min-width:0}.po-row>span{min-width:0}.mobile-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:199}
+.container{max-width:none;width:100%;margin:0 auto;padding:20px var(--content-pad);min-width:0}.view{display:none}.view.active{display:block}.po-items.open{max-height:2000px!important;overflow-x:auto!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y}.po-items table{min-width:720px}#allPOsView{flex:1;width:100%;min-width:0;overflow-x:hidden}.po-page{padding:24px 32px;min-width:0}.po-page-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:16px;min-width:0}.po-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;min-width:0}.po-grid-header,.po-row{min-width:0}.po-row>span{min-width:0}.mobile-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:199}
 .loading{text-align:center;padding:60px;color:var(--text-dim)}.freshness-warning{display:none;margin:0 0 16px;padding:12px 16px;border-radius:12px;border:1px solid #F4B183;background:#FFF7ED;color:#92400E;font-size:12px;line-height:1.5}.freshness-warning b{color:#7C2D12}.loading .spinner{display:inline-block;width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin 0.8s linear infinite;margin-bottom:12px}
 @keyframes spin{to{transform:rotate(360deg)}}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px}
@@ -1384,8 +1384,8 @@ function renderPurchaseOrders(allPOs) {
         <span data-label="SKUs" style="color:var(--text-dim);text-align:right;white-space:nowrap">${skuCount(po)} SKUs · ${totalItems(po)}</span>
         <span data-label="" style="font-size:14px;text-align:center;transition:transform 0.2s">▼</span>
       </div>
-      <div class="po-items" style="max-height:0;overflow:hidden;transition:max-height 0.3s ease">
-        <table style="width:100%;font-size:11px;border-collapse:collapse">
+      <div class="po-items" style="max-height:0;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;transition:max-height 0.3s ease">
+        <table style="width:100%;min-width:720px;font-size:11px;border-collapse:collapse">
           <thead><tr style="background:var(--bg-body)">
             <th data-sort="sku" onclick="sortPoItemRows(this,'sku')" style="text-align:left;padding:8px 18px;color:var(--text-dim);font-weight:600;cursor:pointer">SKU ↕</th>
             <th data-sort="name" onclick="sortPoItemRows(this,'name')" style="text-align:left;padding:8px 18px;color:var(--text-dim);font-weight:600;cursor:pointer">Product Name ↕</th>
