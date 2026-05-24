@@ -50,7 +50,7 @@ const SHOPIFY_STORES = {
 
 // ===== CK DEFINITIONS =====
 const CK_DEFS = {
-  'llau':      { name: 'Little Lifely AU',              prefix: 'LLAU-CB-', logo: 'little-lifely.png', store: 'lifely', excludeCV: false, poDestination: 'Australia', salesCountry: 'AU', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Little Lifely', filter: sku => !sku.includes('CBCF'), sizes: {'PACK':'Swatch Packs','-S-':'Single','-KS-':'King Single','-D-':'Double'} },
+  'llau':      { name: 'Little Lifely AU',              prefix: 'LLAU-CB-', logo: 'little-lifely.png', store: 'lifely', excludeCV: false, poDestination: 'Australia', salesCountry: 'AU', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Little Lifely', option1Bypass: sku => sku.startsWith('LLAU-CB-'), filter: sku => !sku.includes('CBCF'), sizes: {'PACK':'Swatch Packs','-S-':'Single','-KS-':'King Single','-D-':'Double'} },
   'llnz':      { name: 'Little Lifely NZ',              prefix: 'LLAU-CB-', logo: 'little-lifely.png', store: 'lifely', excludeCV: false, poDestination: 'New Zealand', salesCountry: 'NZ', stockBranches: LL_NZ_BRANCH_IDS, strictStockBranches: true, option1: 'Category Killer - Little Lifely', filter: sku => !sku.includes('CBCF'), sizes: {'PACK':'Swatch Packs','-S-':'Single','-KS-':'King Single','-D-':'Double'} },
   'llau-cbcf': { name: 'LL AU Combos',            prefix: 'LLAU-CBCF-', logo: 'little-lifely.png', store: 'lifely', excludeCV: true, salesCountry: 'AU', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Little Lifely', sizes: {'-S-':'Single','-KS-':'King Single','-D-':'Double'} },
   'llna':     { name: 'Little Lifely NA',       prefix: 'LLNA',   logo: 'little-lifely.png', store: 'lifely', excludeCV: false, poDestination: 'United States', salesCountry: 'US', stockBranches: LL_US_BRANCH_IDS, option1: 'Category Killer - Little Lifely', sizes: {'-TWX-':'Twin XL','-TW-':'Twin','-F-':'Full'} },
@@ -2543,7 +2543,7 @@ function buildCKData(ckId) {
 
   // Remove inactive Shopify SKUs (draft/archived)
   const inactiveSet = new Set(relatedStores.flatMap(sourceStore => dataCache.shopifyInventory?.[sourceStore]?.['__inactive__'] || []));
-  const keepInactiveForPanel = ckId === 'll-mattresses' || ckId === 'dd' || ckId === 'lifely-sofa';
+  const keepInactiveForPanel = ckId === 'll-mattresses' || ckId === 'dd' || ckId === 'lifely-sofa' || ckId === 'llau';
   for (const sku of Object.keys(cin7)) {
     if (!keepInactiveForPanel && inactiveSet.has(sku)) { delete cin7[sku]; delete velocity[sku]; delete shopify[sku]; }
   }
