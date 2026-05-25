@@ -1,0 +1,482 @@
+[
+  {
+    "tab": "case-goods",
+    "sku": "ODEN-D120-OAK-ECO",
+    "soh": 1,
+    "open": 0,
+    "available": -26,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 26,
+    "diff": -26
+  },
+  {
+    "tab": "case-goods",
+    "sku": "BLC-V2-BBQ-OAK-ECO",
+    "soh": 0,
+    "open": 0,
+    "available": -19,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 19,
+    "diff": -19
+  },
+  {
+    "tab": "cusb-us",
+    "sku": "V2-QB-CREAM",
+    "soh": 3,
+    "open": 0,
+    "available": -16,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 16,
+    "diff": -16
+  },
+  {
+    "tab": "case-goods",
+    "sku": "LARY-6COD-ECO",
+    "soh": 0,
+    "open": 0,
+    "available": -16,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 16,
+    "diff": -16
+  },
+  {
+    "tab": "case-goods",
+    "sku": "LYLA-BF-GL-K-ECO",
+    "soh": 0,
+    "open": 0,
+    "available": -14,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 14,
+    "diff": -14
+  },
+  {
+    "tab": "case-goods",
+    "sku": "EVE-BF-Q-ECO",
+    "soh": 0,
+    "open": 0,
+    "available": -14,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 14,
+    "diff": -14
+  },
+  {
+    "tab": "cusb-au",
+    "sku": "LFSB-TW-WHT",
+    "soh": 2,
+    "open": 0,
+    "available": -12,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 12,
+    "diff": -12
+  },
+  {
+    "tab": "cusb-us",
+    "sku": "V2-DB-CREAM",
+    "soh": 1,
+    "open": 0,
+    "available": -12,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 12,
+    "diff": -12
+  },
+  {
+    "tab": "case-goods",
+    "sku": "AFI-BF-Q-ECO",
+    "soh": 0,
+    "open": 0,
+    "available": -12,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 12,
+    "diff": -12
+  },
+  {
+    "tab": "case-goods",
+    "sku": "EVE-BF-K-ECO",
+    "soh": 1,
+    "open": 0,
+    "available": -12,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 12,
+    "diff": -12
+  },
+  {
+    "tab": "cocoon",
+    "sku": "COCOON-QUEEN-CRML",
+    "soh": 0,
+    "open": 0,
+    "available": -9,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 9,
+    "diff": -9
+  },
+  {
+    "tab": "case-goods",
+    "sku": "BLC-BBK-OAK-ECO",
+    "soh": 3,
+    "open": 0,
+    "available": -9,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 9,
+    "diff": -9
+  },
+  {
+    "tab": "cusb-us",
+    "sku": "V2-TB-CREAM",
+    "soh": 2,
+    "open": 0,
+    "available": -7,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 7,
+    "diff": -7
+  },
+  {
+    "tab": "case-goods",
+    "sku": "AFI-BF-K-ECO",
+    "soh": 1,
+    "open": 0,
+    "available": -7,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 7,
+    "diff": -7
+  },
+  {
+    "tab": "case-goods",
+    "sku": "IRNE-SB180-OAK-ECO",
+    "soh": 0,
+    "open": 0,
+    "available": -7,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 7,
+    "diff": -7
+  },
+  {
+    "tab": "case-goods",
+    "sku": "HDSN-DSK-OAK-ECO",
+    "soh": 1,
+    "open": 0,
+    "available": -6,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 6,
+    "diff": -6
+  },
+  {
+    "tab": "case-goods",
+    "sku": "HDSN-DT180-OAK-ECO",
+    "soh": 1,
+    "open": 0,
+    "available": -6,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 6,
+    "diff": -6
+  },
+  {
+    "tab": "cocoon",
+    "sku": "COCOON-KING-CRML",
+    "soh": 0,
+    "open": 0,
+    "available": -5,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 5,
+    "diff": -5
+  },
+  {
+    "tab": "case-goods",
+    "sku": "LYLA-BF-GL-Q-ECO",
+    "soh": 0,
+    "open": 0,
+    "available": -5,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 5,
+    "diff": -5
+  },
+  {
+    "tab": "case-goods",
+    "sku": "BLC-6COD-WNT-ECO",
+    "soh": 0,
+    "open": 0,
+    "available": -5,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 5,
+    "diff": -5
+  },
+  {
+    "tab": "case-goods",
+    "sku": "EMMA-DT180-OAK-ECO",
+    "soh": 2,
+    "open": 0,
+    "available": -5,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 5,
+    "diff": -5
+  },
+  {
+    "tab": "cusb-au",
+    "sku": "CUSB-Q-LTGN",
+    "soh": 1,
+    "open": 0,
+    "available": -3,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 3,
+    "diff": -3
+  },
+  {
+    "tab": "case-goods",
+    "sku": "IRNE-TV200-OAK-ECO",
+    "soh": 0,
+    "open": 0,
+    "available": -3,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 3,
+    "diff": -3
+  },
+  {
+    "tab": "cocoon",
+    "sku": "COCOON-QUEEN-IVR",
+    "soh": 0,
+    "open": 0,
+    "available": -2,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 2,
+    "diff": -2
+  },
+  {
+    "tab": "cusb-au",
+    "sku": "CUSB-K-LTGN",
+    "soh": 0,
+    "open": 0,
+    "available": -2,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 2,
+    "diff": -2
+  },
+  {
+    "tab": "cusb-au",
+    "sku": "LFSB-D-CHC",
+    "soh": 0,
+    "open": 0,
+    "available": -2,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 2,
+    "diff": -2
+  },
+  {
+    "tab": "cusb-au",
+    "sku": "LFSB-TW-CHC",
+    "soh": 2,
+    "open": 0,
+    "available": -2,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 2,
+    "diff": -2
+  },
+  {
+    "tab": "cusb-au",
+    "sku": "LFSB-D-WHT",
+    "soh": 1,
+    "open": 0,
+    "available": -2,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 2,
+    "diff": -2
+  },
+  {
+    "tab": "cusb-us",
+    "sku": "V2-DB-LGN",
+    "soh": 15,
+    "open": 0,
+    "available": -2,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 2,
+    "diff": -2
+  },
+  {
+    "tab": "llnz",
+    "sku": "LLAU-CB-D-CTCN",
+    "soh": 0,
+    "open": 1,
+    "available": 0,
+    "preFromOpenMinusSoh": 1,
+    "preFromAvailable": 0,
+    "diff": 1
+  },
+  {
+    "tab": "llnz",
+    "sku": "LLAU-CB-D-MSM",
+    "soh": 0,
+    "open": 1,
+    "available": 0,
+    "preFromOpenMinusSoh": 1,
+    "preFromAvailable": 0,
+    "diff": 1
+  },
+  {
+    "tab": "llnz",
+    "sku": "LLAU-CB-S-DGY",
+    "soh": 0,
+    "open": 2,
+    "available": -1,
+    "preFromOpenMinusSoh": 2,
+    "preFromAvailable": 1,
+    "diff": 1
+  },
+  {
+    "tab": "llnz",
+    "sku": "LLAU-CB-D-PST",
+    "soh": 0,
+    "open": 1,
+    "available": 0,
+    "preFromOpenMinusSoh": 1,
+    "preFromAvailable": 0,
+    "diff": 1
+  },
+  {
+    "tab": "cocoon",
+    "sku": "COCOON-KING-IVR",
+    "soh": 1,
+    "open": 0,
+    "available": -1,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 1,
+    "diff": -1
+  },
+  {
+    "tab": "cusb-au",
+    "sku": "CUSB-Q-TBRN",
+    "soh": 0,
+    "open": 0,
+    "available": -1,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 1,
+    "diff": -1
+  },
+  {
+    "tab": "cusb-au",
+    "sku": "LFSB-CHS-CHC",
+    "soh": 0,
+    "open": 0,
+    "available": -1,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 1,
+    "diff": -1
+  },
+  {
+    "tab": "cusb-us",
+    "sku": "V3-QB-TWHT",
+    "soh": 1,
+    "open": 0,
+    "available": -1,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 1,
+    "diff": -1
+  },
+  {
+    "tab": "cusb-us",
+    "sku": "V2-CH-CREAM",
+    "soh": 2,
+    "open": 0,
+    "available": -1,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 1,
+    "diff": -1
+  },
+  {
+    "tab": "case-goods",
+    "sku": "ACHE-FLAMP-ECO",
+    "soh": 0,
+    "open": 0,
+    "available": -1,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 1,
+    "diff": -1
+  },
+  {
+    "tab": "case-goods",
+    "sku": "AFI-BF-Q-WHT-ECO",
+    "soh": 0,
+    "open": 0,
+    "available": -1,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 1,
+    "diff": -1
+  },
+  {
+    "tab": "case-goods",
+    "sku": "ARH-SB160-WHT-ECO",
+    "soh": 0,
+    "open": 0,
+    "available": -1,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 1,
+    "diff": -1
+  },
+  {
+    "tab": "case-goods",
+    "sku": "LOLA-BSF-NAL",
+    "soh": 0,
+    "open": 1,
+    "available": 10,
+    "preFromOpenMinusSoh": 1,
+    "preFromAvailable": 0,
+    "diff": 1
+  },
+  {
+    "tab": "case-goods",
+    "sku": "HANK-SB160-WNT-ECO",
+    "soh": 0,
+    "open": 0,
+    "available": -1,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 1,
+    "diff": -1
+  },
+  {
+    "tab": "case-goods",
+    "sku": "STLA-FLAMP-ECO",
+    "soh": 0,
+    "open": 0,
+    "available": -1,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 1,
+    "diff": -1
+  },
+  {
+    "tab": "case-goods",
+    "sku": "CAM-DSK150-WG-ECO",
+    "soh": 0,
+    "open": 0,
+    "available": -1,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 1,
+    "diff": -1
+  },
+  {
+    "tab": "case-goods",
+    "sku": "DIRI-DS-CRM-ECO",
+    "soh": 0,
+    "open": 0,
+    "available": -1,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 1,
+    "diff": -1
+  },
+  {
+    "tab": "case-goods",
+    "sku": "TATE-EDT-BLK-ECO",
+    "soh": 0,
+    "open": 0,
+    "available": -1,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 1,
+    "diff": -1
+  },
+  {
+    "tab": "case-goods",
+    "sku": "JOSE-BF-K-FG-ECO",
+    "soh": 0,
+    "open": 0,
+    "available": -1,
+    "preFromOpenMinusSoh": 0,
+    "preFromAvailable": 1,
+    "diff": -1
+  }
+]
