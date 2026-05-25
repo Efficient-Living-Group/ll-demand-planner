@@ -695,6 +695,7 @@ function getCin7StockMetricBySku(branchIds = null, country = '', metric = 'openS
       if (branchSet && !branchSet.has(String(branchId))) continue;
       if (metric === 'preorder') qty += Math.max(-Number(row.available || 0), 0);
       else if (metric === 'available') qty += Number(row.available || 0);
+      else if (metric === 'incoming') qty += Number(row.incoming || 0);
       else qty += Number(row.openSales || 0);
     }
     if (metric !== 'available' && qty <= 0) continue;
@@ -2070,6 +2071,13 @@ function buildCKData(ckId) {
     }
   }
 
+  const incoming = {};
+  for (const po of pos || []) {
+    for (const [sku, qty] of Object.entries(po.analyticsItems || po.items || {})) {
+      incoming[sku] = (incoming[sku] || 0) + Number(qty || 0);
+    }
+  }
+
   // Build human-readable names from SKU + best-known supplier by SKU from CIN7 POs
   const names = {};
   const suppliers = {};
@@ -2228,6 +2236,7 @@ function buildCKData(ckId) {
       const viewAvailable = {};
       const viewOpenOrders = {};
       const viewShopify = {};
+      const viewIncoming = {};
       const viewCoverageOpenDemandBySku = {};
       const viewCoverageStockBySku = {};
       const branchNormalized = buildCin7ForBranchIds(ids);
@@ -2236,6 +2245,7 @@ function buildCKData(ckId) {
         viewAvailable[sku] = typeof data === 'object' ? Number(data.available || 0) : viewCin7[sku];
         viewOpenOrders[sku] = 0;
         viewShopify[sku] = 0;
+        viewIncoming[sku] = 0;
         viewCoverageStockBySku[sku] = { soh: viewCin7[sku], available: viewAvailable[sku] };
       }
       if (ckId === 'llau') {
@@ -2253,17 +2263,20 @@ function buildCKData(ckId) {
       }
       const branchOpenDemand = getCin7PreordersBySku(ids, salesCountry || '');
       const branchOpenSales = getCin7OpenSalesBySku(ids, salesCountry || '');
+      const branchIncoming = getCin7StockMetricBySku(ids, salesCountry || '', 'incoming');
       for (const [rawSku, qty] of Object.entries(branchOpenDemand)) {
         const sku = canonicalDemandSku(rawSku, salesCountry || '');
         viewCoverageOpenDemandBySku[sku] = (viewCoverageOpenDemandBySku[sku] || 0) + Number(qty || 0);
       }
       addCin7DemandToVisibleMap(branchOpenDemand, viewShopify, salesCountry || '');
       addCin7DemandToVisibleMap(branchOpenSales, viewOpenOrders, salesCountry || '');
+      addCin7DemandToVisibleMap(branchIncoming, viewIncoming, salesCountry || '');
       for (const sku of Object.keys(viewCin7)) {
         viewShopify[sku] = -Number(viewShopify[sku] || 0);
         viewOpenOrders[sku] = Number(viewOpenOrders[sku] || 0);
+        viewIncoming[sku] = Number(viewIncoming[sku] || 0);
       }
-      return { cin7: viewCin7, available: viewAvailable, openOrders: viewOpenOrders, shopify: viewShopify, coverageOpenDemandBySku: viewCoverageOpenDemandBySku, coverageStockBySku: viewCoverageStockBySku };
+      return { cin7: viewCin7, available: viewAvailable, openOrders: viewOpenOrders, shopify: viewShopify, incoming: viewIncoming, coverageOpenDemandBySku: viewCoverageOpenDemandBySku, coverageStockBySku: viewCoverageStockBySku };
     };
     for (const branchId of branchIds) warehouseViews[String(branchId)] = buildBranchView([branchId]);
   }
@@ -2780,6 +2793,7 @@ function buildCKData(ckId) {
     shopify,
     openOrders,
     available: cin7Available,
+    incoming,
     velocity,
     pos,
     allPos,

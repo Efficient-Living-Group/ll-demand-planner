@@ -302,3 +302,18 @@ Add a script that fails if:
 2. Update `getNet()` to use `DATA.available[s]` if the intended business meaning is net available.
 3. Stop using `DATA.shopify` to carry Cin7 preorder deficits.
 4. Add `fieldSources` metadata to `/api/ck/:id`, so frontend labels are generated from source metadata rather than static generic copy.
+
+## Fixes applied after audit
+
+Commit pending from this working session applies the first remediation pass:
+
+- Frontend `Preorders` / coverage now uses explicit preorder deficit via `getPreorderUnits()` instead of treating preorder deficit as raw open sales and subtracting SOH again.
+- `Net after Open Orders` was relabelled to `Net Available`, and `getNet()` now prefers Cin7 `Stock.available` when present.
+- API now returns an explicit `incoming` map per CK.
+- Warehouse-filtered views now include branch-specific `incoming`; frontend `getIncoming()` uses that map before falling back to PO rows.
+
+Remaining design work:
+
+- `DATA.shopify` is still a legacy negative preorder carrier in parts of the frontend. It should be renamed to an explicit preorder/demand map in a future cleanup.
+- Normalized SKU vs raw PO item matching still needs a dedicated normalization layer for PO rows.
+- `Units/wk` still needs clearer source labelling or split actual/estimated velocity fields.
