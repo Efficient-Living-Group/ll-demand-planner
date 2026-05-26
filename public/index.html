@@ -978,7 +978,7 @@ function downloadExcelWorkbook(sheets, filename){
   const xml=`<?xml version="1.0"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">${worksheets}</Workbook>`;
   const blob=new Blob([xml],{type:'application/vnd.ms-excel;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename.endsWith('.xls')?filename:filename+'.xls';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);
 }
-function exportMetaRows(label){return [[label||'Demand Planner Export'],['Category Killer',currentCK||'All'],['Generated',new Date().toLocaleString()],['Filters',`Size: ${dashFilter.size||'All'} · Region: ${dashFilter.region||'All'} · Warehouse: ${dashFilter.warehouse||'All'} · Type: ${dashFilter.productType||dashFilter.reorderType||'All'}`],[]]}
+function exportMetaRows(label){return []}
 function activePlannerView(){return document.querySelector('.tab.active')?.dataset.view||'dashboard'}
 function exportCurrentViewExcel(){
   if(document.getElementById('allPOsView')?.style.display==='block')return exportPurchaseOrdersExcel();
@@ -999,7 +999,7 @@ function exportPurchaseOrdersExcel(){
   if(!_allPOsCache.length){alert('Purchase Orders are still loading. Open the PO tab first, then try again.');return;}
   renderPurchaseOrders(_allPOsCache);
   const pos=window._poRendered||[];
-  const rows=[['PO Export'],['Generated',new Date().toLocaleString()],['Filter',_poFilter||'all'],['Destination',_poDestination||'all'],['ETA Month',_poEtaMonth||'all'],['Search',document.getElementById('poSearch')?.value||''],[]];
+  const rows=[];
   rows.push(['PO','Status','Quality %','Supplier','Container','Destination','CRD/ETD','ETA','Original ETA','ATA','ETA vs Original','Product Total AUD','Freight AUD','Tariff AUD','SKU','Product Name','CK Category','Qty','Currency','Original Product Total','Raw Stage']);
   for(const po of pos){
     const entries=Object.entries(po.items||{});const base=[cleanPoRef(po.reference),poStageText(po),po.quality?.pct??'',po.company||'',po.containerNumber||poContainerNumber(po)||po.trackingCode||'',po.deliveryCountry||'',poExcelDate(po.crd||po.etd),poExcelDate(po.estimatedArrivalDate||po.arrival),poExcelDate(po.customFields?.orders_1000),poExcelDate(po.fullyReceivedDate),poEtaVsOriginal(po),po.productTotalAUD!=null?Number(po.productTotalAUD||0):poMoneyAud(po.total,po.currencyCode||'AUD'),poMoneyAud(po.freight,po.freightCurrency||'AUD'),Number(po.tariffAmount||0)];
