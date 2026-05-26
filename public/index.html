@@ -121,7 +121,7 @@ th[data-tip]{position:relative;cursor:help}th[data-tip]:after{content:' ⓘ';fon
     <div><h1 id="headerTitle"><span>Select a Category Killer</span></h1><div class="subtitle" id="headerSub">Loading data...</div></div>
   </div>
     <div style="text-align:right;flex-shrink:0"><div style="font-size:11px;color:#A8C5C8" id="headerMeta"></div>
-    <button onclick="manualRefresh()" class="btn btn-ghost" style="padding:2px 10px;font-size:11px;margin-top:4px;color:#A8C5C8;border-color:#A8C5C8" id="refreshBtn">🔄 Refresh</button></div>
+    <button onclick="exportCurrentViewExcel()" class="btn btn-ghost" style="padding:2px 10px;font-size:11px;margin-top:4px;color:#A8C5C8;border-color:#A8C5C8" id="exportExcelBtn">📥 Export Excel</button> <button onclick="manualRefresh()" class="btn btn-ghost" style="padding:2px 10px;font-size:11px;margin-top:4px;color:#A8C5C8;border-color:#A8C5C8" id="refreshBtn">🔄 Refresh</button></div>
   </div>
   <div class="tabs">
     <div class="tab active" data-view="dashboard">📊 Dashboard</div>
@@ -172,7 +172,7 @@ th[data-tip]{position:relative;cursor:help}th[data-tip]:after{content:' ⓘ';fon
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
           <div id="reorderTypeFilters" style="display:none;gap:6px;align-items:center"></div>
           <div style="font-size:12px;display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:var(--bg-card);user-select:none" onclick="window._incPO=!window._incPO;this.style.background=window._incPO?'#E8EFEF':'var(--bg-card)';this.style.borderColor=window._incPO?'var(--blue)':'var(--border)';this.querySelector('input').checked=window._incPO;renderReorder()"><input type="checkbox" style="accent-color:var(--blue);pointer-events:none"> <span>+ Incoming POs</span></div>
-          <button class="btn btn-primary" onclick="exportCSV()">📥 Export CSV</button>
+          <button class="btn btn-primary" onclick="exportCurrentViewExcel()">📥 Export Excel</button>
         </div>
       </div>
       <div id="caRestockPlan" style="display:none;margin-bottom:18px"></div>
@@ -191,6 +191,7 @@ th[data-tip]{position:relative;cursor:help}th[data-tip]:after{content:' ⓘ';fon
       <div class="po-toolbar">
         <button onclick="expandAllPORows()" style="padding:8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--bg-card);color:var(--blue);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">Expand all</button>
         <button onclick="collapseAllPORows()" style="padding:8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--bg-card);color:var(--blue);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">Collapse all</button>
+        <button onclick="exportPurchaseOrdersExcel()" style="padding:8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--blue);color:#fff;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">📥 Export Excel</button>
         <button id="poCurrencyBtn" title="PO product totals, freight and tariffs shown in AUD. USD PO totals use the current USD→AUD FX rate from the app." style="padding:8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--blue);color:#fff;font-size:12px;font-weight:700;cursor:default;min-width:50px">AUD</button>
         <select id="poDestFilter" onchange="_poDestination=this.value;renderPurchaseOrders(_allPOsCache)" style="padding:8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:12px;outline:none;cursor:pointer">
           <option value="all">All Destinations</option>
@@ -967,7 +968,47 @@ function renderReorder(){
   document.querySelector('#reorderTable tbody').innerHTML=rows.map(r=>
     `<tr><td style="font-family:monospace;font-size:10px">${r.sku}${skuLabel(r.sku)}</td><td>${r.size}</td><td>${fmt(r.net)}</td><td>${r.vel.toFixed(1)}${isEstVel(r.sku)?' <span style="color:var(--yellow);font-size:9px" title="Estimated: using last in-stock velocity">(est)</span>':''}${trendIndicator(r.sku)}</td><td>${window._incPO?'<span style="color:var(--green);font-size:10px">Added to Net ✓</span>':r.inc}</td><td>${r.wlNow>=99?'99+':r.wlNow}</td><td>${r.wlInc>=99?'99+':r.wlInc}</td><td>${r.sd}</td><td>${r.su}</td><td>${r.rop}</td><td>${r.rq>0?`<b>${r.rq}</b>`:'—'}</td><td>${r.ob}</td><td>${statusBadge(r.wl,r.sku)}</td><td style="background:${(()=>{let s=r.vel>0?Math.round((r.vel*4.3)/((r.vel*4.3)+Math.max(r.net,0))*100):0;return s>=70?'rgba(91,171,49,0.1)':s>=41?'rgba(212,147,13,0.1)':'rgba(195,50,82,0.1)'})()};color:${(()=>{let s=r.vel>0?Math.round((r.vel*4.3)/((r.vel*4.3)+Math.max(r.net,0))*100):0;return s>=70?'var(--green)':s>=41?'var(--yellow)':'var(--alert)'})()};font-weight:700;text-align:center">${r.vel>0?Math.round((r.vel*4.3)/((r.vel*4.3)+Math.max(r.net,0))*100):0}%${r.vel===0&&!isEstVel(r.sku)&&r.net>0?' 💀':''}</td></tr>`).join('')}
 
-function exportCSV(){let rows=[['SKU','Size','Net Available','Vel/wk','Incoming','Wks Left','Reorder Qty']];getSkus().forEach(sku=>{let net=getNet(sku),vel=getVel(sku),inc=getIncoming(sku),p=project(sku),sw=p.findIndex(x=>x.close<=0),wl=sw>=0?sw:99,su=Math.round(vel*4),rq=Math.max(0,Math.round(vel*12+su-net-inc));rows.push([sku,getSize(sku),net,vel.toFixed(1),inc,wl,rq])});let csv=rows.map(r=>r.join(',')).join('\n'),b=new Blob([csv],{type:'text/csv'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`demand_${currentCK}_${new Date().toISOString().slice(0,10)}.csv`;a.click()}
+function excelXmlEscape(v){return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function excelSheetName(name){return String(name||'Sheet').replace(/[\\/?*\[\]:]/g,' ').slice(0,31)||'Sheet'}
+function cleanExcelText(el){const c=el.cloneNode(true);c.querySelectorAll('.tip,script,style,button').forEach(x=>x.remove());return c.textContent.replace(/\s+/g,' ').trim()}
+function tableToExcelRows(table){if(!table)return[];return[...table.querySelectorAll('tr')].map(tr=>[...tr.children].map(td=>cleanExcelText(td))).filter(r=>r.some(v=>String(v).trim()!==''))}
+function downloadExcelWorkbook(sheets, filename){
+  const valid=(sheets||[]).filter(s=>s&&s.rows&&s.rows.length);if(!valid.length){alert('Nothing to export yet. Open the tab first, then try again.');return;}
+  const worksheets=valid.map(sheet=>`<Worksheet ss:Name="${excelXmlEscape(excelSheetName(sheet.name))}"><Table>${sheet.rows.map(row=>`<Row>${row.map(cell=>`<Cell><Data ss:Type="String">${excelXmlEscape(cell)}</Data></Cell>`).join('')}</Row>`).join('')}</Table></Worksheet>`).join('');
+  const xml=`<?xml version="1.0"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">${worksheets}</Workbook>`;
+  const blob=new Blob([xml],{type:'application/vnd.ms-excel;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename.endsWith('.xls')?filename:filename+'.xls';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);
+}
+function exportMetaRows(label){return [[label||'Demand Planner Export'],['Category Killer',currentCK||'All'],['Generated',new Date().toLocaleString()],['Filters',`Size: ${dashFilter.size||'All'} · Region: ${dashFilter.region||'All'} · Warehouse: ${dashFilter.warehouse||'All'} · Type: ${dashFilter.productType||dashFilter.reorderType||'All'}`],[]]}
+function activePlannerView(){return document.querySelector('.tab.active')?.dataset.view||'dashboard'}
+function exportCurrentViewExcel(){
+  if(document.getElementById('allPOsView')?.style.display==='block')return exportPurchaseOrdersExcel();
+  const view=activePlannerView();
+  if(view==='stockout'&&!document.querySelector('#heatmapContainer table'))renderHeatmap();
+  if(view==='reorder')renderReorder();
+  if(view==='forecast')renderForecast();
+  const tableMap={dashboard:'#stockTable',stockout:'#heatmapContainer table',reorder:'#reorderTable',forecast:'#forecastTable'};
+  const labelMap={dashboard:'Dashboard Stock Position',stockout:'Stockout Heatmap',reorder:'Reorder Recommendations',forecast:'Forecast Accuracy'};
+  const table=document.querySelector(tableMap[view]);
+  const rows=[...exportMetaRows(labelMap[view]),...tableToExcelRows(table)];
+  downloadExcelWorkbook([{name:labelMap[view],rows}],`demand_planner_${currentCK||'all'}_${view}_${new Date().toISOString().slice(0,10)}.xls`);
+}
+function poMoneyAud(val,currency){const n=Number(val||0),c=String(currency||'AUD').toUpperCase();if(!n)return 0;if(c==='USD')return n*(_poFxRate||1.45);return n}
+function poExcelDate(v){if(!v)return'';const d=parsePoDate(v);return d?d.toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}):String(v)}
+function poEtaVsOriginal(po){const eta=parsePoDate(po.estimatedArrivalDate||po.arrival),orig=parseOriginalEta(po);if(!eta||!orig)return'';const diff=Math.round((eta.setHours(0,0,0,0)-orig.setHours(0,0,0,0))/86400000);return diff===0?'On original ETA':(diff>0?`${diff}d after original`:`${Math.abs(diff)}d before original`)}
+function exportPurchaseOrdersExcel(){
+  if(!_allPOsCache.length){alert('Purchase Orders are still loading. Open the PO tab first, then try again.');return;}
+  renderPurchaseOrders(_allPOsCache);
+  const pos=window._poRendered||[];
+  const rows=[['PO Export'],['Generated',new Date().toLocaleString()],['Filter',_poFilter||'all'],['Destination',_poDestination||'all'],['ETA Month',_poEtaMonth||'all'],['Search',document.getElementById('poSearch')?.value||''],[]];
+  rows.push(['PO','Status','Quality %','Supplier','Container','Destination','CRD/ETD','ETA','Original ETA','ATA','ETA vs Original','Product Total AUD','Freight AUD','Tariff AUD','SKU','Product Name','CK Category','Qty','Currency','Original Product Total','Raw Stage']);
+  for(const po of pos){
+    const entries=Object.entries(po.items||{});const base=[cleanPoRef(po.reference),poStageText(po),po.quality?.pct??'',po.company||'',po.containerNumber||poContainerNumber(po)||po.trackingCode||'',po.deliveryCountry||'',poExcelDate(po.crd||po.etd),poExcelDate(po.estimatedArrivalDate||po.arrival),poExcelDate(po.customFields?.orders_1000),poExcelDate(po.fullyReceivedDate),poEtaVsOriginal(po),po.productTotalAUD!=null?Number(po.productTotalAUD||0):poMoneyAud(po.total,po.currencyCode||'AUD'),poMoneyAud(po.freight,po.freightCurrency||'AUD'),Number(po.tariffAmount||0)];
+    if(entries.length){for(const[sku,qty]of entries)rows.push([...base,sku,poProductName(po,sku),poItemCategory(po,sku),qty,po.currencyCode||'AUD',Number(po.total||0),po.stage||'']);}
+    else rows.push([...base,'','','',0,po.currencyCode||'AUD',Number(po.total||0),po.stage||'']);
+  }
+  downloadExcelWorkbook([{name:'Purchase Orders',rows}],`demand_planner_purchase_orders_${new Date().toISOString().slice(0,10)}.xls`);
+}
+function exportCSV(){exportCurrentViewExcel()}
 
 let chatOpen=false,chatHistory=[];
 function toggleChat(){chatOpen=!chatOpen;document.getElementById('chatPanel').classList.toggle('open',chatOpen);document.getElementById('chatToggle').textContent=chatOpen?'✕':'💬'}
