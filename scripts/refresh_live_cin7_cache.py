@@ -466,6 +466,7 @@ def build_products_and_stock(products_raw: list[dict[str, Any]], product_options
         branch_key = str(int(branch_id))
         stock_by_branch.setdefault(sku, {})[branch_key] = {
             "soh": float(row.get("stockOnHand") or 0),
+            "virtual": float(row.get("virtual") if row.get("virtual") is not None else row.get("stockOnHand") or 0),
             "available": float(row.get("available") or 0),
             "openSales": float(row.get("openSales") or 0),
             "incoming": float(row.get("incoming") or 0),
@@ -474,12 +475,14 @@ def build_products_and_stock(products_raw: list[dict[str, Any]], product_options
 
     for sku, branches in stock_by_branch.items():
         total_soh = sum(float(b.get("soh") or 0) for b in branches.values())
+        total_virtual = sum(float(b.get("virtual", b.get("soh") or 0) or 0) for b in branches.values())
         total_available = sum(float(b.get("available") or 0) for b in branches.values())
         if sku in products:
             products[sku]["soh"] = total_soh
+            products[sku]["virtual"] = total_virtual
             products[sku]["available"] = total_available
         else:
-            products[sku] = {"soh": total_soh, "available": total_available, "costAUD": 0, "cbm": 0, "option1": ""}
+            products[sku] = {"soh": total_soh, "virtual": total_virtual, "available": total_available, "costAUD": 0, "cbm": 0, "option1": ""}
 
     return products, stock_by_branch
 

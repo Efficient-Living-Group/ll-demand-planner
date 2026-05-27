@@ -1400,6 +1400,7 @@ async function fetchCin7AllProducts() {
         if (!stockByBranch[sku]) stockByBranch[sku] = {};
         stockByBranch[sku][branchId] = {
           soh: Number(row.stockOnHand || 0),
+          virtual: Number(row.virtual ?? row.stockOnHand ?? 0),
           available: Number(row.available || 0),
           openSales: Number(row.openSales || 0),
           incoming: Number(row.incoming || 0),
@@ -1411,12 +1412,14 @@ async function fetchCin7AllProducts() {
 
   for (const [sku, branches] of Object.entries(stockByBranch)) {
     const totalSoh = Object.values(branches).reduce((sum, b) => sum + (Number(b.soh) || 0), 0);
+    const totalVirtual = Object.values(branches).reduce((sum, b) => sum + (Number(b.virtual ?? b.soh) || 0), 0);
     const totalAvailable = Object.values(branches).reduce((sum, b) => sum + (Number(b.available) || 0), 0);
     if (products[sku]) {
       products[sku].soh = totalSoh;
+      products[sku].virtual = totalVirtual;
       products[sku].available = totalAvailable;
     } else {
-      products[sku] = { soh: totalSoh, available: totalAvailable, costAUD: 0, cbm: 0 };
+      products[sku] = { soh: totalSoh, virtual: totalVirtual, available: totalAvailable, costAUD: 0, cbm: 0 };
     }
   }
 
@@ -1966,22 +1969,34 @@ function buildCKData(ckId) {
           const row = branchRows[branchId];
           if (!row) return acc;
           acc.soh += Number(row.soh || 0);
+          acc.virtual += Number(row.virtual ?? row.soh ?? 0);
           acc.available += Number(row.available || 0);
           acc.openSales += Number(row.openSales || 0);
           acc.matched += 1;
           return acc;
-        }, { soh: 0, available: 0, openSales: 0, matched: 0 });
+        }, { soh: 0, virtual: 0, available: 0, openSales: 0, matched: 0 });
+        const displaySoh = ckId === 'case-goods' && dataCache.cin7BOMs?.[sku] ? branchData.virtual : branchData.soh;
         cin7Raw[sku] = branchData.matched > 0
-          ? { ...data, soh: branchData.soh, available: branchData.available }
-          : { ...data, soh: 0, available: 0 };
+          ? { ...data, soh: displaySoh, virtual: branchData.virtual, available: branchData.available }
+          : { ...data, soh: 0, virtual: 0, available: 0 };
       } else {
-        cin7Raw[sku] = data;
+        cin7Raw[sku] = ckId === 'case-goods' && dataCache.cin7BOMs?.[sku]
+          ? { ...data, soh: Number(data.virtual ?? data.soh ?? 0) }
+          : data;
       }
     }
   }
 
   // Normalize: merge box-splits, map components to sets
   let cin7Normalized = normalizeCIN7(cin7Raw);
+  if (ckId === 'case-goods') {
+    for (const sku of Object.keys(cin7Normalized)) {
+      if (!dataCache.cin7BOMs?.[sku]) continue;
+      const source = dataCache.cin7Products?.[sku] || cin7Normalized[sku] || {};
+      const virtual = Number(source.virtual ?? source.soh ?? 0);
+      cin7Normalized[sku] = { ...(typeof cin7Normalized[sku] === 'object' ? cin7Normalized[sku] : {}), ...source, soh: virtual, virtual };
+    }
+  }
   // Lifely Sofa should show true physical component/carton SKUs. Do not merge
   // component boxes back into sellable combo parents such as LIFELY-OTM-WHT.
   if (ckId === 'lifely-sofa') cin7Normalized = { ...cin7Raw };
