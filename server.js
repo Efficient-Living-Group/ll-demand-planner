@@ -427,6 +427,11 @@ function explodeLittleLifelyBundleSku(sku, ckId) {
 
 function explodeCushieSnuggleSetSku(sku, ckId) {
   const s = String(sku || '').toUpperCase().trim();
+  if ((ckId === 'cusb-au' || ckId === 'cusb-au-snuggle') && s.startsWith('CUSB-') && s.endsWith('-SET')) {
+    const cached = getCachedCin7BomComponentList(s);
+    if (cached) return cached;
+  }
+
   let m = s.match(/^(CUSB-(TW|D|Q|K)-([A-Z0-9]+))-SET$/);
   if (m && (ckId === 'cusb-au' || ckId === 'cusb-au-snuggle')) return [m[1], `${m[1]}-CV`];
 
