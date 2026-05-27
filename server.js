@@ -272,13 +272,60 @@ function explodeLifelySofaSku(sku) {
 }
 
 function lfsbSizeFromCmss(size) {
-  if (size === 'K') return 'Q';
+  if (size === 'K') return 'TW';
   if (['S', 'D', 'Q', 'TW'].includes(size)) return size;
   return null;
 }
 
+function normalizeCushieBomComponentSku(sku) {
+  return String(sku || '').toUpperCase().trim().replace(/-(?:[12]|C[12])$/, '');
+}
+
+function expandComponentQtyMap(components) {
+  const out = [];
+  for (const [componentSku, rawQty] of Object.entries(components || {})) {
+    const qty = Math.max(0, Math.round(Number(rawQty || 0)));
+    for (let i = 0; i < qty; i += 1) out.push(componentSku);
+  }
+  return out;
+}
+
+function normalizeCin7BomComponents(components = []) {
+  const groups = {};
+  for (const component of components || []) {
+    const rawSku = String(component?.code || component?.sku || '').toUpperCase().trim();
+    if (!rawSku) continue;
+    const baseSku = normalizeCushieBomComponentSku(rawSku);
+    const qty = Math.max(0, Number(component?.qty ?? component?.quantity ?? 1));
+    if (!qty) continue;
+    if (!groups[baseSku]) groups[baseSku] = { directQty: 0, cartonQty: 0 };
+    // LFSB parent rows in the planner represent a buildable module. Cin7 BOMs
+    // list carton rows such as -1/-2 separately, so use the max carton qty for
+    // that parent instead of summing both boxes and doubling demand.
+    if (rawSku !== baseSku) groups[baseSku].cartonQty = Math.max(groups[baseSku].cartonQty, qty);
+    else groups[baseSku].directQty += qty;
+  }
+  return Object.fromEntries(
+    Object.entries(groups)
+      .map(([sku, group]) => [sku, group.directQty + group.cartonQty])
+      .filter(([, qty]) => qty > 0)
+  );
+}
+
+function getCachedCin7BomComponentList(sku) {
+  const s = String(sku || '').toUpperCase().trim();
+  const cached = dataCache?.cin7BOMs?.[s];
+  if (!cached) return null;
+  const components = cached.components || cached;
+  if (Array.isArray(components)) return components.map(normalizeCushieBomComponentSku).filter(Boolean);
+  const expanded = expandComponentQtyMap(components);
+  return expanded.length ? expanded : null;
+}
+
 function explodeCushieModularSku(sku) {
   const s = String(sku || '').toUpperCase().trim();
+  const cached = s.startsWith('CMSS-') ? getCachedCin7BomComponentList(s) : null;
+  if (cached) return cached;
   const colour = s.split('-').pop();
   if (!['CHC', 'LTGN', 'WHT', 'DNM'].includes(colour || '')) return null;
   const out = [];
@@ -289,36 +336,47 @@ function explodeCushieModularSku(sku) {
 
   let m = s.match(/^CMSS-SB-S-([A-Z0-9]+)$/);
   if (m) {
-    add(`LFSB-S-${m[1]}`);
+    add(`LFSB-AMST-${m[1]}`);
+    add(`LFSB-TW-${m[1]}`);
     return out;
   }
 
   m = s.match(/^CMSS-2S-SB-(D|Q|K)-([A-Z0-9]+)$/);
   if (m) {
     const size = lfsbSizeFromCmss(m[1]);
-    add(size ? `LFSB-${size}-${m[2]}` : null);
+    add(`LFSB-AMST-${m[2]}`);
+    add(size ? `LFSB-${size}-${m[2]}` : null, m[1] === 'K' ? 2 : 1);
     return out;
   }
 
   m = s.match(/^CMSS-(?:2S-SSB|[34]S-SSB-CHS)-(Q|K)-([A-Z0-9]+)$/);
   if (m) {
     const size = lfsbSizeFromCmss(m[1]);
-    add(size ? `LFSB-${size}-${m[2]}` : null);
-    add(`LFSB-CHS-${m[2]}`);
+    add(`LFSB-AMST-${m[2]}`);
+    if (s.includes('2S-SSB')) add(`LFSB-SOTM-${m[2]}`);
+    add(size ? `LFSB-${size}-${m[2]}` : null, m[1] === 'K' ? 2 : 1);
+    if (!s.includes('2S-SSB')) add(`LFSB-CHS-${m[2]}`);
     return out;
   }
 
   m = s.match(/^CMSS-(?:4S-USB-DCHS|5S-USB-CHS)-(Q|K)-([A-Z0-9]+)$/);
   if (m) {
     const size = lfsbSizeFromCmss(m[1]);
-    add(size ? `LFSB-${size}-${m[2]}` : null);
+    add(`LFSB-AMST-${m[2]}`);
+    add(size ? `LFSB-${size}-${m[2]}` : null, m[1] === 'K' ? 2 : 1);
     add(`LFSB-CHS-${m[2]}`, 2);
     return out;
   }
 
-  m = s.match(/^CMSS-(?:SOTM|OTSB)-([A-Z0-9]+)$/);
+  m = s.match(/^CMSS-SOTM-([A-Z0-9]+)$/);
   if (m) {
     add(`LFSB-SOTM-${m[1]}`);
+    return out;
+  }
+
+  m = s.match(/^CMSS-OTSB-([A-Z0-9]+)$/);
+  if (m) {
+    add(`LFSB-S-${m[1]}`);
     return out;
   }
 
@@ -590,6 +648,7 @@ let dataCache = {
   lastSnapshotWrite: null,
   cin7Products: {},   // sku -> {soh, available, costAUD, cbm}
   cin7StockByBranch: {}, // sku -> { branchId -> { soh, available, branchName } }
+  cin7BOMs: {},        // make sku -> { components: { visibleSku -> qty } }
   cin7POs: [],        // [{reference, status, stage, arrival, items: {sku: qty}}]
   shopifyVelocity: {}, // store -> {sku -> weekly_velocity}
   shopifyInventory: {}, // store -> {sku -> inventory_level}
@@ -1359,6 +1418,50 @@ async function fetchCin7AllProducts() {
   return { products, stockByBranch };
 }
 
+// ===== CIN7: FETCH BOM MASTERS =====
+async function fetchCin7BOMMasters() {
+  if (!CIN7_USER || !CIN7_KEY) return {};
+  const auth = Buffer.from(`${CIN7_USER}:${CIN7_KEY}`).toString('base64');
+  const boms = {};
+
+  for (let page = 1; page <= 30; page++) {
+    try {
+      console.log('CIN7 BOMMasters: fetching page ' + page);
+      let body, status, headers;
+      try {
+        await throttleCin7Request();
+        const resp = await apiRequest({
+          hostname: 'api.cin7.com',
+          path: `/api/v1/BOMMasters?page=${page}&rows=250`,
+          headers: { 'Authorization': `Basic ${auth}` }
+        });
+        body = resp.body;
+        status = resp.status;
+        headers = resp.headers || {};
+      } catch (fetchErr) {
+        console.error(`CIN7 BOMMasters page ${page} failed:`, fetchErr.message);
+        break;
+      }
+      console.log('CIN7 BOMMasters page ' + page + ': status=' + status + ' isArray=' + Array.isArray(body) + ' length=' + (Array.isArray(body) ? body.length : 'N/A'));
+      if (status === 429) {
+        markCin7Backoff(`BOMMasters page ${page}`, parseInt(headers['retry-after'] || '0', 10));
+        break;
+      }
+      if (!Array.isArray(body) || body.length === 0) break;
+      for (const bom of body) {
+        const product = bom.product || {};
+        const productSku = String(product.code || '').toUpperCase().trim();
+        if (!productSku) continue;
+        const components = normalizeCin7BomComponents(product.components || []);
+        if (!Object.keys(components).length) continue;
+        boms[productSku] = { components, reference: bom.reference || '', modifiedDate: bom.modifiedDate || null };
+      }
+    } catch (e) { console.error(`CIN7 BOMMasters page ${page} error:`, e.message); break; }
+  }
+
+  return boms;
+}
+
 // ===== CIN7: FETCH PURCHASE ORDERS =====
 async function fetchCin7POs() {
   if (!CIN7_USER || !CIN7_KEY) return [];
@@ -1648,8 +1751,10 @@ async function refreshAllData(forceCin7 = false, pushReason = null) {
 
       let cin7Products = {};
       let cin7StockByBranch = {};
+      let cin7BOMs = {};
       let cin7POs = [];
       let fetchedCin7Count = 0;
+      let fetchedBomCount = 0;
       let fetchedPoCount = 0;
       const cin7SkipReason = getCin7SkipReason(forceCin7);
 
@@ -1659,8 +1764,10 @@ async function refreshAllData(forceCin7 = false, pushReason = null) {
         const cin7Data = await fetchCin7AllProducts();
         cin7Products = cin7Data.products || {};
         cin7StockByBranch = cin7Data.stockByBranch || {};
+        cin7BOMs = await fetchCin7BOMMasters();
         cin7POs = await fetchCin7POs();
         fetchedCin7Count = Object.keys(cin7Products).length;
+        fetchedBomCount = Object.keys(cin7BOMs).length;
         fetchedPoCount = cin7POs.length;
       }
 
@@ -1678,6 +1785,7 @@ async function refreshAllData(forceCin7 = false, pushReason = null) {
       if (fetchedCin7Count > 0) {
         nextCache.cin7Products = cin7Products;
         nextCache.cin7StockByBranch = cin7StockByBranch;
+        if (fetchedBomCount > 0) nextCache.cin7BOMs = cin7BOMs;
         nextCache.lastCin7Refresh = nowIso;
         cin7BackoffUntil = 0;
         if (cin7RecoveryTimer) {
@@ -1733,7 +1841,8 @@ async function refreshAllData(forceCin7 = false, pushReason = null) {
       const elapsed = ((Date.now() - start) / 1000).toFixed(1);
       const liveCin7Count = Object.keys(dataCache.cin7Products).length;
       const livePoCount = dataCache.cin7POs.length;
-      console.log(`Data refresh complete in ${elapsed}s. Fetched CIN7: ${fetchedCin7Count} SKUs, ${fetchedPoCount} POs. Live cache: ${liveCin7Count} SKUs, ${livePoCount} POs. Cache wrote=${cacheSaveResult.wrote} pushed=${cacheSaveResult.pushed} skipped=${cacheSaveResult.skipped || 'none'}.`);
+      const liveBomCount = Object.keys(dataCache.cin7BOMs || {}).length;
+      console.log(`Data refresh complete in ${elapsed}s. Fetched CIN7: ${fetchedCin7Count} SKUs, ${fetchedBomCount} BOMs, ${fetchedPoCount} POs. Live cache: ${liveCin7Count} SKUs, ${liveBomCount} BOMs, ${livePoCount} POs. Cache wrote=${cacheSaveResult.wrote} pushed=${cacheSaveResult.pushed} skipped=${cacheSaveResult.skipped || 'none'}.`);
       return { ok: true, cin7Updated, shopifyUpdated, cacheSaveResult, fetchedCin7Count, fetchedPoCount, lastRefresh: dataCache.lastRefresh };
     } catch (e) {
       console.error('Data refresh failed:', e.message);

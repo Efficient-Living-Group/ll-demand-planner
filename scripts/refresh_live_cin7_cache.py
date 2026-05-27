@@ -372,6 +372,48 @@ def fetch_shopify_snapshot() -> dict[str, Any]:
     }
 
 
+def normalize_cushie_bom_component_sku(sku: Any) -> str:
+    return re.sub(r"-(?:[12]|C[12])$", "", str(sku or "").upper().strip())
+
+
+def normalize_cin7_bom_components(components_raw: list[dict[str, Any]]) -> dict[str, float]:
+    groups: dict[str, dict[str, float]] = {}
+    for component in components_raw or []:
+        raw_sku = str(component.get("code") or component.get("sku") or "").upper().strip()
+        if not raw_sku:
+            continue
+        base_sku = normalize_cushie_bom_component_sku(raw_sku)
+        qty = float(component.get("qty") if component.get("qty") is not None else component.get("quantity") or 1)
+        if qty <= 0:
+            continue
+        group = groups.setdefault(base_sku, {"direct_qty": 0.0, "carton_qty": 0.0})
+        # Planner rows use the normalized buildable parent (e.g. LFSB-Q-LTGN).
+        # Cin7 BOMs list -1/-2 cartons separately; use max carton qty so one
+        # module demand is not doubled just because it ships in two boxes.
+        if raw_sku != base_sku:
+            group["carton_qty"] = max(group["carton_qty"], qty)
+        else:
+            group["direct_qty"] += qty
+    return {sku: group["direct_qty"] + group["carton_qty"] for sku, group in groups.items() if group["direct_qty"] + group["carton_qty"] > 0}
+
+
+def build_bom_masters(boms_raw: list[dict[str, Any]]) -> dict[str, Any]:
+    boms: dict[str, Any] = {}
+    for bom in boms_raw or []:
+        product = bom.get("product") or {}
+        product_sku = str(product.get("code") or "").upper().strip()
+        if not product_sku:
+            continue
+        components = normalize_cin7_bom_components(product.get("components") or [])
+        if not components:
+            continue
+        boms[product_sku] = {
+            "components": components,
+            "reference": bom.get("reference") or "",
+            "modifiedDate": bom.get("modifiedDate"),
+        }
+    return boms
+
 def build_products_and_stock(products_raw: list[dict[str, Any]], product_options_raw: list[dict[str, Any]], stock_raw: list[dict[str, Any]], fx_usd_aud: float) -> tuple[dict[str, Any], dict[str, Any]]:
     products: dict[str, Any] = {}
     stock_by_branch: dict[str, Any] = {}
@@ -495,6 +537,7 @@ def build_purchase_orders(pos_raw: list[dict[str, Any]]) -> list[dict[str, Any]]
 def write_cache(
     products: dict[str, Any],
     stock_by_branch: dict[str, Any],
+    boms: dict[str, Any],
     pos: list[dict[str, Any]],
     shopify_payload: dict[str, Any] | None = None,
     dry_run: bool = False,
@@ -513,6 +556,7 @@ def write_cache(
         "lastPoRefresh": ts if cin7_updated else existing.get("lastPoRefresh"),
         "cin7Products": products,
         "cin7StockByBranch": stock_by_branch,
+        "cin7BOMs": boms,
         "cin7POs": pos,
         "shopifyVelocity": shopify_payload.get("shopifyVelocity", existing.get("shopifyVelocity", {})),
         "shopifyVelocityByCountry": shopify_payload.get("shopifyVelocityByCountry", existing.get("shopifyVelocityByCountry", {})),
@@ -524,12 +568,12 @@ def write_cache(
         "cacheGeneratedBy": "scripts/refresh_live_cin7_cache.py",
     }
     if dry_run:
-        print(f"DRY RUN: would write {len(products)} SKUs, {len(pos)} POs at {ts}; shopify_updated={shopify_updated}")
+        print(f"DRY RUN: would write {len(products)} SKUs, {len(boms)} BOMs, {len(pos)} POs at {ts}; shopify_updated={shopify_updated}")
         return
     CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
     payload = json.dumps(snapshot, separators=(",", ":"))
     CACHE_PATH.write_text(payload)
-    print(f"Wrote cache: {len(products)} SKUs, {len(pos)} POs at {ts}")
+    print(f"Wrote cache: {len(products)} SKUs, {len(boms)} BOMs, {len(pos)} POs at {ts}")
 
 
 def git_commit_and_push(message: str) -> None:
@@ -563,22 +607,25 @@ def main() -> int:
     if args.skip_cin7:
         products = existing.get("cin7Products") or {}
         stock_by_branch = existing.get("cin7StockByBranch") or {}
+        boms = existing.get("cin7BOMs") or {}
         pos = existing.get("cin7POs") or []
-        print(f"Reusing existing Cin7 cache: SKUs={len(products)}, POs={len(pos)}")
+        print(f"Reusing existing Cin7 cache: SKUs={len(products)}, BOMs={len(boms)}, POs={len(pos)}")
     else:
         auth = cin7_auth_header()
         try:
             products_raw = fetch_all("Products", auth, max_pages=60)
             product_options_raw = fetch_all("ProductOptions", auth, max_pages=60)
             stock_raw = fetch_all("Stock", auth, max_pages=80)
+            boms_raw = fetch_all("BOMMasters", auth, max_pages=30)
             pos_raw = fetch_all("PurchaseOrders", auth, max_pages=20)
         except RateLimited as exc:
             print(str(exc))
             return 75
 
         products, stock_by_branch = build_products_and_stock(products_raw, product_options_raw, stock_raw, fx_usd_aud=1.45)
+        boms = build_bom_masters(boms_raw)
         pos = build_purchase_orders(pos_raw)
-        print(f"Fetched live Cin7: products_raw={len(products_raw)}, product_options={len(product_options_raw)}, stock_rows={len(stock_raw)}, SKUs={len(products)}, POs={len(pos)}")
+        print(f"Fetched live Cin7: products_raw={len(products_raw)}, product_options={len(product_options_raw)}, stock_rows={len(stock_raw)}, BOMs={len(boms)}, SKUs={len(products)}, POs={len(pos)}")
 
     if len(products) < MIN_PRODUCTS or len(pos) < MIN_PURCHASE_ORDERS:
         print(f"Refusing to write suspicious cache: SKUs={len(products)}, POs={len(pos)}")
@@ -586,7 +633,7 @@ def main() -> int:
 
     shopify_payload = fetch_shopify_snapshot() if args.include_shopify else None
 
-    write_cache(products, stock_by_branch, pos, shopify_payload=shopify_payload, dry_run=args.dry_run, cin7_updated=cin7_updated)
+    write_cache(products, stock_by_branch, boms, pos, shopify_payload=shopify_payload, dry_run=args.dry_run, cin7_updated=cin7_updated)
     if args.commit and not args.dry_run:
         message = "Update live Cin7 and Shopify cache" if args.include_shopify and cin7_updated else "Update live Shopify cache" if args.include_shopify else "Update live Cin7 cache"
         git_commit_and_push(message)
