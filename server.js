@@ -69,7 +69,7 @@ const CK_DEFS = {
 
   'cmss':     { name: 'Cushie Modular Sleeper', prefix: 'CMSS',   logo: 'cushie.png',        store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Cushie V2', sizes: {'-S-':'Single','-D-':'Double','-Q-':'Queen','-K-':'King'} },
   'lifely-sofa': { name: 'Lifely Sofa',         prefix: 'MULTI',  logo: 'lifely-sofa.png',   store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Lifely Sofa', filter: isLifelySofaComponentSku, sizes: {} },
-  'case-goods': { name: 'Case Goods',           prefix: 'MULTI',  logo: 'lifely-sofa.png',   store: 'lifely', option1: ['Case goods - Active', 'Case goods - Discontinued'], filter: isCaseGoodsSku, sizes: {} }
+  'case-goods': { name: 'Case Goods',           prefix: 'MULTI',  logo: 'lifely-sofa.png',   store: 'lifely', option1: 'Case goods - Active', filter: isCaseGoodsSku, sizes: {} }
 };
 
 // ===== COMBO BOM (Bill of Materials) =====
