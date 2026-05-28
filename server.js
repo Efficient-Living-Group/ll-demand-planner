@@ -662,7 +662,6 @@ let dataCache = {
   error: null
 };
 const CACHE_SNAPSHOT_PATH = path.join(__dirname, 'data', 'cache-snapshot.json');
-const PO_LINE_OVERRIDES_PATH = path.join(__dirname, 'data', 'po-line-overrides.json');
 const SNAPSHOT_PUSH_STATE_PATH = path.join(__dirname, 'data', 'snapshot-push-state.json');
 let cacheSnapshotPushInFlight = false;
 const CIN7_DATA_SOURCE = 'live-cin7-api-cache';
@@ -828,26 +827,8 @@ function ckCategoryForSku(sku) {
   return 'Uncategorised';
 }
 
-function loadPoLineOverrides() {
-  try { return JSON.parse(fs.readFileSync(PO_LINE_OVERRIDES_PATH, 'utf8')); }
-  catch (_) { return {}; }
-}
-
-function applyPoLineOverride(po, overrides = {}) {
-  const override = overrides[rawPoReference(po.reference)];
-  if (!override) return po;
-  const currentItems = po.items || {};
-  if (Object.keys(currentItems).length > 0) return po;
-  return {
-    ...po,
-    items: override.items || {},
-    itemNames: { ...(po.itemNames || {}), ...(override.itemNames || {}) },
-    itemOption1: { ...(po.itemOption1 || {}), ...(override.itemOption1 || {}) }
-  };
-}
-
-function cin7Option1CategoriesForPoItems(items, itemOption1 = {}) {
-  return Object.fromEntries(Object.keys(items || {}).map(sku => [sku, dataCache.cin7Products?.[sku]?.option1 || itemOption1?.[sku] || '']));
+function cin7Option1CategoriesForPoItems(items) {
+  return Object.fromEntries(Object.keys(items || {}).map(sku => [sku, dataCache.cin7Products?.[sku]?.option1 || '']));
 }
 
 function isCaseGoodsSku(sku) {
@@ -3210,9 +3191,7 @@ function scorePO(po) {
 app.get('/api/all-pos', requireAuth, (req, res) => {
   reloadSnapshotIfNewer();
   const sourcePos = dataCache.cin7POs || [];
-  const poLineOverrides = loadPoLineOverrides();
-  const pos = sourcePos.map(sourcePo => {
-    const po = applyPoLineOverride(sourcePo, poLineOverrides);
+  const pos = sourcePos.map(po => {
     const destination = inferDestination(po);
     const landed = estimateLandedCost(po, destination);
     const quality = scorePO(po);
@@ -3248,7 +3227,7 @@ app.get('/api/all-pos', requireAuth, (req, res) => {
       quality,
       etaHistory: getPoEtaHistoryRecord(po),
       itemNames: po.itemNames || {},
-      itemCategories: cin7Option1CategoriesForPoItems(po.items || {}, po.itemOption1 || {}),
+      itemCategories: cin7Option1CategoriesForPoItems(po.items || {}),
       items: po.items || {}
     };
   });
