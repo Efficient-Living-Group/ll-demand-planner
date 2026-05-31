@@ -587,13 +587,17 @@ def git_commit_and_push(message: str) -> None:
         return
     subprocess.run(["git", "commit", "-m", message], cwd=ROOT, check=True)
 
-    if not GITHUB_JAKE_PATH.exists():
-        subprocess.run(["git", "push", "origin", "main"], cwd=ROOT, check=True)
-        return
-    gh = load_json(GITHUB_JAKE_PATH, {})
-    raw = f"{gh.get('user', 'x-access-token')}:{gh['pat']}".encode()
-    header = "Authorization: Basic " + base64.b64encode(raw).decode()
-    subprocess.run(["git", "-c", "credential.helper=", "-c", f"http.extraHeader={header}", "push", "origin", "main"], cwd=ROOT, check=True)
+    try:
+        if not GITHUB_JAKE_PATH.exists():
+            subprocess.run(["git", "push", "origin", "main"], cwd=ROOT, check=True)
+            return
+        gh = load_json(GITHUB_JAKE_PATH, {})
+        raw = f"{gh.get('user', 'x-access-token')}:{gh['pat']}".encode()
+        header = "Authorization: Basic " + base64.b64encode(raw).decode()
+        subprocess.run(["git", "-c", "credential.helper=", "-c", f"http.extraHeader={header}", "push", "origin", "main"], cwd=ROOT, check=True)
+    except subprocess.CalledProcessError as exc:
+        print(f"git push failed with exit code {exc.returncode}; cache commit remains local")
+        raise SystemExit(1)
 
 
 def main() -> int:
