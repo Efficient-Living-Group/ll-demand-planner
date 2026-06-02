@@ -1923,6 +1923,15 @@ function normalizeCushiePoItems(items) {
   return { ...(items || {}) };
 }
 
+function cushieProductTypeForSku(sku, option1 = '') {
+  const s = String(sku || '').toUpperCase().trim();
+  const o = String(option1 || '').toLowerCase();
+  if (s.endsWith('-SC') || s.includes('-CV') || /slip\s*cover|slipcover/.test(o)) return 'Slipcover';
+  if (s.startsWith('V3-') || o.includes('v3') || o.includes('snuggle')) return 'V3';
+  if (s.startsWith('V2-') || s.startsWith('CUSB') || s.startsWith('LFSB') || o.includes('v2') || o.includes('lifely sofa')) return 'V2';
+  return 'Other';
+}
+
 
 // ===== BUILD CK DATA FROM CACHE =====
 function buildCKData(ckId) {
@@ -2211,8 +2220,12 @@ function buildCKData(ckId) {
   const names = {};
   const suppliers = {};
   const allSkus = new Set([...Object.keys(cin7), ...Object.keys(velocity), ...Object.keys(shopify)]);
+  const productTypes = {};
   for (const sku of allSkus) {
     names[sku] = sku; // Default to SKU code; frontend can prettify
+    if (ckId.startsWith('cusb')) {
+      productTypes[sku] = cushieProductTypeForSku(sku, dataCache.cin7Products?.[sku]?.option1 || cin7Normalized?.[sku]?.option1 || '');
+    }
   }
   for (const po of dataCache.cin7POs || []) {
     const company = po.company || '';
@@ -2932,6 +2945,7 @@ function buildCKData(ckId) {
     cbmMap,
     suppliers,
     landedCosts,
+    productTypes,
     coverageAux,
     warehouseOptions,
     warehouseViews,

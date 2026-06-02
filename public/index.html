@@ -261,7 +261,7 @@ async function fetchJsonNoCache(path, attempts=2){
   }
   throw lastErr||new Error('Load failed');
 }
-let DATA={cin7:{},shopify:{},openOrders:{},available:{},incoming:{},velocity:{},pos:[],allPos:[],names:{},sizes:{},cbmMap:{},suppliers:{},landedCosts:{},mattressRegions:null,warehouseOptions:null,warehouseViews:null,_base:null},currentCK=null,charts={},dashFilter={size:'All',region:'All',warehouse:'All',productType:'All'},heatmapSortMode='sku';
+let DATA={cin7:{},shopify:{},openOrders:{},available:{},incoming:{},velocity:{},pos:[],allPos:[],names:{},sizes:{},cbmMap:{},suppliers:{},landedCosts:{},productTypes:{},mattressRegions:null,warehouseOptions:null,warehouseViews:null,_base:null},currentCK=null,charts={},dashFilter={size:'All',region:'All',warehouse:'All',productType:'All'},heatmapSortMode='sku';
 const LOGO_VERSION='20260521b';
 function logoSrc(logo){return '/logos/'+encodeURIComponent(logo||'')+'?v='+LOGO_VERSION}
 function logoFallback(img){img.style.display='none'}
@@ -428,7 +428,7 @@ function getVel(s){let v=DATA.velocity[s]||0;if(typeof v!=='number')v=Number(v)|
 function isEstVel(s){return(DATA.velocity[s]||0)===0&&(DATA.trendData||{})[s]?.lastInStockVel>0}
 function getSize(s){for(const[k,l]of Object.entries(DATA.sizes||{})){if(s.includes(k))return l}return'Other'}
 function getSizeKeys(){const s=new Set(getSkus().map(x=>getSize(x)));return['All',...s]}
-function getCushieUsProductType(sku){const s=String(sku||'').toUpperCase();if(s.endsWith('-SC'))return'Slipcover';if(s.startsWith('V3-'))return'V3';if(s.startsWith('V2-'))return'V2';return'Other'}
+function getCushieProductType(sku){if(DATA.productTypes&&DATA.productTypes[sku])return DATA.productTypes[sku];const s=String(sku||'').toUpperCase();if(s.endsWith('-SC')||s.includes('-CV'))return'Slipcover';if(s.startsWith('V3-'))return'V3';if(s.startsWith('V2-')||s.startsWith('CUSB')||s.startsWith('LFSB'))return'V2';return'Other'}
 function isLittleLifelyCountryPanel(){return ['llau','llnz','llna','llca','lluk','llsg'].includes(currentCK)}
 function getLittleLifelyComponentType(sku){
   const s=String(sku||'').toUpperCase();
@@ -439,12 +439,12 @@ function getLittleLifelyComponentType(sku){
 }
 function matchesDashboardProductType(sku){
   if(!dashFilter.productType||dashFilter.productType==='All')return true;
-  if(currentCK==='cusb-us'||currentCK==='cusb-ca')return getCushieUsProductType(sku)===dashFilter.productType;
+  if(isCushieTypeFilterPanel())return getCushieProductType(sku)===dashFilter.productType;
   if(isLittleLifelyCountryPanel())return getLittleLifelyComponentType(sku)===dashFilter.productType;
   return true;
 }
-function isCushieNorthAmericaPanel(){return currentCK==='cusb-us'||currentCK==='cusb-ca'}
-function matchesCushieUsProductType(sku){return !isCushieNorthAmericaPanel()||!dashFilter.productType||dashFilter.productType==='All'||getCushieUsProductType(sku)===dashFilter.productType}
+function isCushieTypeFilterPanel(){return ['cusb-au','cusb-us','cusb-ca','cusb-uk'].includes(currentCK)}
+function matchesCushieUsProductType(sku){return !isCushieTypeFilterPanel()||!dashFilter.productType||dashFilter.productType==='All'||getCushieProductType(sku)===dashFilter.productType}
 function skuName(s){return DATA.names[s]||s}
 function isNewSku(sku){const t=DATA.trendData?.[sku];if(!t?.firstSeen)return false;const age=(Date.now()-new Date(t.firstSeen))/86400000;return age<30}
 function statusBadge(w,sku){if(w<=0)return'<span class="badge stockout">STOCKOUT</span>';if(sku&&getVel(sku)===0&&!isEstVel(sku)&&(DATA.cin7[sku]||0)>0)return'<span class="badge critical">💀 DEAD</span>';if(sku&&isNewSku(sku))return'<span class="badge ok">NEW</span>';if(w<=2)return'<span class="badge critical">CRITICAL</span>';if(w<=4)return'<span class="badge low">LOW</span>';if(w<=8)return'<span class="badge ok">OK</span>';if(w>=25)return'<span class="badge yellow">OVERSTOCK</span>';return'<span class="badge healthy">HEALTHY</span>'}
@@ -505,7 +505,7 @@ async function selectCK(ckId){
   const activeItem=document.querySelector(`.sidebar-item[data-ck="${ckId}"]`);const groupEl=activeItem?.closest('.sidebar-brand-group');if(groupEl){groupEl.classList.remove('collapsed');brandOpenState[groupEl.dataset.brandGroup]=true;const caret=groupEl.querySelector('.sidebar-brand-caret');if(caret)caret.textContent='▾';}const subgroupEl=activeItem?.closest('.sidebar-subgroup');if(subgroupEl){subgroupEl.classList.remove('collapsed');subgroupOpenState[subgroupEl.dataset.subgroup]=true;const subCaret=subgroupEl.querySelector('.sidebar-subgroup-caret');if(subCaret)subCaret.textContent='▾';}
   document.getElementById('loadingScreen').style.display='block';document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
   try{const d=await fetchJsonNoCache(`/api/ck/${ckId}`);if(!d)return;
-  DATA={cin7:d.cin7||{},shopify:d.shopify||{},openOrders:d.openOrders||{},available:d.available||{},incoming:d.incoming||{},velocity:d.velocity||{},pos:d.pos||[],allPos:d.allPos||d.pos||[],names:d.names||{},sizes:d.sizes||{},bomData:d.bomData||null,reorderBomData:d.reorderBomData||null,costs:d.costs||{},trendData:d.trendData||{},weeklyData:d.weeklyData||null,cbmMap:d.cbmMap||{},suppliers:d.suppliers||{},landedCosts:d.landedCosts||{},coverageAux:d.coverageAux||null,warehouseOptions:d.warehouseOptions||null,warehouseViews:d.warehouseViews||null,mattressRegions:d.mattressRegions||null,fx:d.fx||null,lastRefresh:d.lastRefresh||null,lastCin7Refresh:d.lastCin7Refresh||null,lastPoRefresh:d.lastPoRefresh||null,lastShopifyRefresh:d.lastShopifyRefresh||null};
+  DATA={cin7:d.cin7||{},shopify:d.shopify||{},openOrders:d.openOrders||{},available:d.available||{},incoming:d.incoming||{},velocity:d.velocity||{},pos:d.pos||[],allPos:d.allPos||d.pos||[],names:d.names||{},sizes:d.sizes||{},bomData:d.bomData||null,reorderBomData:d.reorderBomData||null,costs:d.costs||{},trendData:d.trendData||{},weeklyData:d.weeklyData||null,cbmMap:d.cbmMap||{},suppliers:d.suppliers||{},landedCosts:d.landedCosts||{},productTypes:d.productTypes||{},coverageAux:d.coverageAux||null,warehouseOptions:d.warehouseOptions||null,warehouseViews:d.warehouseViews||null,mattressRegions:d.mattressRegions||null,fx:d.fx||null,lastRefresh:d.lastRefresh||null,lastCin7Refresh:d.lastCin7Refresh||null,lastPoRefresh:d.lastPoRefresh||null,lastShopifyRefresh:d.lastShopifyRefresh||null};
   DATA._base={cin7:DATA.cin7,shopify:DATA.shopify,openOrders:DATA.openOrders,available:DATA.available,incoming:DATA.incoming,velocity:DATA.velocity,trendData:DATA.trendData,weeklyData:DATA.weeklyData,pos:DATA.pos,allPos:DATA.allPos,coverageAux:DATA.coverageAux};
   document.getElementById('headerTitle').innerHTML=`<img src="${logoSrc(d.ck.logo)}" style="height:32px;filter:brightness(0) invert(1)" alt="${d.ck.name||'logo'}" onerror="logoFallback(this)"> ${d.ck.name}`;
   Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}});charts={};dashFilter.size='All';dashFilter.region='All';dashFilter.warehouse='All';dashFilter.productType='All';dashFilter.reorderType='All';applyMattressRegion();applyWarehouseFilter();updateHeaderSub();
@@ -758,7 +758,7 @@ function renderDashboard(){
     <div class="card ${deadstockVal>0?'red':'green'}" title="Dollar value of SKUs with physical stock but zero sales velocity. Supplier price (FOB) only, not landed cost."><div class="label">💀 Dead Stock Value</div><div class="value">$${deadstockVal>=1000000?(deadstockVal/1000000).toFixed(1)+'M':Math.round(deadstockVal).toLocaleString()}</div><div class="sub">Zero-velocity stock, FOB only</div></div>`;
   const regionFilters=currentCK==='ll-mattresses'?['All','AU','NZ','UK'].map(r=>`<button class="filter-btn ${dashFilter.region===r?'active':''}" onclick="setMattressRegion('${r}')">${r}</button>`).join(''):'';
   const warehouseFilters=DATA.warehouseOptions?DATA.warehouseOptions.map(w=>`<button class="filter-btn ${(dashFilter.warehouse||'All')===String(w.id)?'active':''}" onclick="setWarehouseFilter('${String(w.id)}')">${w.name}</button>`).join(''):'';
-  const productTypeOptions=isCushieNorthAmericaPanel()?['All','Slipcover','V2','V3']:(littleLifelyPanels.includes(currentCK)?['All','Frames','Covers']:null);
+  const productTypeOptions=isCushieTypeFilterPanel()?['All','Slipcover','V2','V3']:(littleLifelyPanels.includes(currentCK)?['All','Frames','Covers']:null);
   const productTypeFilters=productTypeOptions?productTypeOptions.map(t=>`<button class="filter-btn ${(dashFilter.productType||'All')===t?'active':''}" onclick="dashFilter.productType='${t}';renderDashboard()">${t}</button>`).join(''):'';
   const sizeFilters=getSizeKeys().map(s=>`<button class="filter-btn ${dashFilter.size===s?'active':''}" onclick="dashFilter.size='${s}';renderDashboard()">${s}</button>`).join('');
   document.getElementById('dash-filters').innerHTML=regionFilters+(regionFilters?'<span style="font-size:11px;color:var(--text-dim);margin:0 6px">Size:</span>':'')+(warehouseFilters?`<span style="font-size:11px;color:var(--text-dim);margin:0 6px">Warehouse:</span>${warehouseFilters}`:'')+(productTypeFilters?`<span style="font-size:11px;color:var(--text-dim);margin:0 6px">Type:</span>${productTypeFilters}`:'')+((warehouseFilters||productTypeFilters)?'<span style="font-size:11px;color:var(--text-dim);margin:0 6px">Size:</span>':'')+sizeFilters;
@@ -930,7 +930,7 @@ function renderReorder(){
     if(isLittleLifelyCountry){
       filterEl.style.display='flex';
       filterEl.innerHTML=['All','Frame','Cover'].map(t=>`<button class="filter-btn ${typeFilter===t?'active':''}" onclick="dashFilter.reorderType='${t}';renderReorder()">${t}</button>`).join('');
-    }else if(isCushieNorthAmericaPanel()){
+    }else if(isCushieTypeFilterPanel()){
       filterEl.style.display='flex';
       filterEl.innerHTML=['All','Slipcover','V2','V3'].map(t=>`<button class="filter-btn ${(dashFilter.productType||'All')===t?'active':''}" onclick="dashFilter.productType='${t}';renderReorder()">${t}</button>`).join('');
     }else{filterEl.style.display='none';filterEl.innerHTML='';}
