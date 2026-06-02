@@ -995,12 +995,13 @@ function exportCurrentViewExcel(){
 function poMoneyAud(val,currency){const n=Number(val||0),c=String(currency||'AUD').toUpperCase();if(!n)return 0;if(c==='USD')return n*(_poFxRate||1.45);return n}
 function poExcelDate(v){if(!v)return'';const d=parsePoDate(v);return d?d.toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}):String(v)}
 function poEtaVsOriginal(po){const eta=parsePoDate(po.estimatedArrivalDate||po.arrival),orig=parseOriginalEta(po);if(!eta||!orig)return'';const diff=Math.round((eta.setHours(0,0,0,0)-orig.setHours(0,0,0,0))/86400000);return diff===0?'On original ETA':(diff>0?`${diff}d after original`:`${Math.abs(diff)}d before original`)}
+function formatPoRate(rate){const pct=Math.round(Number(rate||0)*1000)/10;return `${Math.abs(pct-Math.round(pct))<0.05?Math.round(pct).toFixed(0):pct.toFixed(1)}%`}
 function exportPurchaseOrdersExcel(){
   if(!_allPOsCache.length){alert('Purchase Orders are still loading. Open the PO tab first, then try again.');return;}
   renderPurchaseOrders(_allPOsCache);
   const pos=window._poRendered||[];
   const rows=[];
-  rows.push(['PO','Status','Quality %','Supplier','Container','Destination','CRD/ETD','ETA','Original ETA','ATA','ETA vs Original','Product Total AUD','Freight AUD','Tariff AUD','SKU','Product Name','CK Category','Qty','Currency','Original Product Total','Raw Stage']);
+  rows.push(['PO','Status','Quality %','Supplier','Container','Destination','CRD/ETD','ETA','Original ETA','ATA','ETA vs Original','Product Total AUD','Freight AUD','Tariff/Charges AUD','SKU','Product Name','CK Category','Qty','Currency','Original Product Total','Raw Stage']);
   for(const po of pos){
     const entries=Object.entries(po.items||{});const base=[cleanPoRef(po.reference),poStageText(po),po.quality?.pct??'',po.company||'',po.containerNumber||poContainerNumber(po)||po.trackingCode||'',po.deliveryCountry||'',poExcelDate(po.crd||po.etd),poExcelDate(po.estimatedArrivalDate||po.arrival),poExcelDate(po.customFields?.orders_1000),poExcelDate(po.fullyReceivedDate),poEtaVsOriginal(po),po.productTotalAUD!=null?Number(po.productTotalAUD||0):poMoneyAud(po.total,po.currencyCode||'AUD'),poMoneyAud(po.freight,po.freightCurrency||'AUD'),Number(po.tariffAmount||0)];
     if(entries.length){for(const[sku,qty]of entries)rows.push([...base,sku,poProductName(po,sku),poItemCategory(po,sku),qty,po.currencyCode||'AUD',Number(po.total||0),po.stage||'']);}
@@ -1362,7 +1363,7 @@ function renderPurchaseOrders(allPOs) {
   const qIcon = avgQuality >= 90 ? '🟢' : avgQuality >= 70 ? '🟡' : avgQuality >= 50 ? '🟠' : '🔴';
   const criticalPOs = activePOsWithScore.filter(p => p.quality.pct < 50).length;
   document.getElementById('poSummaryCards').innerHTML = `
-    <div class="card blue"><div class="label">Showing</div><div class="value">${shownPOs.length}</div><div class="sub">${totalUnits.toLocaleString()} units · ${fmtVal(totalValue)}</div><div class="sub" style="font-size:10px;color:var(--text-dim);margin-top:2px">🚛 ${fmtVal(totalFreight)} freight${totalTariff ? ' + ' + fmtVal(totalTariff) + ' tariff' : ''}</div></div>
+    <div class="card blue"><div class="label">Showing</div><div class="value">${shownPOs.length}</div><div class="sub">${totalUnits.toLocaleString()} units · ${fmtVal(totalValue)}</div><div class="sub" style="font-size:10px;color:var(--text-dim);margin-top:2px">🚛 ${fmtVal(totalFreight)} freight${totalTariff ? ' + ' + fmtVal(totalTariff) + ' tariff/charges' : ''}</div></div>
     <div class="card yellow"><div class="label">🏭 In Production</div><div class="value">${productionPOsUnique.length}</div><div class="sub">${fmtVal(productionValue)}</div><div class="sub" style="font-size:10px;color:var(--text-dim);margin-top:2px">🚛 ${fmtVal(productionFreight)} freight</div></div>
     <div class="card green"><div class="label">🚢 In Transit</div><div class="value">${transitPOsUnique.length}</div><div class="sub">${fmtVal(transitValue)}</div><div class="sub" style="font-size:10px;color:var(--text-dim);margin-top:2px">🚛 ${fmtVal(transitFreight)} freight</div></div>
     ${overduePOsUnique.length > 0 ? `<div class="card" style="border-left:3px solid #991B1B"><div class="label">⚠️ Overdue</div><div class="value">${overduePOsUnique.length}</div><div class="sub">${fmtVal(overdueValue)}</div><div class="sub" style="font-size:10px;color:var(--text-dim);margin-top:2px">🚛 ${fmtVal(overdueFreight)} freight</div></div>` : ''}
@@ -1385,7 +1386,7 @@ function renderPurchaseOrders(allPOs) {
     ${poSortableHeader('ETA vs ATA','comparison','center')}
     ${poSortableHeader('Product','total','right')}
     ${poSortableHeader('Freight','freight','right')}
-    ${poSortableHeader('Tariff','tariff','right')}
+    ${poSortableHeader('Tariff / Charges','tariff','right')}
     ${poSortableHeader('SKUs / Units','items','right')}
     <span></span>
   </div>`;
@@ -1420,7 +1421,7 @@ function renderPurchaseOrders(allPOs) {
         <span data-label="ETA vs ATA" style="text-align:center" title="Original ETA vs ATA (actual arrival)">${etaAtaComparison}</span>
         <span data-label="Product" style="font-weight:700;color:var(--text);text-align:right" title="Original PO value: ${po.total ? originalMoney(po) : '—'}; shown converted to AUD for rollups">${po.total ? fmtVal(productAud(po)) : '—'}</span>
         <span data-label="Freight" style="text-align:right;color:var(--text-dim);white-space:nowrap" title="Freight in AUD${po.isEstFreight ? ' (estimated)' : ''}${po.tariffRate ? ' + ' + (po.tariffRate*100) + '% tariff' : ''}">🚛 ${po.freight ? (po.isEstFreight ? '<span style="font-size:8px;padding:1px 3px;border-radius:3px;background:#FEF3C7;color:#92400E">est</span> ' : '') + fmtVal(cx(po.freight, po.freightCurrency || 'USD')) : '—'}</span>
-        <span data-label="Tariff" style="text-align:right;color:var(--text-dim);white-space:nowrap" title="${po.tariffNote || ''}">${po.tariffRate ? (po.tariffRate*100) + '%' : '0%'}</span>
+        <span data-label="Tariff / Charges" style="text-align:right;color:var(--text-dim);white-space:nowrap;cursor:help" title="${po.tariffNote || 'Aggregated tariff/charges rate for this PO'}">${formatPoRate(po.tariffRate)}</span>
         <span data-label="SKUs" style="color:var(--text-dim);text-align:right;white-space:nowrap">${skuCount(po)} SKUs · ${totalItems(po)}</span>
         <span data-label="" style="font-size:14px;text-align:center;transition:transform 0.2s">▼</span>
       </div>

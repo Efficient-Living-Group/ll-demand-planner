@@ -3117,15 +3117,68 @@ function inferDestination(po) {
   return 'Australia';
 }
 
-// Estimated freight + tariff by destination (from yk's shipping data)
+// Estimated freight + tariff/charges by destination (from yk's shipping data)
 const FREIGHT_TARIFF = {
-  'United States':  { freight: 8404, freightCurrency: 'AUD', tariff: 0.19, tariffNote: '19% US tariff' },
-  'Canada':         { freight: 8404, freightCurrency: 'AUD', tariff: 0.08, tariffNote: '~8% MFN (⚠️ 188% if upholstered seating)' },
-  'United Kingdom': { freight: 7245, freightCurrency: 'AUD', tariff: 0,    tariffNote: '' },
-  'Australia':      { freight: 7000, freightCurrency: 'AUD', tariff: 0,    tariffNote: '' },
-  'Singapore':      { freight: 2898, freightCurrency: 'AUD', tariff: 0,    tariffNote: '0% (free trade)' },
-  'New Zealand':    { freight: 2898, freightCurrency: 'AUD', tariff: 0,    tariffNote: '' },
+  'United States':  { freight: 8404, freightCurrency: 'AUD', defaultTariff: 0 },
+  'Canada':         { freight: 8404, freightCurrency: 'AUD', defaultTariff: 0 },
+  'United Kingdom': { freight: 7245, freightCurrency: 'AUD', defaultTariff: 0 },
+  'Australia':      { freight: 7000, freightCurrency: 'AUD', defaultTariff: 0 },
+  'Singapore':      { freight: 2898, freightCurrency: 'AUD', defaultTariff: 0 },
+  'New Zealand':    { freight: 2898, freightCurrency: 'AUD', defaultTariff: 0 },
 };
+const DESTINATION_BRAND_TARIFF_RULES = {
+  'United States': {
+    cushie: { label: 'Cushie', tariff: 0, additional: 0.10, note: '0% tariff + 10% additional charges' },
+    littleLifely: { label: 'Little Lifely', tariff: 0, additional: 0.10, note: '0% tariff + 10% additional charges' }
+  },
+  'Canada': {
+    cushie: { label: 'Cushie', tariff: 0.095, additional: 0, note: '9.5% tariff' },
+    littleLifely: { label: 'Little Lifely', tariff: 0, additional: 0, note: '0% tariff' }
+  },
+  'United Kingdom': {
+    cushie: { label: 'Cushie', tariff: 0.02, additional: 0, note: '2% tariff' },
+    littleLifely: { label: 'Little Lifely', tariff: 0.02, additional: 0, note: '2% tariff' }
+  }
+};
+
+function poTariffBrandForSku(sku, option1 = '') {
+  const s = String(sku || '').toUpperCase().trim();
+  const o = String(option1 || '').toLowerCase();
+  if (o.includes('cushie') || s.startsWith('V2-') || s.startsWith('V3-') || s.startsWith('CUSB') || s.startsWith('LFSB') || s.startsWith('CMSS')) return 'cushie';
+  if (o.includes('little lifely') || s.startsWith('LLAU') || s.startsWith('LLNA') || s.startsWith('LLUK') || s.startsWith('LLSG') || s.startsWith('LLNZ') || s.startsWith('LLCA')) return 'littleLifely';
+  return 'other';
+}
+function formatPercent(rate) {
+  const pct = Math.round(Number(rate || 0) * 1000) / 10;
+  return `${Math.abs(pct - Math.round(pct)) < 0.05 ? Math.round(pct).toFixed(0) : pct.toFixed(1)}%`;
+}
+function resolvePoTariff(po, destination) {
+  const destRules = DESTINATION_BRAND_TARIFF_RULES[destination] || {};
+  const items = Object.entries(po.items || {});
+  let totalQty = 0;
+  let weightedRate = 0;
+  const groups = {};
+  for (const [sku, rawQty] of items) {
+    const qty = Math.max(0, Number(rawQty || 0)) || 1;
+    const brand = poTariffBrandForSku(sku, po.itemOption1?.[sku] || dataCache.cin7Products?.[sku]?.option1 || '');
+    const rule = destRules[brand];
+    const rate = rule ? Number(rule.tariff || 0) + Number(rule.additional || 0) : Number(FREIGHT_TARIFF[destination]?.defaultTariff || 0);
+    totalQty += qty;
+    weightedRate += qty * rate;
+    if (!groups[brand]) groups[brand] = { qty: 0, rate, rule };
+    groups[brand].qty += qty;
+  }
+  const tariffRate = totalQty > 0 ? weightedRate / totalQty : Number(FREIGHT_TARIFF[destination]?.defaultTariff || 0);
+  const groupNotes = Object.entries(groups).map(([brand, g]) => {
+    if (g.rule) return `${g.rule.label}: ${g.rule.note} (${Number(g.qty).toLocaleString()} units)`;
+    return `Other/unconfigured: ${formatPercent(g.rate)} (${Number(g.qty).toLocaleString()} units)`;
+  });
+  const configuredNotes = Object.values(destRules).map(r => `${r.label}: ${r.note}`);
+  const tariffNote = groupNotes.length
+    ? `Displayed as one aggregated rate: ${formatPercent(tariffRate)}. Aggregation is quantity-weighted by PO line units and includes additional charges where configured. PO mix: ${groupNotes.join('; ')}.`
+    : (configuredNotes.length ? `Configured ${destination} rates: ${configuredNotes.join('; ')}.` : `${formatPercent(tariffRate)} tariff/charges`);
+  return { tariffRate, tariffNote };
+}
 
 function estimateLandedCost(po, destination) {
   const freightActual = po.freightTotal > 0 ? po.freightTotal : 0;
@@ -3144,9 +3197,8 @@ function estimateLandedCost(po, destination) {
   const isEstimated = freightActual === 0;
   const freight = freightActual > 0 ? toAud(freightActual, productCurrency) : (dest ? dest.freight : 0);
   const freightCurrency = 'AUD';
-  const tariffRate = dest ? dest.tariff : 0;
+  const { tariffRate, tariffNote } = resolvePoTariff(po, destination);
   const tariffAmount = productValueAUD * tariffRate;
-  const tariffNote = dest ? dest.tariffNote : '';
   return { productValueAUD, freight, freightCurrency, tariffRate, tariffAmount, tariffNote, isEstimated, landedTotal: productValueAUD + freight + tariffAmount };
 }
 
