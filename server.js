@@ -3119,12 +3119,12 @@ function inferDestination(po) {
 
 // Estimated freight + tariff/charges by destination (from yk's shipping data)
 const FREIGHT_TARIFF = {
-  'United States':  { freight: 8404, freightCurrency: 'AUD', defaultTariff: 0 },
-  'Canada':         { freight: 8404, freightCurrency: 'AUD', defaultTariff: 0 },
-  'United Kingdom': { freight: 7245, freightCurrency: 'AUD', defaultTariff: 0 },
-  'Australia':      { freight: 7000, freightCurrency: 'AUD', defaultTariff: 0 },
-  'Singapore':      { freight: 2898, freightCurrency: 'AUD', defaultTariff: 0 },
-  'New Zealand':    { freight: 2898, freightCurrency: 'AUD', defaultTariff: 0 },
+  'United States':  { freight: 8404, freightCurrency: 'AUD', defaultTariff: 0.19, tariffNote: '19% US tariff' },
+  'Canada':         { freight: 8404, freightCurrency: 'AUD', defaultTariff: 0.08, tariffNote: '~8% MFN (⚠️ 188% if upholstered seating)' },
+  'United Kingdom': { freight: 7245, freightCurrency: 'AUD', defaultTariff: 0,    tariffNote: '' },
+  'Australia':      { freight: 7000, freightCurrency: 'AUD', defaultTariff: 0,    tariffNote: '' },
+  'Singapore':      { freight: 2898, freightCurrency: 'AUD', defaultTariff: 0,    tariffNote: '0% (free trade)' },
+  'New Zealand':    { freight: 2898, freightCurrency: 'AUD', defaultTariff: 0,    tariffNote: '' },
 };
 const DESTINATION_BRAND_TARIFF_RULES = {
   'United States': {
@@ -3168,15 +3168,16 @@ function resolvePoTariff(po, destination) {
     if (!groups[brand]) groups[brand] = { qty: 0, rate, rule };
     groups[brand].qty += qty;
   }
-  const tariffRate = totalQty > 0 ? weightedRate / totalQty : Number(FREIGHT_TARIFF[destination]?.defaultTariff || 0);
+  const fallback = FREIGHT_TARIFF[destination] || {};
+  const tariffRate = totalQty > 0 ? weightedRate / totalQty : Number(fallback.defaultTariff || 0);
   const groupNotes = Object.entries(groups).map(([brand, g]) => {
     if (g.rule) return `${g.rule.label}: ${g.rule.note} (${Number(g.qty).toLocaleString()} units)`;
-    return `Other/unconfigured: ${formatPercent(g.rate)} (${Number(g.qty).toLocaleString()} units)`;
+    return `Other/unconfigured: ${fallback.tariffNote || formatPercent(g.rate)} (${Number(g.qty).toLocaleString()} units)`;
   });
   const configuredNotes = Object.values(destRules).map(r => `${r.label}: ${r.note}`);
   const tariffNote = groupNotes.length
     ? `Displayed as one aggregated rate: ${formatPercent(tariffRate)}. Aggregation is quantity-weighted by PO line units and includes additional charges where configured. PO mix: ${groupNotes.join('; ')}.`
-    : (configuredNotes.length ? `Configured ${destination} rates: ${configuredNotes.join('; ')}.` : `${formatPercent(tariffRate)} tariff/charges`);
+    : (configuredNotes.length ? `Configured ${destination} rates: ${configuredNotes.join('; ')}.` : (fallback.tariffNote || `${formatPercent(tariffRate)} tariff/charges`));
   return { tariffRate, tariffNote };
 }
 
