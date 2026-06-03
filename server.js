@@ -1118,12 +1118,27 @@ async function saveCacheSnapshot(pushToGit = false, pushReason = 'cin7-refresh',
 
 loadCacheSnapshot();
 
-// Load Excel-derived landed costs (SOH Stock Value ÷ SOH Stock Qty from CIN7 report)
+// Load landed costs from the single active cache.
+// Current format: { landed_costs: { SKU: { cost, ... } } } from live Cin7 SalesOrders.
+// Legacy Demand Planner format is still accepted only as a compatibility fallback.
 let excelLandedCosts = {};
 try {
-  excelLandedCosts = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'landed-costs.json'), 'utf8'));
-  console.log(`Loaded ${Object.keys(excelLandedCosts).length} Excel landed costs`);
-} catch (e) { console.log('No Excel landed costs file found - will use estimated only'); }
+  const landedPayload = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'landed-costs.json'), 'utf8'));
+  const landedRows = landedPayload.landed_costs || landedPayload;
+  for (const [sku, row] of Object.entries(landedRows || {})) {
+    const landedPerUnit = Number(row.landedPerUnit ?? row.cost ?? row.latest_landed_cost_aud ?? 0);
+    if (landedPerUnit > 0) {
+      excelLandedCosts[sku] = {
+        ...row,
+        landedPerUnit,
+        sohQty: Number(row.sohQty ?? row.lineCount60d ?? row.qtySold60d ?? 0),
+        sohValue: Number(row.sohValue ?? 0),
+        source: row.source || landedPayload.source || 'landed-costs.json'
+      };
+    }
+  }
+  console.log(`Loaded ${Object.keys(excelLandedCosts).length} landed costs from single cache`);
+} catch (e) { console.log('No landed costs file found - will use estimated only'); }
 
 // ===== LIVE FX RATE =====
 let fxRate = { USDAUD: 1.45, lastFetch: null }; // fallback
