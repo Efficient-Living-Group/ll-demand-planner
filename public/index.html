@@ -208,11 +208,9 @@ th[data-tip]{position:relative;cursor:help}th[data-tip]:after{content:' ⓘ';fon
       <button class="filter-btn" onclick="setPoFilter('production',this)">🏭 In Production</button>
       <button class="filter-btn" onclick="setPoFilter('transit',this)">🚢 In Transit</button>
       <button class="filter-btn" onclick="setPoFilter('overdue',this)">⚠️ Overdue</button>
-      <button class="filter-btn" onclick="setPoFilter('delayed',this)">🚨 Delayed</button>
       <button class="filter-btn" onclick="setPoFilter('received',this)">✅ Received</button>
     </div>
     <div id="poSummaryCards" class="cards" style="margin-bottom:20px"></div>
-    <div id="poDelayAlerts" style="margin-bottom:20px"></div>
     <div id="poList"></div>
   </div>
 </div>
@@ -1163,75 +1161,6 @@ function poEtaDelayInfo(po) {
   const diff = Math.round((eta - original) / (24 * 60 * 60 * 1000));
   return { diff, title: `ETA is ${diff} day${diff===1?'':'s'} after Original ETA` };
 }
-function latestPositiveEtaMove(po) {
-  const moves = poEtaHistoryEvents(po)
-    .filter(e => e.type === 'eta_changed')
-    .map(e => {
-      const from = startOfPoDay(parsePoDate(e.from));
-      const to = startOfPoDay(parsePoDate(e.to));
-      const delta = Number.isFinite(Number(e.deltaDays)) ? Number(e.deltaDays) : (from && to ? Math.round((to - from) / (24 * 60 * 60 * 1000)) : 0);
-      const detectedAt = parsePoDate(e.detectedAt) || new Date(0);
-      return {...e, fromDate: from, toDate: to, deltaDaysComputed: delta, detectedAtDate: detectedAt};
-    })
-    .filter(e => e.deltaDaysComputed > 0)
-    .sort((a,b) => b.detectedAtDate - a.detectedAtDate);
-  return moves[0] || null;
-}
-function poFulfillmentDelayInfo(po) {
-  if (!po || poIsVoid(po) || poIsReceived(po)) return null;
-  const etaDelay = poEtaDelayInfo(po);
-  const latestMove = latestPositiveEtaMove(po);
-  if (!etaDelay && !latestMove) return null;
-  const eta = startOfPoDay(parsePoDate(po.estimatedArrivalDate || po.arrival));
-  const original = startOfPoDay(parseOriginalEta(po));
-  const daysDelayed = Math.max(etaDelay?.diff || 0, latestMove?.deltaDaysComputed || 0);
-  const items = po.items || {};
-  const skuCount = Object.keys(items).length;
-  const units = Object.values(items).reduce((t,q)=>t+Number(q||0),0);
-  const currentEta = eta || latestMove?.toDate || null;
-  const originalEta = original || latestMove?.fromDate || null;
-  const reason = latestMove ? 'ETA moved later' : 'Current ETA is later than Original ETA';
-  return {po, daysDelayed, latestMove, currentEta, originalEta, skuCount, units, reason};
-}
-function renderPoDelayAlerts(pos) {
-  const el = document.getElementById('poDelayAlerts');
-  if (!el) return;
-  const alerts = (pos || [])
-    .map(poFulfillmentDelayInfo)
-    .filter(Boolean)
-    .sort((a,b) => (b.daysDelayed - a.daysDelayed) || ((a.currentEta?.getTime?.() || 0) - (b.currentEta?.getTime?.() || 0)));
-  if (!alerts.length) {
-    el.innerHTML = _poFilter === 'delayed'
-      ? '<div class="card green" style="border-left:4px solid var(--green)"><div class="label">Fulfillment Delay Alerts</div><div class="value" style="font-size:20px">All clear</div><div class="sub">No active delayed POs match the current filters.</div></div>'
-      : '';
-    return;
-  }
-  const totalUnits = alerts.reduce((t,a)=>t+a.units,0);
-  const maxDays = alerts.reduce((m,a)=>Math.max(m,a.daysDelayed),0);
-  const visible = alerts.slice(0, 8);
-  const hidden = alerts.length - visible.length;
-  const rows = visible.map(a => {
-    const po = a.po;
-    const moveText = a.latestMove ? ` · latest move ${fmtEtaHistoryDate(a.latestMove.from)} → ${fmtEtaHistoryDate(a.latestMove.to)}` : '';
-    return `<div style="display:grid;grid-template-columns:minmax(120px,1.1fr) minmax(100px,1fr) minmax(130px,1.2fr) minmax(120px,1fr) minmax(70px,.7fr);gap:10px;align-items:center;padding:9px 0;border-top:1px solid rgba(153,27,27,0.14);font-size:12px">
-      <div><b style="font-family:monospace;color:#991B1B">${escapeHtml(cleanPoRef(po.reference))}</b><div style="font-size:10px;color:var(--text-dim)">${escapeHtml(po.company || 'Supplier unknown')}</div></div>
-      <div>${escapeHtml(po.deliveryCountry || '—')}<div style="font-size:10px;color:var(--text-dim)">${poStageText(po)}</div></div>
-      <div><b>${fmtEtaHistoryDate(a.originalEta)}</b> → <b style="color:#991B1B">${fmtEtaHistoryDate(a.currentEta)}</b><div style="font-size:10px;color:var(--text-dim)">${escapeHtml(a.reason)}${escapeHtml(moveText)}</div></div>
-      <div>${a.skuCount} SKUs · ${a.units.toLocaleString()} units</div>
-      <div style="text-align:right"><span class="badge" style="background:#DC2626;color:#fff">+${a.daysDelayed}d</span></div>
-    </div>`;
-  }).join('');
-  el.innerHTML = `<div style="background:#FFF7F7;border:1px solid rgba(220,38,38,0.28);border-left:5px solid #DC2626;border-radius:14px;padding:16px 18px;box-shadow:0 1px 3px rgba(153,27,27,0.08)">
-    <div style="display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap;margin-bottom:8px">
-      <div><div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#991B1B;font-weight:900">🚨 Fulfillment Delay Notification</div>
-      <div style="font-size:18px;font-weight:900;color:#7F1D1D;margin-top:3px">${alerts.length} active delayed PO${alerts.length===1?'':'s'} need fulfillment review</div>
-      <div style="font-size:12px;color:#7F1D1D;margin-top:3px">${totalUnits.toLocaleString()} affected units · longest delay +${maxDays} day${maxDays===1?'':'s'} · based on ETA history and Original ETA comparison</div></div>
-      ${_poFilter !== 'delayed' ? '<button onclick="setPoFilter(\'delayed\',document.querySelector(\'#poFilterBtns .filter-btn[onclick*=delayed]\'))" class="btn" style="background:#DC2626;color:#fff">Show delayed only</button>' : ''}
-    </div>
-    ${rows}
-    ${hidden > 0 ? `<div style="font-size:11px;color:#7F1D1D;margin-top:10px;font-weight:700">+ ${hidden} more delayed PO${hidden===1?'':'s'} hidden — use the Delayed filter or export for the full list.</div>` : ''}
-  </div>`;
-}
 
 function poEtaHistoryEvents(po) {
   return (po.etaHistory?.events || []).filter(e => e.type === 'eta_changed' || e.type === 'first_seen' || e.type === 'received' || e.type === 'original_eta_changed');
@@ -1337,7 +1266,6 @@ function renderPurchaseOrders(allPOs) {
     if (_poFilter === 'production') return poIsOpen(po) && !poHasShipped(po);
     if (_poFilter === 'transit') return poHasShipped(po) && !poIsOverdue(po);
     if (_poFilter === 'overdue') return poIsOverdue(po);
-    if (_poFilter === 'delayed') return !!poFulfillmentDelayInfo(po);
     if (_poFilter === 'received') return poIsReceived(po);
     return true;
   });
@@ -1385,12 +1313,7 @@ function renderPurchaseOrders(allPOs) {
     return _poSort.dir === 'asc' ? cmp : -cmp;
   });
   const container = document.getElementById('poList');
-  if (!pos.length) {
-    document.getElementById('poSummaryCards').innerHTML = '';
-    renderPoDelayAlerts(pos);
-    container.innerHTML = '<p style="color:var(--text-dim);text-align:center;padding:40px">No purchase orders found</p>';
-    return;
-  }
+  if (!pos.length) { container.innerHTML = '<p style="color:var(--text-dim);text-align:center;padding:40px">No purchase orders found</p>'; return; }
   const fmt = d => { if (!d) return '—'; try { return new Date(d).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}); } catch(e) { return d; } };
   const qualityBadge = po => {
     const q = po.quality;
@@ -1440,18 +1363,14 @@ function renderPurchaseOrders(allPOs) {
   const avgQuality = activePOsWithScore.length > 0 ? Math.round(activePOsWithScore.reduce((t, p) => t + p.quality.pct, 0) / activePOsWithScore.length) : 0;
   const qIcon = avgQuality >= 90 ? '🟢' : avgQuality >= 70 ? '🟡' : avgQuality >= 50 ? '🟠' : '🔴';
   const criticalPOs = activePOsWithScore.filter(p => p.quality.pct < 50).length;
-  const delayedPOs = shownPOs.map(poFulfillmentDelayInfo).filter(Boolean);
-  const delayedUnits = delayedPOs.reduce((t,a)=>t+a.units,0);
   document.getElementById('poSummaryCards').innerHTML = `
     <div class="card blue"><div class="label">Showing</div><div class="value">${shownPOs.length}</div><div class="sub">${totalUnits.toLocaleString()} units · ${fmtVal(totalValue)}</div><div class="sub" style="font-size:10px;color:var(--text-dim);margin-top:2px">🚛 ${fmtVal(totalFreight)} freight${totalTariff ? ' + ' + fmtVal(totalTariff) + ' tariff/charges' : ''}</div></div>
     <div class="card yellow"><div class="label">🏭 In Production</div><div class="value">${productionPOsUnique.length}</div><div class="sub">${fmtVal(productionValue)}</div><div class="sub" style="font-size:10px;color:var(--text-dim);margin-top:2px">🚛 ${fmtVal(productionFreight)} freight</div></div>
     <div class="card green"><div class="label">🚢 In Transit</div><div class="value">${transitPOsUnique.length}</div><div class="sub">${fmtVal(transitValue)}</div><div class="sub" style="font-size:10px;color:var(--text-dim);margin-top:2px">🚛 ${fmtVal(transitFreight)} freight</div></div>
     ${overduePOsUnique.length > 0 ? `<div class="card" style="border-left:3px solid #991B1B"><div class="label">⚠️ Overdue</div><div class="value">${overduePOsUnique.length}</div><div class="sub">${fmtVal(overdueValue)}</div><div class="sub" style="font-size:10px;color:var(--text-dim);margin-top:2px">🚛 ${fmtVal(overdueFreight)} freight</div></div>` : ''}
-    ${delayedPOs.length > 0 ? `<div class="card red" style="border-left:3px solid #DC2626"><div class="label">🚨 Fulfillment Delays</div><div class="value">${delayedPOs.length}</div><div class="sub">${delayedUnits.toLocaleString()} affected units</div></div>` : ''}
     <div class="card"><div class="label">✅ Received</div><div class="value">${receivedCount}</div><div class="sub">Completed</div></div>
     <div class="card" style="border-left:3px solid ${avgQuality>=90?'#5BAB31':avgQuality>=70?'#D4930D':avgQuality>=50?'#EA580C':'#991B1B'}"><div class="label">${qIcon} Data Quality</div><div class="value">${avgQuality}%</div><div class="sub">${activePOsWithScore.length} active POs${criticalPOs > 0 ? ' · <span style="color:#991B1B;font-weight:600">' + criticalPOs + ' critical</span>' : ''}</div></div>
   `;
-  renderPoDelayAlerts(pos);
   window._poRendered = pos;
   const poGridCols = 'minmax(135px,1.35fr) 85px 55px minmax(120px,2fr) minmax(110px,1.1fr) minmax(80px,1fr) minmax(90px,1fr) minmax(100px,1.2fr) minmax(90px,1fr) minmax(100px,1fr) minmax(80px,0.95fr) minmax(75px,0.9fr) minmax(75px,0.9fr) 60px minmax(75px,0.9fr) 24px';
   const header = `<div class="po-grid-header" style="position:sticky;top:0;z-index:5;display:grid;grid-template-columns:${poGridCols};align-items:center;padding:8px 18px;margin-bottom:6px;border:1px solid var(--border);border-radius:10px;background:#F6F8F4;font-size:10px;gap:6px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
