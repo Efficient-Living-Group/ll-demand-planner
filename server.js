@@ -396,6 +396,22 @@ function explodeLittleLifelyBundleSku(sku, ckId) {
     return SWATCH_COLOURS.map(colour => `LLAU-CB-CS-${colour}`);
   }
 
+  // AU sells colour/size bed SET parent SKUs, while stock is held as one
+  // size-level frame plus one colour/size cover. Funnel SET and combo sales
+  // into the physical component SKUs so frame/cover velocity and deadstock are
+  // not understated.
+  if (ckId === 'llau') {
+    let auSet = s.match(/^LLAU-CB-(S|KS|D)-([A-Z0-9]+)(?:-SET)?$/);
+    if (auSet && auSet[2] !== 'FRM' && auSet[2] !== 'PACK' && !auSet[2].startsWith('CS')) {
+      return [`LLAU-CB-${auSet[1]}-FRM`, `LLAU-CB-${auSet[1]}-${auSet[2]}-CV`];
+    }
+    auSet = s.match(/^LLAU-CBCF-(S|KS|D)-([A-Z0-9]+)(?:-SET)?$/);
+    if (auSet) {
+      const mattressMap = { S: 'DD-21915CF', KS: 'DD-21107CF', D: 'DD-21137CF' };
+      return [`LLAU-CB-${auSet[1]}-FRM`, `LLAU-CB-${auSet[1]}-${auSet[2]}-CV`, mattressMap[auSet[1]]].filter(Boolean);
+    }
+  }
+
   // UK does not stock/display colour-specific bed SET rows in the planner.
   // Funnel SET and combo demand into the real component SKUs: one size-level
   // frame plus one colour/size cover. Mattress demand remains on LL Mattresses.
