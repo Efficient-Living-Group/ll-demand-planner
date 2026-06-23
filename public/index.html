@@ -63,6 +63,7 @@ thead th{cursor:pointer;user-select:none}thead th:hover{background:var(--bg-acce
 .filters{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
 .filter-btn{padding:5px 14px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text-dim);cursor:pointer;font-size:12px;transition:all 0.2s}
 .filter-btn.active,.filter-btn:hover{background:#E8EFEF;color:var(--blue);border-color:var(--blue)}
+.column-controls{display:flex;justify-content:flex-end;align-items:center;margin:-4px 0 10px;position:relative;z-index:20}.column-picker{position:relative}.column-picker-menu{display:none;position:absolute;right:0;top:calc(100% + 6px);width:280px;max-height:420px;overflow:auto;background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.16);padding:10px;z-index:50}.column-picker.open .column-picker-menu{display:block}.column-picker-actions{display:flex;gap:6px;margin-bottom:8px}.column-picker-actions button{flex:1;padding:5px 8px;border-radius:8px;border:1px solid var(--border);background:#F6F8F4;color:var(--blue);font-size:11px;cursor:pointer}.column-option{display:flex;align-items:center;gap:8px;padding:6px 4px;border-radius:6px;font-size:12px;color:var(--text);cursor:pointer}.column-option:hover{background:#F6F8F4}.column-option input{accent-color:var(--blue)}
 .chart-container{background:var(--bg-card);border-radius:12px;padding:20px;border:1px solid var(--border);box-shadow:0 1px 3px rgba(0,0,0,0.06);margin-bottom:24px}
 .chart-container h3{margin-bottom:12px;font-size:14px}.chart-container canvas{max-height:400px}
 .heatmap-table{border-collapse:collapse;font-size:11px;width:100%}.heatmap-table th,.heatmap-table td{padding:5px 7px;text-align:center;white-space:nowrap;border:1px solid var(--border)}
@@ -144,6 +145,7 @@ th[data-tip]{position:relative;cursor:help}th[data-tip]:after{content:' ⓘ';fon
       <h3 style="font-size:14px;margin-bottom:12px">📦 Bundle ATP & Binding Constraints</h3>
       
     </div>
+    <div class="column-controls" id="stockColumnControls"></div>
     <div class="table-wrap"><table id="stockTable"><thead></thead><tbody></tbody></table></div>
     <div id="auMarketingPanel" style="display:none;margin-top:24px"></div>
     </div>
@@ -268,6 +270,47 @@ function logoFallback(img){img.style.display='none'}
 let brandOpenState={};
 let subgroupOpenState={};
 const TODAY=new Date();
+
+const STOCK_COLUMN_PREF_KEY='dpStockTableHiddenColumns:v1';
+function getHiddenStockColumns(){try{return new Set(JSON.parse(localStorage.getItem(STOCK_COLUMN_PREF_KEY)||'[]'))}catch(e){return new Set()}}
+function saveHiddenStockColumns(set){localStorage.setItem(STOCK_COLUMN_PREF_KEY,JSON.stringify([...set]))}
+function stockColumnLabel(th){
+  if(!th)return'';
+  if(th.dataset&&th.dataset.col)return th.dataset.col;
+  const textNode=[...th.childNodes].find(n=>n.nodeType===Node.TEXT_NODE&&n.textContent.trim());
+  return (textNode?textNode.textContent:th.textContent||'').trim().replace(/\s+/g,' ');
+}
+function stockColumnLabels(){return [...document.querySelectorAll('#stockTable thead th')].map(stockColumnLabel).filter(Boolean)}
+function isLockedStockColumn(label){return ['SKU','Component'].includes(label)}
+function applyStockColumnVisibility(){
+  const table=document.getElementById('stockTable'); if(!table)return;
+  const labels=stockColumnLabels(); const hidden=getHiddenStockColumns();
+  [...table.querySelectorAll('tr')].forEach(row=>{[...row.children].forEach((cell,i)=>{const label=labels[i]||'';cell.style.display=hidden.has(label)&&!isLockedStockColumn(label)?'none':'';});});
+  renderStockColumnControls();
+}
+function toggleStockColumn(label,visible){
+  if(isLockedStockColumn(label))return;
+  const hidden=getHiddenStockColumns();
+  if(visible)hidden.delete(label);else hidden.add(label);
+  saveHiddenStockColumns(hidden);applyStockColumnVisibility();
+}
+function showAllStockColumns(){saveHiddenStockColumns(new Set());applyStockColumnVisibility()}
+function hideStockColumnSet(labels){const hidden=getHiddenStockColumns();labels.forEach(l=>{if(!isLockedStockColumn(l))hidden.add(l)});saveHiddenStockColumns(hidden);applyStockColumnVisibility()}
+function renderStockColumnControls(){
+  const el=document.getElementById('stockColumnControls'); if(!el)return;
+  const labels=stockColumnLabels();
+  if(!labels.length){el.innerHTML='';return;}
+  const hidden=getHiddenStockColumns();
+  const shown=labels.filter(l=>!hidden.has(l)||isLockedStockColumn(l)).length;
+  el.innerHTML=`<div class="column-picker ${window._stockColumnPickerOpen?'open':''}" id="stockColumnPicker">
+    <button class="filter-btn" onclick="window._stockColumnPickerOpen=!window._stockColumnPickerOpen;renderStockColumnControls()">Columns ${shown}/${labels.length} ▾</button>
+    <div class="column-picker-menu" onclick="event.stopPropagation()">
+      <div class="column-picker-actions"><button onclick="showAllStockColumns()">Show all</button><button onclick="hideStockColumnSet(['FOB','Freight/u','Landed','Supplier','CBM'])">Hide cost/CBM</button></div>
+      ${labels.map(label=>`<label class="column-option"><input type="checkbox" ${(!hidden.has(label)||isLockedStockColumn(label))?'checked':''} ${isLockedStockColumn(label)?'disabled':''} onchange="toggleStockColumn('${label.replace(/'/g,"\\'")}',this.checked)"><span>${label}${isLockedStockColumn(label)?' <span style="color:var(--text-dim)">(fixed)</span>':''}</span></label>`).join('')}
+    </div>
+  </div>`;
+}
+document.addEventListener('click',e=>{if(window._stockColumnPickerOpen&&!e.target.closest?.('#stockColumnPicker')){window._stockColumnPickerOpen=false;renderStockColumnControls();}});
 function getSkus(){return[...new Set([...Object.keys(DATA.cin7),...Object.keys(DATA.velocity)])].filter(s=>s&&!s.startsWith('_')&&!(s.includes('-CS-')&&!s.includes('PACK')))}
 function updateHeaderSub(){const el=document.getElementById('headerSub');if(el)el.textContent=`${Object.keys(DATA.cin7).length} CIN7 SKUs · ${Object.keys(DATA.velocity).filter(k=>!k.startsWith('_')).length} with velocity · ${uniquePoCount(DATA.pos)} open POs`;}
 function applyMattressRegion(){if(currentCK!=='ll-mattresses'||!DATA.mattressRegions)return;const base=DATA._base||{};const region=dashFilter.region||'All';const src=region==='All'?base:DATA.mattressRegions[region];if(!src)return;DATA.cin7=src.cin7||{};DATA.shopify=src.shopify||{};DATA.openOrders=src.openOrders||{};DATA.available=src.available||{};DATA.incoming=src.incoming||{};DATA.velocity=src.velocity||{};DATA.trendData=src.trendData||{};DATA.weeklyData=src.weeklyData||null;DATA.pos=src.pos||[];DATA.allPos=src.allPos||src.pos||[];updateHeaderSub();}
@@ -774,6 +817,7 @@ function renderBOM() {
       : 'blue';
     return '<tr><td style="font-family:monospace;font-size:10px">'+sku+'</td><td>'+typeLabel+'</td><td>'+sizeLabel+'</td><td>'+Math.round(c.soh)+'</td><td>'+c.incoming+'</td><td>'+(oversold<0?'<span class="neg">'+oversold+'</span>':'0')+'</td><td>'+Math.round(c.totalPreorders||0)+'</td><td style="font-size:10px">'+(coverage.nextPO?coverage.nextPO+' <span style="color:var(--text-dim)">('+Math.round(coverage.nextQty||0)+')</span>':'—')+'</td><td style="font-size:10px">'+fmtEtaShort(coverage.nextETA)+'</td><td style="font-size:10px">'+(coverage.coveragePO||'—')+'</td><td style="font-size:10px">'+fmtEtaShort(coverage.coverageETA)+'</td><td><span class="badge '+coverageBadge+'">'+coverage.status+'</span></td><td>'+c.standaloneDemand.toFixed(1)+'</td><td>'+c.comboDemand.toFixed(1)+'</td><td><b>'+c.totalDemand.toFixed(1)+'</b></td><td>'+wks+'</td><td>'+badge+(wks>=25?' <span style="color:var(--yellow);font-size:10px" title="Over 25 weeks — push this SKU">⚠️ OVERSTOCK</span>':'')+'</td><td style="font-size:10px">'+supplier+'</td><td style="text-align:right">'+(cbm?cbm.toFixed(3):'—')+'</td></tr>';
   }).join('');
+  applyStockColumnVisibility();
 }
 
 
@@ -919,6 +963,7 @@ function renderDashboard(){
       ? `<td>${coverage.preorderUnits==null?'<span style="color:var(--text-dim)">—</span>':fmt(coverage.preorderUnits)}</td><td style="font-size:10px">${coverage.nextPO?`${coverage.nextPO} <span style="color:var(--text-dim)">(${Math.round(coverage.nextQty)})</span>`:'—'}</td><td style="font-size:10px">${fmtEtaShort(coverage.nextETA)}</td><td style="font-size:10px">${coverage.coveragePO||'—'}</td><td style="font-size:10px">${fmtEtaShort(coverage.coverageETA)}</td><td><span class="badge ${coverageBadgeClass}">${coverage.status}</span></td>`
       : '';
     return`<tr><td style="font-family:monospace;font-size:10px">${s}${skuLabel(s)}</td><td>${getSize(s)}</td><td>${fmt(soh)}</td><td>${fmt(sh)}</td><td>${fmt(net)}</td><td>${fmt(inc)}</td>${coverageCells}<td>${vel.toFixed(1)}${isEstVel(s)?' <span style="color:var(--yellow);font-size:9px" title="Estimated: using last in-stock velocity (avg of last active weeks). Currently OOS — no recent sales.">(est)</span>':''}${trendIndicator(s)}</td><td>${wks>=25?'⚠️ '+wks:wks}</td><td>${wksInc>=25?'⚠️ '+wksInc:wksInc}</td><td>${fmtStockTurnDays(stockTurnDays)}</td><td style="font-size:10px">${targetStockTurnCell(targetRule)}</td><td>${stockTurnTargetBadge(stockTurnDays,targetRule)}</td><td>${statusBadge(wks,s)}${wks>=25&&vel>0?' <span style="color:var(--yellow);font-size:10px" title="'+Math.round(soh-(vel*25))+' extra units beyond 25 weeks of demand. Costing $'+((DATA.costs||{})[s]||0).toFixed(0)+' each (supplier price). Consider promoting or discounting.">⚠️ $'+Math.round(Math.max(0,soh-(vel*25))*((DATA.costs||{})[s]||0)).toLocaleString()+'</span>':''}</td><td style="text-align:right;font-size:10px">${fob>0?'$'+fob.toFixed(2):'<span style="color:var(--text-dim)">—</span>'}</td><td style="text-align:right;font-size:10px">${lc?'$'+lc.freightPerUnit.toFixed(2)+(isEst?' <span style="font-size:8px;padding:1px 3px;border-radius:3px;background:#FEF3C7;color:#92400E">est</span>':''):'<span style="color:var(--text-dim)">—</span>'}</td><td style="text-align:right;font-weight:600;font-size:10px">${lc?'$'+lc.landedPerUnit.toFixed(2)+(isEst?' <span style="font-size:8px;padding:1px 3px;border-radius:3px;background:#FEF3C7;color:#92400E">est</span>':''):(fob>0?'$'+fob.toFixed(2)+'<span style="color:var(--text-dim);font-weight:400;font-size:8px"> (FOB only)</span>':'<span style="color:var(--text-dim)">—</span>')}</td><td style="font-size:10px">${supplier}</td><td style="text-align:right;font-size:10px">${cbm?cbm.toFixed(3):'—'}</td></tr>`}).join('');
+  applyStockColumnVisibility();
   let cs=filtered.filter(s=>(DATA.cin7[s]||0)>0||getIncoming(s)>0).slice(0,30);
   if(charts.stock)charts.stock.destroy();
   charts.stock=new Chart(document.getElementById('stockChart'),{type:'bar',data:{labels:cs.map(s=>s),datasets:[
