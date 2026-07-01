@@ -34,9 +34,12 @@ SPACING_SECONDS = 1.55
 MIN_PRODUCTS = 1000
 MIN_PURCHASE_ORDERS = 50
 SHOPIFY_STORES = {
-    "lifely": "lifely",
-    "cushie": "cushie",
-    "littlelifely": "little_lifely",
+    # Prefer the latest client-credentials capable paths first. Older limited
+    # shpat tokens can expire/401 while the *_full entries can be refreshed
+    # safely in-memory for this read-only cache job.
+    "lifely": ["lifely_full", "lifely"],
+    "cushie": ["cushie_full", "cushie"],
+    "littlelifely": ["little_lifely"],
 }
 SHOPIFY_SPACING_SECONDS = 0.55
 
@@ -65,17 +68,65 @@ def cin7_auth_header() -> str:
     return "Basic " + base64.b64encode(raw).decode()
 
 
+def refresh_shopify_client_credentials(domain: str, store: dict[str, Any]) -> str | None:
+    client_id = store.get("client_id")
+    client_secret = store.get("client_secret")
+    if not (domain and client_id and client_secret):
+        return None
+    payload = json.dumps({
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "grant_type": "client_credentials",
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        f"https://{domain}/admin/oauth/access_token",
+        data=payload,
+        headers={"Content-Type": "application/json", "Accept": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as res:
+            body = json.loads(res.read().decode("utf-8") or "{}")
+            return body.get("access_token")
+    except urllib.error.HTTPError as exc:
+        # Some older entries may be legacy shpat tokens without a client-credentials
+        # grant path. Fall back to their stored access token below.
+        print(f"Shopify client-credentials refresh unavailable for {domain}: HTTP {exc.code}")
+        return None
+    except Exception as exc:
+        print(f"Shopify client-credentials refresh unavailable for {domain}: {exc}")
+        return None
+
+
+def resolve_shopify_store_token(planner_key: str, credential_keys: list[str], stores: dict[str, Any]) -> dict[str, str] | None:
+    last_candidate: dict[str, str] | None = None
+    for credential_key in credential_keys:
+        store = stores.get(credential_key) or {}
+        domain = store.get("shop_domain") or store.get("domain") or store.get("shop")
+        if not domain:
+            continue
+        refreshed = refresh_shopify_client_credentials(domain, store)
+        token = refreshed or store.get("access_token") or store.get("token") or store.get("admin_api_access_token")
+        if token:
+            candidate = {"domain": domain, "token": token, "credential_key": credential_key}
+            if refreshed:
+                print(f"Shopify {planner_key}: using refreshed client-credentials path {credential_key}")
+                return candidate
+            last_candidate = candidate
+    if last_candidate:
+        print(f"Shopify {planner_key}: using stored token path {last_candidate['credential_key']}")
+    return last_candidate
+
+
 def load_shopify_stores() -> tuple[str, dict[str, dict[str, str]]]:
     creds = load_json(SHOPIFY_CRED_PATH, {})
     api_version = creds.get("api_version") or "2026-01"
     stores = creds.get("stores") or {}
     resolved: dict[str, dict[str, str]] = {}
-    for planner_key, credential_key in SHOPIFY_STORES.items():
-        store = stores.get(credential_key) or {}
-        domain = store.get("shop_domain") or store.get("domain") or store.get("shop")
-        token = store.get("access_token") or store.get("token") or store.get("admin_api_access_token")
-        if domain and token:
-            resolved[planner_key] = {"domain": domain, "token": token}
+    for planner_key, credential_keys in SHOPIFY_STORES.items():
+        store = resolve_shopify_store_token(planner_key, credential_keys, stores)
+        if store:
+            resolved[planner_key] = store
     return api_version, resolved
 
 
