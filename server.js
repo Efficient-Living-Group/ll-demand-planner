@@ -1533,6 +1533,11 @@ async function fetchCin7POs() {
           logisticsCarrier: po.logisticsCarrier || '',
           internalComments: po.internalComments || '',
           freightTotal: po.freightTotal || 0,
+          freightDescription: po.freightDescription || '',
+          surcharge: po.surcharge || 0,
+          surchargeDescription: po.surchargeDescription || '',
+          modifiedCOGSDate: po.modifiedCOGSDate || null,
+          accountingAttributes: po.accountingAttributes || {},
           createdBy: po.createdBy || null,
           invoiceDate: po.invoiceDate || null,
           supplierInvoiceReference: po.supplierInvoiceReference || '',
@@ -3268,6 +3273,18 @@ function estimateLandedCost(po, destination) {
   return { productValueAUD, freight, freightCurrency, tariffRate, tariffAmount, tariffNote, isEstimated, landedTotal: productValueAUD + freight + tariffAmount };
 }
 
+function poHasApiVisibleLandedCostSignal(po) {
+  // Cin7 Omni has two real landed-cost entry paths:
+  // 1) additional costs entered in the PO's Landed Costs section, and
+  // 2) linked import-cost POs for freight/customs.
+  // The public PurchaseOrders API does not expose either section/link directly.
+  // The only similar header fields exposed by the API are supplier-paid Freight/Surcharge
+  // and ModifiedCOGSDate, so keep these as diagnostic signals only — not a PO score gate.
+  return Number(po.freightTotal || 0) > 0
+    || Number(po.surcharge || 0) > 0
+    || !!po.modifiedCOGSDate;
+}
+
 // PO Data Quality Score
 function scorePO(po) {
   const crd = po.crd || po.etd;
@@ -3292,8 +3309,9 @@ function scorePO(po) {
     addCheck('Tracking Code', 15, !!po.trackingCode);
   }
 
-  // Landed costs: check if freightTotal > 0 (actual landed cost entered)
-  addCheck('Landed Costs', 10, po.freightTotal > 0);
+  // Do not score Landed Costs here. Cin7's real Landed Costs / linked import-cost
+  // entries are not exposed by the public PurchaseOrders API, and freightTotal is
+  // only the supplier-paid Freight header. Using it capped received POs at 90%.
 
   // Received-only checks
   if (isReceived) {
@@ -3342,6 +3360,12 @@ app.get('/api/all-pos', requireAuth, (req, res) => {
       supplierInvoiceReference: po.supplierInvoiceReference || '',
       port: po.port || '',
       freightTotal: po.freightTotal || 0,
+      freightDescription: po.freightDescription || '',
+      surcharge: po.surcharge || 0,
+      surchargeDescription: po.surchargeDescription || '',
+      modifiedCOGSDate: po.modifiedCOGSDate || null,
+      landedCostApiSignal: poHasApiVisibleLandedCostSignal(po),
+      accountingAttributes: po.accountingAttributes || {},
       quality,
       etaHistory: getPoEtaHistoryRecord(po),
       itemNames: po.itemNames || {},
