@@ -69,7 +69,7 @@ const CK_DEFS = {
   'cusb-uk':  { name: 'Cushie UK',              prefix: 'MULTI',  logo: 'cushie.png',        store: 'lifely', salesCountry: 'GB', stockBranches: [62444], option1: ['Category Killer - Cushie V2', 'Category Killer - Cushie V3 Snuggle'], filter: sku => (sku.startsWith('CUSB') || sku.startsWith('LFSB')) && sku.includes('-UK'), excludeCV: true, sizes: {'-TW-':'Twin','-S-':'Single','-D-':'Double','-Q-':'Queen','-K-':'King','-CHS-':'Chaise','-SOTM-':'Ottoman','-AMST-':'Armrest'} },
 
   'cmss':     { name: 'Cushie Modular Sleeper', prefix: 'CMSS',   logo: 'cushie.png',        store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Cushie V2', sizes: {'-S-':'Single','-D-':'Double','-Q-':'Queen','-K-':'King'} },
-  'lifely-sofa': { name: 'Lifely Sofa',         prefix: 'MULTI',  logo: 'lifely-sofa.png',   store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Lifely Sofa', filter: isLifelySofaComponentSku, sizes: {} },
+  'lifely-sofa': { name: 'Lifely Sofa',         prefix: 'MULTI',  logo: 'lifely-sofa.png',   store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: ['Category Killer - Lifely Sofa', 'Category Killer - Lifely Sofa - Discontinued'], filter: isLifelySofaComponentSku, sizes: {} },
   'case-goods': { name: 'Case Goods',           prefix: 'MULTI',  logo: 'lifely-sofa.png',   store: 'lifely', option1: 'Case goods - Active', filter: isCaseGoodsSku, sizes: {} }
 };
 
@@ -199,8 +199,12 @@ const LIFELY_SOFA_SWATCH_COLOURS = ['BLST', 'CHC', 'CRMPIP', 'DKGN', 'LB', 'OG',
 
 function isLifelySofaComponentSku(sku) {
   const s = String(sku || '').toUpperCase().trim();
+  if (!s) return false;
+  // Physical Lifely Sofa planning rows are component/frame/cover/carton rows.
+  // The current Cin7 catalogue still labels many of these as discontinued, but
+  // they carry live SOH/open-sales/incoming quantities used by the sofa panel.
   if (/^LIFELY-FS-(BLST|CHC|CRMPIP|DKGN|LB|OG|RST|WHT)$/.test(s)) return true;
-  if (/^LFSF-(AMLS|CRNR|OTM)-(FC|CV-[A-Z0-9]+)$/.test(s)) return true;
+  if (/^LFSF-(AMLS|AMCR|CRNR|OTM)-(FC|CV-[A-Z0-9]+)$/.test(s)) return true;
   if (/^LIFELY-OTM-[A-Z0-9]+-\d+$/.test(s)) return true;
   if (/^LIFELY-SOFA-(AMLS|AMCR|CRNR)-[A-Z0-9]+-\d+$/.test(s)) return true;
   return false;
@@ -1885,6 +1889,27 @@ async function refreshAllData(forceCin7 = false, pushReason = null) {
 // ===== SKU NORMALIZATION =====
 // CIN7 tracks multi-box products as SKU-1, SKU-2 etc.
 // Shopify and sales use the base SKU. We need to merge box variants.
+function normalizePoItemQuantities(items) {
+  const result = {};
+  const boxGroups = {};
+  for (const [sku, qty] of Object.entries(items || {})) {
+    const q = Number(qty || 0);
+    const match = String(sku || '').match(/^(.+)-(\d)$/);
+    if (match) {
+      const base = match[1];
+      if (!boxGroups[base]) boxGroups[base] = [];
+      boxGroups[base].push(q);
+    } else {
+      result[sku] = (result[sku] || 0) + q;
+    }
+  }
+  for (const [base, quantities] of Object.entries(boxGroups)) {
+    // A boxed parent is only buildable up to the limiting carton quantity.
+    result[base] = Math.max(result[base] || 0, Math.min(...quantities));
+  }
+  return result;
+}
+
 function normalizeCIN7(cin7Raw) {
   const result = {};
   const boxPattern = /^(.+)-(\d)$/;
@@ -2237,7 +2262,9 @@ function buildCKData(ckId) {
       }
     }
     if (Object.keys(relevantItems).length > 0) {
-      const normalizedPoItems = ckId.startsWith('cusb') ? normalizeCushiePoItems(relevantItems) : relevantItems;
+      const normalizedPoItems = ckId.startsWith('cusb')
+        ? normalizeCushiePoItems(relevantItems)
+        : (ckId === 'lifely-sofa' ? relevantItems : normalizePoItemQuantities(relevantItems));
       allPos.push({ ...po, items: relevantItems, analyticsItems: normalizedPoItems });
       if (isOpenPO(po)) {
         pos.push({ ...po, items: relevantItems, analyticsItems: normalizedPoItems });
