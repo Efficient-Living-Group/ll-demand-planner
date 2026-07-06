@@ -311,7 +311,7 @@ function renderStockColumnControls(){
   </div>`;
 }
 document.addEventListener('click',e=>{if(window._stockColumnPickerOpen&&!e.target.closest?.('#stockColumnPicker')){window._stockColumnPickerOpen=false;renderStockColumnControls();}});
-function getSkus(){return[...new Set([...Object.keys(DATA.cin7),...Object.keys(DATA.velocity)])].filter(s=>s&&!s.startsWith('_')&&(currentCK==='llau'&&s.startsWith('LLAU-CB-CS-')||!(s.includes('-CS-')&&!s.includes('PACK'))))}
+function getSkus(){return[...new Set([...Object.keys(DATA.cin7),...Object.keys(DATA.velocity)])].filter(s=>s&&!s.startsWith('_')&&!(s.includes('-CS-')&&!s.includes('PACK')))}
 function updateHeaderSub(){const el=document.getElementById('headerSub');if(el)el.textContent=`${Object.keys(DATA.cin7).length} CIN7 SKUs · ${Object.keys(DATA.velocity).filter(k=>!k.startsWith('_')).length} with velocity · ${uniquePoCount(DATA.pos)} open POs`;}
 function applyMattressRegion(){if(currentCK!=='ll-mattresses'||!DATA.mattressRegions)return;const base=DATA._base||{};const region=dashFilter.region||'All';const src=region==='All'?base:DATA.mattressRegions[region];if(!src)return;DATA.cin7=src.cin7||{};DATA.shopify=src.shopify||{};DATA.openOrders=src.openOrders||{};DATA.available=src.available||{};DATA.incoming=src.incoming||{};DATA.velocity=src.velocity||{};DATA.trendData=src.trendData||{};DATA.weeklyData=src.weeklyData||null;DATA.pos=src.pos||[];DATA.allPos=src.allPos||src.pos||[];updateHeaderSub();}
 function setMattressRegion(region){dashFilter.region=region;dashFilter.size='All';applyMattressRegion();renderDashboard()}

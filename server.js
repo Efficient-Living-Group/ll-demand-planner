@@ -408,9 +408,9 @@ function pushComponent(out, sku, qty = 1) {
 
 function explodeLittleLifelyBundleSku(sku, ckId) {
   const s = String(sku || '').toUpperCase().trim();
-  if ((ckId === 'llau' || ckId === 'llnz') && s === 'LLAU-CB-CS-PACK') {
-    return SWATCH_COLOURS.map(colour => `LLAU-CB-CS-${colour}`);
-  }
+  // LLAU fabric swatch packs are sold/planned as packs. Keep demand and
+  // velocity on LLAU-CB-CS-PACK, while stock is displayed from Cin7 virtual.
+  if ((ckId === 'llau' || ckId === 'llnz') && s === 'LLAU-CB-CS-PACK') return null;
 
   // AU sells colour/size bed SET parent SKUs, while stock is held as one
   // size-level frame plus one colour/size cover. Funnel SET and combo sales
@@ -1971,18 +1971,20 @@ function normalizeCIN7(cin7Raw) {
 // Individual swatches inherit PACK velocity (they're only sold as a set)
 function normalizeSwatchPack(cin7) {
   const result = { ...cin7 };
+  const pack = cin7['LLAU-CB-CS-PACK'];
+  const packVirtual = typeof pack === 'object' ? Number(pack.virtual ?? pack.soh ?? 0) : Number(pack || 0);
   const swatchKeys = SWATCH_COLOURS.map(c => 'LLAU-CB-CS-' + c);
-  const sohValues = swatchKeys.map(k => {
+  const fallbackValues = swatchKeys.map(k => {
     const d = cin7[k];
-    return typeof d === 'object' ? (d.soh || 0) : (d || 0);
+    return typeof d === 'object' ? Number(d.virtual ?? d.soh ?? 0) : Number(d || 0);
   });
   const costs = swatchKeys.map(k => {
     const d = cin7[k];
     return typeof d === 'object' ? (d.costAUD || 0) : 0;
   });
-  const packSoh = Math.min(...sohValues);
+  const packSoh = packVirtual || Math.min(...fallbackValues);
   const packCost = costs.reduce((a, b) => a + b, 0);
-  result['LLAU-CB-CS-PACK'] = { soh: packSoh, available: packSoh, costAUD: packCost };
+  result['LLAU-CB-CS-PACK'] = { ...(typeof pack === 'object' ? pack : {}), soh: packSoh, virtual: packSoh, available: packSoh, costAUD: packCost };
   return result;
 }
 
