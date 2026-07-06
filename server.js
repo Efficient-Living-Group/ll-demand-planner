@@ -2876,8 +2876,9 @@ function buildCKData(ckId) {
     }
   }
 
-  // WFH Chair has no CBM on the sellable SKU, so allocate the latest open PO's
-  // freight + customs/charges evenly per unit instead of leaving Freight/u blank.
+  // WFH Chair has CBM, but the landed-cost cache can contain an actual
+  // landed row with Freight/u = 0. When freight is missing/zero, use the latest
+  // open WFH PO's freight + customs/charges evenly per unit so Freight/u is not blank.
   if (ckId === 'wfhcr') {
     const latestWfhPo = (allPos || [])
       .filter(po => isOpenPO(po) && Object.keys(po.items || {}).some(sku => String(sku || '').toUpperCase().startsWith('WFHCR')))
@@ -2901,7 +2902,7 @@ function buildCKData(ckId) {
           const existing = landedCosts[sku];
           if (existing && Number(existing.freightPerUnit || 0) > 0) continue;
           const fob = (existing?.fob || (costs ? costs[sku] : 0)) || 0;
-          landedCosts[sku] = { fob, freightPerUnit, tariffPerUnit: 0, landedPerUnit: fob + freightPerUnit, cbm: cbmMap[sku] || existing?.cbm || 0, source: 'estimated', poCount: 1, poRef: rawPoReference(latestWfhPo.reference), method: 'latest-po-unit' };
+          landedCosts[sku] = { fob, freightPerUnit, tariffPerUnit: 0, landedPerUnit: fob + freightPerUnit, cbm: cbmMap[sku] || existing?.cbm || 0, source: 'estimated', poCount: 1, poRef: rawPoReference(latestWfhPo.reference), method: 'latest-po-freight-unit' };
         }
       }
     }
