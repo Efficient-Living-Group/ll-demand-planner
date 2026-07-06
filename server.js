@@ -2876,6 +2876,37 @@ function buildCKData(ckId) {
     }
   }
 
+  // WFH Chair has no CBM on the sellable SKU, so allocate the latest open PO's
+  // freight + customs/charges evenly per unit instead of leaving Freight/u blank.
+  if (ckId === 'wfhcr') {
+    const latestWfhPo = (allPos || [])
+      .filter(po => isOpenPO(po) && Object.keys(po.items || {}).some(sku => String(sku || '').toUpperCase().startsWith('WFHCR')))
+      .sort((a, b) => {
+        const da = new Date(a.arrival || a.estimatedArrivalDate || a.etd || 0).getTime() || 0;
+        const db = new Date(b.arrival || b.estimatedArrivalDate || b.etd || 0).getTime() || 0;
+        if (db !== da) return db - da;
+        return String(rawPoReference(b.reference)).localeCompare(String(rawPoReference(a.reference)), undefined, { numeric: true });
+      })[0];
+    if (latestWfhPo) {
+      const destination = inferDestination(latestWfhPo);
+      const landed = estimateLandedCost(latestWfhPo, destination);
+      const surchargeAud = moneyToAud(latestWfhPo.surcharge || 0, latestWfhPo.currencyCode || 'AUD');
+      const wfhItems = Object.entries(latestWfhPo.items || {}).filter(([sku]) => String(sku || '').toUpperCase().startsWith('WFHCR'));
+      const totalUnits = wfhItems.reduce((sum, [, qty]) => sum + Number(qty || 0), 0);
+      const totalFreightCharges = Number(landed.freight || 0) + Number(landed.tariffAmount || 0) + surchargeAud;
+      if (totalUnits > 0 && totalFreightCharges > 0) {
+        const freightPerUnit = totalFreightCharges / totalUnits;
+        for (const [sku] of wfhItems) {
+          if (SKIP_LANDED(sku)) continue;
+          const existing = landedCosts[sku];
+          if (existing && Number(existing.freightPerUnit || 0) > 0) continue;
+          const fob = (existing?.fob || (costs ? costs[sku] : 0)) || 0;
+          landedCosts[sku] = { fob, freightPerUnit, tariffPerUnit: 0, landedPerUnit: fob + freightPerUnit, cbm: cbmMap[sku] || existing?.cbm || 0, source: 'estimated', poCount: 1, poRef: rawPoReference(latestWfhPo.reference), method: 'latest-po-unit' };
+        }
+      }
+    }
+  }
+
   let mattressRegions = null;
   if (ckId === 'll-mattresses') {
     const mattressRegionConfigs = {
@@ -3303,22 +3334,23 @@ function resolvePoTariff(po, destination) {
   return { tariffRate, tariffNote };
 }
 
+function moneyToAud(value, currency) {
+  const n = Number(value || 0);
+  const c = String(currency || 'AUD').toUpperCase();
+  if (!n) return 0;
+  if (c === 'AUD') return n;
+  if (c === 'USD') return n * (fxRate.USDAUD || 1.45);
+  return n;
+}
+
 function estimateLandedCost(po, destination) {
   const freightActual = po.freightTotal > 0 ? po.freightTotal : 0;
   const productValue = po.total || 0;
   const productCurrency = po.currencyCode || 'USD';
-  const toAud = (value, currency) => {
-    const n = Number(value || 0);
-    const c = String(currency || 'AUD').toUpperCase();
-    if (!n) return 0;
-    if (c === 'AUD') return n;
-    if (c === 'USD') return n * (fxRate.USDAUD || 1.45);
-    return n;
-  };
-  const productValueAUD = toAud(productValue, productCurrency);
+  const productValueAUD = moneyToAud(productValue, productCurrency);
   const dest = FREIGHT_TARIFF[destination];
   const isEstimated = freightActual === 0;
-  const freight = freightActual > 0 ? toAud(freightActual, productCurrency) : (dest ? dest.freight : 0);
+  const freight = freightActual > 0 ? moneyToAud(freightActual, productCurrency) : (dest ? dest.freight : 0);
   const freightCurrency = 'AUD';
   const { tariffRate, tariffNote } = resolvePoTariff(po, destination);
   const tariffAmount = productValueAUD * tariffRate;
