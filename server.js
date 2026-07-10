@@ -597,6 +597,8 @@ function explodeKnownBundleSkuForCk(sku, ckId) {
     if (cushieSet) return cushieSet;
     const cushieUsBundle = explodeCushieUsBundleSku(s, ckId);
     if (cushieUsBundle) return cushieUsBundle;
+    const cachedBom = getCachedCin7BomComponentList(s);
+    if (cachedBom && cachedBom.some(componentSku => String(componentSku || '').toUpperCase().trim() !== s)) return cachedBom;
   }
   if (ckId === 'lifely-sofa') {
     const lifelySofa = explodeLifelySofaSku(s);
@@ -2036,7 +2038,9 @@ function normalizeCushie(cin7Normalized) {
 function cushieCartonParentSku(sku) {
   const s = String(sku || '').toUpperCase().trim();
   const m = s.match(/^(.+)-(?:[12]|C[12])$/);
-  return m ? m[1] : null;
+  if (!m) return null;
+  const suffix = s.slice(m[1].length + 1);
+  return suffix === '1' || suffix === '2' || suffix === 'C1' || suffix === 'C2' ? m[1] : null;
 }
 function cushieCartonComponentsForParent(parentSku) {
   const parent = String(parentSku || '').toUpperCase().trim();
@@ -2209,9 +2213,24 @@ function buildCKData(ckId) {
     }
   }
 
-  const visibleDemandSku = (sku) => {
+  const marketDemandSku = (sku) => {
     const s = String(sku || '').toUpperCase().trim();
+    if (ckId !== 'cusb-uk') return s;
+    let m = s.match(/^V3-(TB|DB|QB|KB)-([A-Z0-9]+)$/);
+    if (m) return `CUSB-${{ TB: 'TW', DB: 'D', QB: 'Q', KB: 'K' }[m[1]]}-${m[2]}-UK`;
+    m = s.match(/^V3-ARM-([A-Z0-9]+)$/);
+    if (m) return `CUSB-ARST-SET-${m[1]}-UK`;
+    m = s.match(/^V2-(TB|DB|QB|RMST|OS)-([A-Z0-9]+)$/);
+    if (m) {
+      const code = { TB: 'TW', DB: 'D', QB: 'Q', RMST: 'AMST', OS: 'SOTM' }[m[1]];
+      return `LFSB-${code}-${m[2]}-UK`;
+    }
+    return s;
+  };
+  const visibleDemandSku = (sku) => {
+    let s = String(sku || '').toUpperCase().trim();
     if (!s) return { sku: '', boxSplit: false };
+    s = marketDemandSku(s);
     if (cin7[s] !== undefined || shopify[s] !== undefined) return { sku: s, boxSplit: false };
     const cartonParent = cushieCartonParentSku(s);
     if (cartonParent && cin7[cartonParent] !== undefined) return { sku: cartonParent, boxSplit: true };
@@ -2289,8 +2308,9 @@ function buildCKData(ckId) {
       const exploded = explodeDemandSkuForCk(sku, ckId);
       if (exploded) {
         for (const componentSku of exploded) {
-          if (cin7[componentSku] !== undefined || shopify[componentSku] !== undefined || velocity[componentSku] !== undefined) {
-            velocity[componentSku] = (velocity[componentSku] || 0) + Number(vel || 0);
+          const visible = visibleDemandSku(componentSku);
+          if (cin7[visible.sku] !== undefined || shopify[visible.sku] !== undefined || velocity[visible.sku] !== undefined) {
+            velocity[visible.sku] = (velocity[visible.sku] || 0) + Number(vel || 0);
           }
         }
         continue;
