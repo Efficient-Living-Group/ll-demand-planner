@@ -2004,10 +2004,33 @@ function normalizeRadiant(cin7, shopifySkus) {
   return result;
 }
 
-// Cushie: keep the component/base SKUs visible. Shopify bundle/set demand is
-// exploded into these rows instead of synthesizing -SET display rows.
+// Cushie: keep parent/base rows visible, but collapse physical carton rows
+// (-1/-2 and UK -C1/-C2) into the buildable parent by limiting carton stock.
+// Example: CUSB-D-DNM-UK-C1=11 and -C2=11 => CUSB-D-DNM-UK=11, not 22.
 function normalizeCushie(cin7Normalized) {
-  return { ...cin7Normalized };
+  const result = {};
+  const cartonGroups = {};
+  for (const [sku, data] of Object.entries(cin7Normalized || {})) {
+    const parent = cushieCartonParentSku(sku);
+    if (parent) {
+      if (!cartonGroups[parent]) cartonGroups[parent] = [];
+      cartonGroups[parent].push(data);
+    } else {
+      result[sku] = data;
+    }
+  }
+  for (const [parent, cartons] of Object.entries(cartonGroups)) {
+    const existing = result[parent];
+    const cartonObjects = cartons.map(row => (typeof row === 'object' ? row : { soh: Number(row || 0), available: Number(row || 0), virtual: Number(row || 0) }));
+    const soh = Math.min(...cartonObjects.map(row => Number(row.soh || 0)));
+    const available = Math.min(...cartonObjects.map(row => Number(row.available ?? row.soh ?? 0)));
+    const virtual = Math.min(...cartonObjects.map(row => Number(row.virtual ?? row.soh ?? 0)));
+    const costAUD = cartonObjects.reduce((sum, row) => sum + Number(row.costAUD || 0), 0) || (typeof existing === 'object' ? Number(existing.costAUD || 0) : 0);
+    const cbm = cartonObjects.reduce((sum, row) => sum + Number(row.cbm || 0), 0) || (typeof existing === 'object' ? Number(existing.cbm || 0) : 0);
+    const option1 = cartonObjects.map(row => row.option1 || '').find(Boolean) || (typeof existing === 'object' ? existing.option1 || '' : '');
+    result[parent] = { ...(typeof existing === 'object' ? existing : {}), soh, available, virtual, costAUD, cbm, option1 };
+  }
+  return result;
 }
 
 function cushieCartonParentSku(sku) {
@@ -2190,6 +2213,8 @@ function buildCKData(ckId) {
     const s = String(sku || '').toUpperCase().trim();
     if (!s) return { sku: '', boxSplit: false };
     if (cin7[s] !== undefined || shopify[s] !== undefined) return { sku: s, boxSplit: false };
+    const cartonParent = cushieCartonParentSku(s);
+    if (cartonParent && cin7[cartonParent] !== undefined) return { sku: cartonParent, boxSplit: true };
     const box = s.match(/^(.+)-\d$/);
     if (box && cin7[box[1]] !== undefined) return { sku: box[1], boxSplit: true };
     return { sku: s, boxSplit: false };
