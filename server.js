@@ -2010,8 +2010,44 @@ function normalizeCushie(cin7Normalized) {
   return { ...cin7Normalized };
 }
 
+function cushieCartonParentSku(sku) {
+  const s = String(sku || '').toUpperCase().trim();
+  const m = s.match(/^(.+)-(?:[12]|C[12])$/);
+  return m ? m[1] : null;
+}
+function cushieCartonComponentsForParent(parentSku) {
+  const parent = String(parentSku || '').toUpperCase().trim();
+  if (!parent) return [];
+  const components = Object.keys(dataCache.cin7Products || {})
+    .map(sku => String(sku || '').toUpperCase().trim())
+    .filter(sku => cushieCartonParentSku(sku) === parent)
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  return components;
+}
 function normalizeCushiePoItems(items) {
-  return { ...(items || {}) };
+  const result = {};
+  const cartonGroups = {};
+  for (const [rawSku, rawQty] of Object.entries(items || {})) {
+    const sku = String(rawSku || '').toUpperCase().trim();
+    const qty = Number(rawQty || 0);
+    if (!sku || !qty) continue;
+    const parent = cushieCartonParentSku(sku);
+    if (parent && (dataCache.cin7BOMs?.[parent] || dataCache.cin7Products?.[parent] || cushieCartonComponentsForParent(parent).length)) {
+      if (!cartonGroups[parent]) cartonGroups[parent] = {};
+      cartonGroups[parent][sku] = (cartonGroups[parent][sku] || 0) + qty;
+    } else {
+      result[sku] = (result[sku] || 0) + qty;
+    }
+  }
+  for (const [parent, qtyByCarton] of Object.entries(cartonGroups)) {
+    const requiredCartons = cushieCartonComponentsForParent(parent);
+    const cartonsToUse = requiredCartons.length ? requiredCartons : Object.keys(qtyByCarton);
+    const completeUnits = cartonsToUse.length
+      ? Math.min(...cartonsToUse.map(sku => Number(qtyByCarton[sku] || 0)))
+      : 0;
+    if (completeUnits > 0) result[parent] = Math.max(Number(result[parent] || 0), completeUnits);
+  }
+  return result;
 }
 
 function cushieProductTypeForSku(sku, option1 = '') {

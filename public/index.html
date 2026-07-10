@@ -1752,7 +1752,7 @@ function toggleInboundDrilldown() {
   // Flatten: for each PO, show each SKU that belongs to this CK
   let rows = [];
   pos.forEach(po => {
-    const items = po.items || {};
+    const items = po.analyticsItems || po.items || {};
     for (const [sku, qty] of Object.entries(items)) {
       if (skus.includes(sku) || Object.keys(DATA.cin7).includes(sku) || Object.keys(DATA.velocity).includes(sku)) {
         const etaRaw = po.arrival || po.estimatedArrivalDate || po.customFields?.orders_1000 || null;
