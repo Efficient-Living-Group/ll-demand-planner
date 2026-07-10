@@ -422,7 +422,7 @@ function explodeLittleLifelyBundleSku(sku, ckId) {
   // into the physical component SKUs so frame/cover velocity and deadstock are
   // not understated.
   if (ckId === 'llau' || ckId === 'llnz') {
-    let auSet = s.match(/^LLAU-CB-(S|KS|D)-([A-Z0-9]+)(?:-SET)?$/);
+    let auSet = s.match(/^LLAU-CB-(S|KS|D)-([A-Z0-9]+)-SET$/);
     if (auSet && auSet[2] !== 'FRM' && auSet[2] !== 'PACK' && !auSet[2].startsWith('CS')) {
       return [`LLAU-CB-${auSet[1]}-FRM`, `LLAU-CB-${auSet[1]}-${auSet[2]}-CV`];
     }
@@ -2791,7 +2791,7 @@ function buildCKData(ckId) {
 
   // Remove inactive Shopify SKUs (draft/archived)
   const inactiveSet = new Set(relatedStores.flatMap(sourceStore => dataCache.shopifyInventory?.[sourceStore]?.['__inactive__'] || []));
-  const keepInactiveForPanel = ckId === 'll-mattresses' || ckId === 'dd' || ckId === 'lifely-sofa' || ckId === 'llau';
+  const keepInactiveForPanel = ckId === 'll-mattresses' || ckId === 'dd' || ckId === 'lifely-sofa' || ckId === 'llau' || ckId === 'llna' || ckId === 'llca';
   for (const sku of Object.keys(cin7)) {
     if (!keepInactiveForPanel && inactiveSet.has(sku)) { delete cin7[sku]; delete velocity[sku]; delete shopify[sku]; }
   }
