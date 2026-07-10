@@ -50,13 +50,13 @@ const SHOPIFY_STORES = {
 
 // ===== CK DEFINITIONS =====
 const CK_DEFS = {
-  'llau':      { name: 'Little Lifely AU',              prefix: 'LLAU-CB-', logo: 'little-lifely.png', store: 'lifely', excludeCV: false, poDestination: 'Australia', salesCountry: 'AU', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Little Lifely', option1Bypass: sku => sku.startsWith('LLAU-CB-'), filter: sku => !sku.includes('CBCF') && !isLittleLifelySetBomSku(sku), sizes: {'PACK':'Swatch Packs','-CS-':'Fabric Swatch','-S-':'Single','-KS-':'King Single','-D-':'Double'} },
-  'llnz':      { name: 'Little Lifely NZ',              prefix: 'LLAU-CB-', logo: 'little-lifely.png', store: 'lifely', excludeCV: false, poDestination: 'New Zealand', salesCountry: 'NZ', stockBranches: LL_NZ_BRANCH_IDS, strictStockBranches: true, option1: 'Category Killer - Little Lifely', filter: sku => !sku.includes('CBCF') && !isLittleLifelySetBomSku(sku), sizes: {'PACK':'Swatch Packs','-CS-':'Fabric Swatch','-S-':'Single','-KS-':'King Single','-D-':'Double'} },
+  'llau':      { name: 'Little Lifely AU',              prefix: 'LLAU-CB-', logo: 'little-lifely.png', store: 'lifely', excludeCV: false, poDestination: 'Australia', salesCountry: 'AU', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Little Lifely', option1Bypass: sku => sku.startsWith('LLAU-CB-'), filter: sku => !isLittleLifelyBundleSku(sku), sizes: {'PACK':'Swatch Packs','-CS-':'Fabric Swatch','-S-':'Single','-KS-':'King Single','-D-':'Double'} },
+  'llnz':      { name: 'Little Lifely NZ',              prefix: 'LLAU-CB-', logo: 'little-lifely.png', store: 'lifely', excludeCV: false, poDestination: 'New Zealand', salesCountry: 'NZ', stockBranches: LL_NZ_BRANCH_IDS, strictStockBranches: true, option1: 'Category Killer - Little Lifely', filter: sku => !isLittleLifelyBundleSku(sku), sizes: {'PACK':'Swatch Packs','-CS-':'Fabric Swatch','-S-':'Single','-KS-':'King Single','-D-':'Double'} },
   'llau-cbcf': { name: 'LL AU Combos',            prefix: 'LLAU-CBCF-', logo: 'little-lifely.png', store: 'lifely', excludeCV: true, salesCountry: 'AU', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Little Lifely', sizes: {'-S-':'Single','-KS-':'King Single','-D-':'Double'} },
-  'llna':     { name: 'Little Lifely NA',       prefix: 'LLNA',   logo: 'little-lifely.png', store: 'lifely', excludeCV: false, poDestination: 'United States', salesCountry: 'US', stockBranches: LL_US_BRANCH_IDS, option1: 'Category Killer - Little Lifely', filter: sku => !isLittleLifelySetBomSku(sku), sizes: {'-TWX-':'Twin XL','-TW-':'Twin','-F-':'Full'} },
-  'llca':     { name: 'Little Lifely CA',       prefix: 'LLNA',   logo: 'little-lifely.png', store: 'lifely', excludeCV: false, poDestination: 'Canada', salesCountry: 'CA', stockBranches: [61831], option1: 'Category Killer - Little Lifely', filter: sku => !isLittleLifelySetBomSku(sku), sizes: {'-TWX-':'Twin XL','-TW-':'Twin','-F-':'Full'} },
+  'llna':     { name: 'Little Lifely NA',       prefix: 'LLNA',   logo: 'little-lifely.png', store: 'lifely', excludeCV: false, poDestination: 'United States', salesCountry: 'US', stockBranches: LL_US_BRANCH_IDS, option1: 'Category Killer - Little Lifely', filter: sku => !isLittleLifelyBundleSku(sku), sizes: {'-TWX-':'Twin XL','-TW-':'Twin','-F-':'Full'} },
+  'llca':     { name: 'Little Lifely CA',       prefix: 'LLNA',   logo: 'little-lifely.png', store: 'lifely', excludeCV: false, poDestination: 'Canada', salesCountry: 'CA', stockBranches: [61831], option1: 'Category Killer - Little Lifely', filter: sku => !isLittleLifelyBundleSku(sku), sizes: {'-TWX-':'Twin XL','-TW-':'Twin','-F-':'Full'} },
   'lluk':     { name: 'Little Lifely UK',       prefix: 'LLUK-CB-',   logo: 'little-lifely.png', store: 'lifely', excludeCV: false, salesCountry: 'GB', stockBranches: [62444], option1: 'Category Killer - Little Lifely', filter: isLittleLifelyUkComponentSku, sizes: {'-S-':'Single','-SD-':'Small Double','-D-':'Double'} },
-  'llsg':     { name: 'Little Lifely SG',       prefix: 'LLSG',   logo: 'little-lifely.png', store: 'lifely', excludeCV: false, salesCountry: 'SG', stockBranches: [57843], strictStockBranches: true, option1: 'Category Killer - Little Lifely', filter: sku => !isLittleLifelySetBomSku(sku), sizes: {'-SS-':'Super Single','-S-':'Single','-Q-':'Queen'} },
+  'llsg':     { name: 'Little Lifely SG',       prefix: 'LLSG',   logo: 'little-lifely.png', store: 'lifely', excludeCV: false, salesCountry: 'SG', stockBranches: [57843], strictStockBranches: true, option1: 'Category Killer - Little Lifely', filter: sku => !isLittleLifelyBundleSku(sku), sizes: {'-SS-':'Super Single','-S-':'Single','-Q-':'Queen'} },
   'll-mattresses': { name: 'LL Mattresses',     prefix: 'MULTI',  logo: 'little-lifely.png', store: 'lifely', option1: ['Category Killer - 21cm Mattress', 'Category Killer - Deep Dream'], option1Bypass: sku => sku.startsWith('DDUK'), filter: sku => ['DD-21915CF','DD-21107CF','DD-21137CF'].includes(sku) || sku.startsWith('DDUK'), sizes: {'21915':'Single','21107':'King Single','21137':'Double','2190':'Single UK','21120':'Small Double UK','21135':'Double UK'} },
   'dd':       { name: 'Deep Dream',             prefix: 'MULTI',  logo: 'deep-dream.png',    store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Deepdream', sizes: {'915':'Single','107':'King Single','137':'Double','153':'Queen','183':'King'} },
   'cocoon':   { name: 'Cocoon Bed',             prefix: 'COCOON', logo: 'cocoon-bed.png',    store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Cocoon Bed', sizes: {'-DOUBLE-':'Double','-QUEEN-':'Queen','-KING-':'King'} },
@@ -83,8 +83,13 @@ const SWATCH_COLOURS = ['DSBL', 'DGY', 'PST', 'BABL', 'CTCN', 'MSM'];
 const COCOON_SIZE_WORD = { 'D': 'DOUBLE', 'Q': 'QUEEN', 'K': 'KING' };
 
 const LITTLE_LIFELY_COUNTRY_SET_RE = /^(LLAU|LLNA|LLSG|LLUK)-CB-[A-Z0-9]+-[A-Z0-9]+-SET$/;
+const LITTLE_LIFELY_BUNDLE_RE = /^(LLAU|LLNA|LLSG|LLUK)-(CTP|CBCF|CFDS)-/;
 function isLittleLifelySetBomSku(sku) {
   return LITTLE_LIFELY_COUNTRY_SET_RE.test(String(sku || '').toUpperCase().trim());
+}
+function isLittleLifelyBundleSku(sku) {
+  const s = String(sku || '').toUpperCase().trim();
+  return isLittleLifelySetBomSku(s) || LITTLE_LIFELY_BUNDLE_RE.test(s);
 }
 
 function isCushieSetBomSku(sku) {
@@ -3211,12 +3216,16 @@ const HIDDEN_CK_TABS = new Set(['llau-cbcf', 'cmss']);
 
 app.get('/api/ck-list', requireAuth, (req, res) => {
   reloadSnapshotIfNewer();
+  const littleLifelyListOrder = { llau: 0, llna: 1, llca: 2, lluk: 3, llnz: 4, llsg: 5, 'll-mattresses': 6 };
   const list = Object.entries(CK_DEFS).filter(([id]) => !HIDDEN_CK_TABS.has(id)).map(([id, def]) => {
     const data = buildCKData(id);
     const skuCount = data ? Object.keys(data.cin7).length + Object.keys(data.velocity).length : 0;
     const brand = getBrandGroup(id, def);
     const subgroup = getBrandSubgroup(id, def);
     return { id, name: def.name, logo: def.logo, skuCount, brand, subgroup };
+  }).sort((a, b) => {
+    if (a.brand?.id === 'little-lifely' || b.brand?.id === 'little-lifely') return (littleLifelyListOrder[a.id] ?? 999) - (littleLifelyListOrder[b.id] ?? 999);
+    return 0;
   });
   res.json({ list, lastRefresh: dataCache.lastRefresh });
 });
