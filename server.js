@@ -62,7 +62,7 @@ const CK_DEFS = {
   'cocoon':   { name: 'Cocoon Bed',             prefix: 'COCOON', logo: 'cocoon-bed.png',    store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Cocoon Bed', sizes: {'-DOUBLE-':'Double','-QUEEN-':'Queen','-KING-':'King'} },
   'rdnt':     { name: 'Radiant',                prefix: 'RDNT',   logo: 'radiant.png',       store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Radiant', sizes: {'-D-':'Double','-Q-':'Queen','-K-':'King'} },
   'wfhcr':    { name: 'WFH Chair',              prefix: 'WFHCR',  logo: 'wfh-chair.png',     store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - WFH Chair', filter: isWfhChairSellableSku, sizes: {} },
-  'airflow-pad': { name: 'Airflow Pad',           prefix: 'PAD-',   logo: 'lifely-sofa.png',  store: 'lifely', option1: 'Airflow Pad', sizes: {'LL':'Little Lifely','CC':'Cocoon','V3':'Snuggle','V2':'Cushie V2'} },
+  'airflow-pad': { name: 'Airflow Pad',           prefix: 'PAD-',   logo: 'lifely-sofa.png',  store: 'lifely', option1: 'Airflow Pad', sizes: {} },
   'caterpillar': { name: 'Caterpillar Dining',    prefix: 'MULTI',  logo: 'lifely-sofa.png',  store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Caterpillar', sizes: {'EDT':'Dining Table','EDB':'Dining Chair'} },
   'cusb-au':  { name: 'Cushie AU',              prefix: 'MULTI',  logo: 'cushie.png',        store: 'lifely', poDestination: 'Australia', salesCountry: 'AU', stockBranches: LL_AU_BRANCH_IDS, option1: ['Category Killer - Cushie V3 Snuggle', 'Category Killer - Cushie V2', 'Category Killer - Cushie V2 - Discontinued', 'Category Killer - Lifely Sofa'], filter: sku => !isCushieSetBomSku(sku) && ((sku.startsWith('CUSB') && !sku.includes('-UK') && !sku.includes('SGE')) || (sku.startsWith('LFSB') && !sku.includes('-UK'))), excludeCV: true, sizes: {'ARST':'Armrest','-TW-':'Twin','-S-':'Single','-D-':'Double','-Q-':'Queen','-K-':'King','-CHS-':'Chaise','-SOTM-':'Ottoman','-AMST-':'Armrest'} },
   'cusb-us':  { name: 'Cushie US',              prefix: 'MULTI',  logo: 'cushie.png',        store: 'lifely', salesCountry: 'US', stockBranches: [60701], option1: ['Category Killer - Cushie V2', 'Category Killer - Cushie V2 - Discontinued', 'Category Killer - Cushie V3 Snuggle'], filter: sku => !isCushieSetBomSku(sku) && (sku.startsWith('V2-') || sku.startsWith('V3-')), excludeCV: true, sizes: {'-TB-':'Twin','-DB-':'Full','-QB-':'Queen','-KB-':'King','-CH-':'Chaise','-OS-':'Ottoman','-OB-':'Ottoman Bed','-RMST':'Armrest','-RMST-':'Armrest','-ARM-':'Armrest'} },
@@ -2515,6 +2515,87 @@ function buildCKData(ckId) {
   }
   let warehouseOptions = null;
   let warehouseViews = null;
+  if (ckId === 'airflow-pad') {
+    const airflowCountryConfigs = [
+      { id: 'AU', name: 'Australia', branchIds: LL_AU_BRANCH_IDS, salesCountry: 'AU', destination: 'Australia' },
+      { id: 'US', name: 'United States', branchIds: LL_US_BRANCH_IDS, salesCountry: 'US', destination: 'United States' },
+      { id: 'CA', name: 'Canada', branchIds: [61831], salesCountry: 'CA', destination: 'Canada' },
+      { id: 'UK', name: 'United Kingdom', branchIds: [62444], salesCountry: 'GB', destination: 'United Kingdom' }
+    ];
+    const airflowStores = ['lifely', 'cushie', 'littlelifely'];
+    warehouseOptions = [{ id: 'All', name: 'All countries' }, ...airflowCountryConfigs.map(cfg => ({ id: cfg.id, name: cfg.name }))];
+    warehouseViews = {};
+    const buildAirflowCountryView = cfg => {
+      const viewCin7 = {};
+      const viewAvailable = {};
+      const viewOpenOrders = {};
+      const viewShopify = {};
+      const viewIncoming = {};
+      const viewVelocity = {};
+      const viewPos = [];
+      const panelSkus = new Set(Object.keys(cin7 || {}).filter(sku => sku.startsWith('PAD-')));
+      const branchSet = new Set(cfg.branchIds.map(String));
+      for (const sku of panelSkus) {
+        const branchRows = dataCache.cin7StockByBranch?.[sku] || {};
+        const branchData = cfg.branchIds.reduce((acc, branchId) => {
+          const row = branchRows[branchId];
+          if (!row) return acc;
+          acc.soh += Number(row.soh || 0);
+          acc.available += Number(row.available || 0);
+          acc.matched += 1;
+          return acc;
+        }, { soh: 0, available: 0, matched: 0 });
+        if (branchData.matched > 0 && (branchData.soh !== 0 || branchData.available !== 0)) {
+          viewCin7[sku] = branchData.soh;
+          viewAvailable[sku] = branchData.available;
+        }
+      }
+      for (const [sku, qty] of Object.entries(getCin7OpenSalesBySku(cfg.branchIds, cfg.salesCountry))) {
+        if (!panelSkus.has(sku)) continue;
+        viewOpenOrders[sku] = (viewOpenOrders[sku] || 0) + Number(qty || 0);
+      }
+      for (const [sku, qty] of Object.entries(getCin7PreordersBySku(cfg.branchIds, cfg.salesCountry))) {
+        if (!panelSkus.has(sku)) continue;
+        viewShopify[sku] = (viewShopify[sku] || 0) - Number(qty || 0);
+      }
+      for (const po of dataCache.cin7POs || []) {
+        if (!isOpenPO(po)) continue;
+        if (resolvePoDestination(po) !== cfg.destination) continue;
+        const relevantItems = {};
+        const normalizedItems = po.analyticsItems || po.items || {};
+        for (const [sku, qty] of Object.entries(normalizedItems)) {
+          if (!panelSkus.has(sku)) continue;
+          const q = Number(qty || 0);
+          if (!q) continue;
+          viewIncoming[sku] = (viewIncoming[sku] || 0) + q;
+          relevantItems[sku] = q;
+        }
+        if (Object.keys(relevantItems).length) viewPos.push({ ...po, analyticsItems: relevantItems });
+      }
+      for (const sourceStore of airflowStores) {
+        const source = dataCache.shopifyVelocityByCountry?.[sourceStore]?.[cfg.salesCountry] || {};
+        for (const [sku, vel] of Object.entries(source)) {
+          if (!panelSkus.has(sku) || String(sku).startsWith('_')) continue;
+          viewVelocity[sku] = (viewVelocity[sku] || 0) + Number(vel || 0);
+        }
+      }
+      for (const sku of panelSkus) {
+        if (viewCin7[sku] !== undefined || viewAvailable[sku] !== undefined || viewOpenOrders[sku] || viewShopify[sku] || viewIncoming[sku] || viewVelocity[sku]) continue;
+        delete viewCin7[sku];
+      }
+      const includedSkus = new Set([...Object.keys(viewCin7), ...Object.keys(viewAvailable), ...Object.keys(viewOpenOrders), ...Object.keys(viewShopify), ...Object.keys(viewIncoming), ...Object.keys(viewVelocity)]);
+      for (const sku of includedSkus) {
+        if (viewCin7[sku] === undefined) viewCin7[sku] = 0;
+        if (viewAvailable[sku] === undefined) viewAvailable[sku] = viewCin7[sku] || 0;
+        if (viewOpenOrders[sku] === undefined) viewOpenOrders[sku] = 0;
+        if (viewShopify[sku] === undefined) viewShopify[sku] = 0;
+        if (viewIncoming[sku] === undefined) viewIncoming[sku] = 0;
+        if (viewVelocity[sku] === undefined) viewVelocity[sku] = 0;
+      }
+      return { cin7: viewCin7, available: viewAvailable, openOrders: viewOpenOrders, shopify: viewShopify, incoming: viewIncoming, velocity: viewVelocity, pos: viewPos, allPos: viewPos };
+    };
+    for (const cfg of airflowCountryConfigs) warehouseViews[cfg.id] = buildAirflowCountryView(cfg);
+  }
   const warehouseBranchConfigs = {
     llau: LL_AU_BRANCH_IDS,
     llna: LL_US_BRANCH_IDS
