@@ -62,8 +62,8 @@ const CK_DEFS = {
   'cocoon':   { name: 'Cocoon Bed',             prefix: 'COCOON', logo: 'cocoon-bed.png',    store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Cocoon Bed', sizes: {'-DOUBLE-':'Double','-QUEEN-':'Queen','-KING-':'King'} },
   'rdnt':     { name: 'Radiant',                prefix: 'RDNT',   logo: 'radiant.png',       store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Radiant', sizes: {'-D-':'Double','-Q-':'Queen','-K-':'King'} },
   'wfhcr':    { name: 'WFH Chair',              prefix: 'WFHCR',  logo: 'wfh-chair.png',     store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - WFH Chair', filter: isWfhChairSellableSku, sizes: {} },
-  'airflow-pad': { name: 'Airflow Pad',           prefix: 'PAD-',   logo: 'lifely-sofa.png',  store: 'lifely', option1: 'Airflow Pad', sizes: {} },
-  'caterpillar': { name: 'Caterpillar Dining',    prefix: 'MULTI',  logo: 'lifely-sofa.png',  store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Caterpillar', sizes: {'EDT':'Dining Table','EDB':'Dining Chair'} },
+  'airflow-pad': { name: 'Airflow Pad',           prefix: 'PAD-',   logo: null,               mark: 'AIR',  store: 'lifely', option1: 'Airflow Pad', sizes: {} },
+  'caterpillar': { name: 'Caterpillar Dining',    prefix: 'MULTI',  logo: null,               mark: 'CAT',  store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Caterpillar', sizes: {'EDT':'Dining Table','EDB':'Dining Chair'} },
   'cusb-au':  { name: 'Cushie AU',              prefix: 'MULTI',  logo: 'cushie.png',        store: 'lifely', poDestination: 'Australia', salesCountry: 'AU', stockBranches: LL_AU_BRANCH_IDS, option1: ['Category Killer - Cushie V3 Snuggle', 'Category Killer - Cushie V2', 'Category Killer - Cushie V2 - Discontinued', 'Category Killer - Lifely Sofa'], filter: sku => !isCushieSetBomSku(sku) && ((sku.startsWith('CUSB') && !sku.includes('-UK') && !sku.includes('SGE')) || (sku.startsWith('LFSB') && !sku.includes('-UK'))), excludeCV: true, sizes: {'ARST':'Armrest','-TW-':'Twin','-S-':'Single','-D-':'Double','-Q-':'Queen','-K-':'King','-CHS-':'Chaise','-SOTM-':'Ottoman','-AMST-':'Armrest'} },
   'cusb-us':  { name: 'Cushie US',              prefix: 'MULTI',  logo: 'cushie.png',        store: 'lifely', salesCountry: 'US', stockBranches: [60701], option1: ['Category Killer - Cushie V2', 'Category Killer - Cushie V2 - Discontinued', 'Category Killer - Cushie V3 Snuggle'], filter: sku => !isCushieSetBomSku(sku) && (sku.startsWith('V2-') || sku.startsWith('V3-')), excludeCV: true, sizes: {'-TB-':'Twin','-DB-':'Full','-QB-':'Queen','-KB-':'King','-CH-':'Chaise','-OS-':'Ottoman','-OB-':'Ottoman Bed','-RMST':'Armrest','-RMST-':'Armrest','-ARM-':'Armrest'} },
   'cusb-ca':  { name: 'Cushie CA',              prefix: 'MULTI',  logo: 'cushie.png',        store: 'lifely', poDestination: 'Canada', salesCountry: 'CA', stockBranches: [61831], option1: ['Category Killer - Cushie V2', 'Category Killer - Cushie V2 - Discontinued', 'Category Killer - Cushie V3 Snuggle'], filter: sku => !isCushieSetBomSku(sku) && (sku.startsWith('V2-') || sku.startsWith('V3-')), excludeCV: true, sizes: {'-TB-':'Twin','-DB-':'Full','-QB-':'Queen','-KB-':'King','-CH-':'Chaise','-OS-':'Ottoman','-OB-':'Ottoman Bed','-RMST':'Armrest','-RMST-':'Armrest','-ARM-':'Armrest'} },
@@ -71,7 +71,7 @@ const CK_DEFS = {
 
   'cmss':     { name: 'Cushie Modular Sleeper', prefix: 'CMSS',   logo: 'cushie.png',        store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Cushie V2', sizes: {'-S-':'Single','-D-':'Double','-Q-':'Queen','-K-':'King'} },
   'lifely-sofa': { name: 'Lifely Sofa',         prefix: 'MULTI',  logo: 'lifely-sofa.png',   store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: ['Category Killer - Lifely Sofa', 'Category Killer - Lifely Sofa - Discontinued'], filter: isLifelySofaComponentSku, sizes: {} },
-  'case-goods': { name: 'Case Goods',           prefix: 'MULTI',  logo: 'lifely-sofa.png',   store: 'lifely', option1: 'Case goods - Active', filter: isCaseGoodsSku, sizes: {} }
+  'case-goods': { name: 'Case Goods',           prefix: 'MULTI',  logo: null,                mark: 'CASE', store: 'lifely', option1: 'Case goods - Active', filter: isCaseGoodsSku, sizes: {} }
 };
 
 // ===== COMBO BOM (Bill of Materials) =====
@@ -3390,7 +3390,7 @@ app.get('/api/ck-list', requireAuth, (req, res) => {
     const skuCount = data ? new Set([...Object.keys(data.cin7 || {}), ...Object.keys(data.velocity || {}).filter(k => !String(k).startsWith('_'))]).size : 0;
     const brand = getBrandGroup(id, def);
     const subgroup = getBrandSubgroup(id, def);
-    return { id, name: def.name, logo: def.logo, skuCount, brand, subgroup };
+    return { id, name: def.name, logo: def.logo, mark: def.mark || null, skuCount, brand, subgroup };
   }).sort((a, b) => {
     if (a.brand?.id === 'little-lifely' || b.brand?.id === 'little-lifely') return (littleLifelyListOrder[a.id] ?? 999) - (littleLifelyListOrder[b.id] ?? 999);
     return 0;
