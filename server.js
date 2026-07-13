@@ -62,6 +62,7 @@ const CK_DEFS = {
   'cocoon':   { name: 'Cocoon Bed',             prefix: 'COCOON', logo: 'cocoon-bed.png',    store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Cocoon Bed', sizes: {'-DOUBLE-':'Double','-QUEEN-':'Queen','-KING-':'King'} },
   'rdnt':     { name: 'Radiant',                prefix: 'RDNT',   logo: 'radiant.png',       store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Radiant', sizes: {'-D-':'Double','-Q-':'Queen','-K-':'King'} },
   'wfhcr':    { name: 'WFH Chair',              prefix: 'WFHCR',  logo: 'wfh-chair.png',     store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - WFH Chair', filter: isWfhChairSellableSku, sizes: {} },
+  'airflow-pad': { name: 'Airflow Pad',           prefix: 'PAD-',   logo: 'lifely-sofa.png',  store: 'lifely', option1: 'Airflow Pad', sizes: {'4P':'4 Pad','6P':'6 Pad','8P':'8 Pad','10P':'10 Pad','15P':'15 Pad','18P':'18 Pad','20P':'20 Pad','30P':'30 Pad'} },
   'caterpillar': { name: 'Caterpillar Dining',    prefix: 'MULTI',  logo: 'lifely-sofa.png',  store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Caterpillar', sizes: {'EDT':'Dining Table','EDB':'Dining Chair'} },
   'cusb-au':  { name: 'Cushie AU',              prefix: 'MULTI',  logo: 'cushie.png',        store: 'lifely', poDestination: 'Australia', salesCountry: 'AU', stockBranches: LL_AU_BRANCH_IDS, option1: ['Category Killer - Cushie V3 Snuggle', 'Category Killer - Cushie V2', 'Category Killer - Cushie V2 - Discontinued', 'Category Killer - Lifely Sofa'], filter: sku => !isCushieSetBomSku(sku) && ((sku.startsWith('CUSB') && !sku.includes('-UK') && !sku.includes('SGE')) || (sku.startsWith('LFSB') && !sku.includes('-UK'))), excludeCV: true, sizes: {'ARST':'Armrest','-TW-':'Twin','-S-':'Single','-D-':'Double','-Q-':'Queen','-K-':'King','-CHS-':'Chaise','-SOTM-':'Ottoman','-AMST-':'Armrest'} },
   'cusb-us':  { name: 'Cushie US',              prefix: 'MULTI',  logo: 'cushie.png',        store: 'lifely', salesCountry: 'US', stockBranches: [60701], option1: ['Category Killer - Cushie V2', 'Category Killer - Cushie V2 - Discontinued', 'Category Killer - Cushie V3 Snuggle'], filter: sku => !isCushieSetBomSku(sku) && (sku.startsWith('V2-') || sku.startsWith('V3-')), excludeCV: true, sizes: {'-TB-':'Twin','-DB-':'Full','-QB-':'Queen','-KB-':'King','-CH-':'Chaise','-OS-':'Ottoman','-OB-':'Ottoman Bed','-RMST':'Armrest','-RMST-':'Armrest','-ARM-':'Armrest'} },
@@ -901,6 +902,7 @@ function isCaseGoodsSku(sku) {
   if (s.startsWith('DD-') || s.startsWith('DDM') || s.startsWith('DDRM')) return false;
   if (s.startsWith('RAD') || s.startsWith('RDNT')) return false;
   if (s.startsWith('WFH')) return false;
+  if (s.startsWith('PAD-')) return false;
   if (['QB+ARMREST', 'TB+ARMREST', 'TB-ARMREST', 'DB+ARMREST', 'OB-', 'OS-'].some(p => s.includes(p))) return false;
   return true;
 }
@@ -2472,7 +2474,7 @@ function buildCKData(ckId) {
   // Little Lifely has special bed+mattress bundle logic above. Lifely CKs use
   // direct SKU open-demand and PO rows so the dashboard can show the same
   // Preorders / Next PO / Coverage columns without mixing category membership.
-  const lifelyCoverageIds = new Set(['dd', 'cocoon', 'rdnt', 'wfhcr', 'lifely-sofa', 'caterpillar']);
+  const lifelyCoverageIds = new Set(['dd', 'cocoon', 'rdnt', 'wfhcr', 'airflow-pad', 'lifely-sofa', 'caterpillar']);
   if (!coverageAux && lifelyCoverageIds.has(ckId)) {
     const openDemandBySku = {};
     const rawOpenDemandBySku = {};
@@ -3285,7 +3287,7 @@ function getBrandGroup(id, def) {
   if (id.startsWith('cusb') || id === 'cmss') return { id: 'cushie', name: 'Cushie', logo: 'cushie.png' };
   if (id.startsWith('ll')) return { id: 'little-lifely', name: 'Little Lifely', logo: 'little-lifely.png' };
   if (id === 'case-goods') return { id: 'case-goods', name: 'Case Goods', logo: def.logo };
-  if (id === 'lifely-sofa' || id === 'dd' || id === 'cocoon' || id === 'rdnt' || id === 'wfhcr' || id === 'caterpillar') return { id: 'lifely-home', name: 'Lifely', logo: def.logo };
+  if (id === 'lifely-sofa' || id === 'dd' || id === 'cocoon' || id === 'rdnt' || id === 'wfhcr' || id === 'airflow-pad' || id === 'caterpillar') return { id: 'lifely-home', name: 'Lifely', logo: def.logo };
   return { id: 'other', name: 'Other', logo: def.logo };
 }
 
