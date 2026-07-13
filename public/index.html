@@ -470,7 +470,7 @@ function buildPreorderCoverage(s){
 function getVel(s){let v=DATA.velocity[s]||0;if(typeof v!=='number')v=Number(v)||0;if(v===0&&(DATA.trendData||{})[s]?.lastInStockVel){return DATA.trendData[s].lastInStockVel}return v}
 function isEstVel(s){return(DATA.velocity[s]||0)===0&&(DATA.trendData||{})[s]?.lastInStockVel>0}
 function getSize(s){for(const[k,l]of Object.entries(DATA.sizes||{})){if(s.includes(k))return l}return'Other'}
-function getSizeKeys(){const s=new Set(getSkus().map(x=>getSize(x)));return['All',...s]}
+function getSizeKeys(){if(currentCK==='airflow-pad')return['All','Little Lifely','Cocoon','Snuggle','Cushie V2'];const s=new Set(getSkus().map(x=>getSize(x)));return['All',...s]}
 function getCushieProductType(sku){if(DATA.productTypes&&DATA.productTypes[sku])return DATA.productTypes[sku];const s=String(sku||'').toUpperCase();if(s.endsWith('-SC')||s.includes('-CV'))return'Slipcover';if(s.startsWith('V3-'))return'V3';if(s.startsWith('V2-')||s.startsWith('CUSB')||s.startsWith('LFSB'))return'V2';return'Other'}
 function isLittleLifelyCountryPanel(){return ['llau','llnz','llna','llca','lluk','llsg'].includes(currentCK)}
 function getLittleLifelyComponentType(sku){
@@ -930,6 +930,7 @@ function renderDashboard(){
     cocoon:{label:'Lifely', place:'Lifely'},
     rdnt:{label:'Lifely', place:'Lifely'},
     wfhcr:{label:'Lifely', place:'Lifely'},
+    'airflow-pad':{label:'Lifely', place:'Lifely'},
     'lifely-sofa':{label:'Lifely', place:'Lifely'},
     caterpillar:{label:'Lifely', place:'Lifely'}
   };

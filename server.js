@@ -62,7 +62,7 @@ const CK_DEFS = {
   'cocoon':   { name: 'Cocoon Bed',             prefix: 'COCOON', logo: 'cocoon-bed.png',    store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Cocoon Bed', sizes: {'-DOUBLE-':'Double','-QUEEN-':'Queen','-KING-':'King'} },
   'rdnt':     { name: 'Radiant',                prefix: 'RDNT',   logo: 'radiant.png',       store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Radiant', sizes: {'-D-':'Double','-Q-':'Queen','-K-':'King'} },
   'wfhcr':    { name: 'WFH Chair',              prefix: 'WFHCR',  logo: 'wfh-chair.png',     store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - WFH Chair', filter: isWfhChairSellableSku, sizes: {} },
-  'airflow-pad': { name: 'Airflow Pad',           prefix: 'PAD-',   logo: 'lifely-sofa.png',  store: 'lifely', option1: 'Airflow Pad', sizes: {'4P':'4 Pad','6P':'6 Pad','8P':'8 Pad','10P':'10 Pad','15P':'15 Pad','18P':'18 Pad','20P':'20 Pad','30P':'30 Pad'} },
+  'airflow-pad': { name: 'Airflow Pad',           prefix: 'PAD-',   logo: 'lifely-sofa.png',  store: 'lifely', option1: 'Airflow Pad', sizes: {'LL':'Little Lifely','CC':'Cocoon','V3':'Snuggle','V2':'Cushie V2'} },
   'caterpillar': { name: 'Caterpillar Dining',    prefix: 'MULTI',  logo: 'lifely-sofa.png',  store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Caterpillar', sizes: {'EDT':'Dining Table','EDB':'Dining Chair'} },
   'cusb-au':  { name: 'Cushie AU',              prefix: 'MULTI',  logo: 'cushie.png',        store: 'lifely', poDestination: 'Australia', salesCountry: 'AU', stockBranches: LL_AU_BRANCH_IDS, option1: ['Category Killer - Cushie V3 Snuggle', 'Category Killer - Cushie V2', 'Category Killer - Cushie V2 - Discontinued', 'Category Killer - Lifely Sofa'], filter: sku => !isCushieSetBomSku(sku) && ((sku.startsWith('CUSB') && !sku.includes('-UK') && !sku.includes('SGE')) || (sku.startsWith('LFSB') && !sku.includes('-UK'))), excludeCV: true, sizes: {'ARST':'Armrest','-TW-':'Twin','-S-':'Single','-D-':'Double','-Q-':'Queen','-K-':'King','-CHS-':'Chaise','-SOTM-':'Ottoman','-AMST-':'Armrest'} },
   'cusb-us':  { name: 'Cushie US',              prefix: 'MULTI',  logo: 'cushie.png',        store: 'lifely', salesCountry: 'US', stockBranches: [60701], option1: ['Category Killer - Cushie V2', 'Category Killer - Cushie V2 - Discontinued', 'Category Killer - Cushie V3 Snuggle'], filter: sku => !isCushieSetBomSku(sku) && (sku.startsWith('V2-') || sku.startsWith('V3-')), excludeCV: true, sizes: {'-TB-':'Twin','-DB-':'Full','-QB-':'Queen','-KB-':'King','-CH-':'Chaise','-OS-':'Ottoman','-OB-':'Ottoman Bed','-RMST':'Armrest','-RMST-':'Armrest','-ARM-':'Armrest'} },
@@ -2878,7 +2878,7 @@ function buildCKData(ckId) {
 
   // Remove inactive Shopify SKUs (draft/archived)
   const inactiveSet = new Set(relatedStores.flatMap(sourceStore => dataCache.shopifyInventory?.[sourceStore]?.['__inactive__'] || []));
-  const keepInactiveForPanel = ckId === 'll-mattresses' || ckId === 'dd' || ckId === 'lifely-sofa' || ckId === 'llau' || ckId === 'llna' || ckId === 'llca';
+  const keepInactiveForPanel = ckId === 'll-mattresses' || ckId === 'dd' || ckId === 'lifely-sofa' || ckId === 'airflow-pad' || ckId === 'llau' || ckId === 'llna' || ckId === 'llca';
   for (const sku of Object.keys(cin7)) {
     if (!keepInactiveForPanel && inactiveSet.has(sku)) { delete cin7[sku]; delete velocity[sku]; delete shopify[sku]; }
   }
@@ -3306,7 +3306,7 @@ app.get('/api/ck-list', requireAuth, (req, res) => {
   const littleLifelyListOrder = { llau: 0, llna: 1, llca: 2, lluk: 3, llnz: 4, llsg: 5, 'll-mattresses': 6 };
   const list = Object.entries(CK_DEFS).filter(([id]) => !HIDDEN_CK_TABS.has(id)).map(([id, def]) => {
     const data = buildCKData(id);
-    const skuCount = data ? Object.keys(data.cin7).length + Object.keys(data.velocity).length : 0;
+    const skuCount = data ? new Set([...Object.keys(data.cin7 || {}), ...Object.keys(data.velocity || {}).filter(k => !String(k).startsWith('_'))]).size : 0;
     const brand = getBrandGroup(id, def);
     const subgroup = getBrandSubgroup(id, def);
     return { id, name: def.name, logo: def.logo, skuCount, brand, subgroup };
