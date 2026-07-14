@@ -66,7 +66,7 @@ const CK_DEFS = {
   'caterpillar': { name: 'Caterpillar Dining',    prefix: 'MULTI',  logo: null,               mark: 'CAT',  store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Caterpillar', sizes: {'EDT':'Dining Table','EDB':'Dining Chair'} },
   'cusb-au':  { name: 'Cushie AU',              prefix: 'MULTI',  logo: 'cushie.png',        store: 'lifely', poDestination: 'Australia', salesCountry: 'AU', stockBranches: LL_AU_BRANCH_IDS, option1: ['Category Killer - Cushie V3 Snuggle', 'Category Killer - Cushie V2', 'Category Killer - Cushie V2 - Discontinued', 'Category Killer - Lifely Sofa'], filter: sku => !isCushieSetBomSku(sku) && ((sku.startsWith('CUSB') && !sku.includes('-UK') && !sku.includes('SGE')) || (sku.startsWith('LFSB') && !sku.includes('-UK'))), excludeCV: true, sizes: {'ARST':'Armrest','-TW-':'Twin','-S-':'Single','-D-':'Double','-Q-':'Queen','-K-':'King','-CHS-':'Chaise','-SOTM-':'Ottoman','-AMST-':'Armrest'} },
   'cusb-us':  { name: 'Cushie US',              prefix: 'MULTI',  logo: 'cushie.png',        store: 'lifely', salesCountry: 'US', stockBranches: [60701], option1: ['Category Killer - Cushie V2', 'Category Killer - Cushie V2 - Discontinued', 'Category Killer - Cushie V3 Snuggle'], filter: sku => !isCushieSetBomSku(sku) && (sku.startsWith('V2-') || sku.startsWith('V3-')), excludeCV: true, sizes: {'-TB-':'Twin','-DB-':'Full','-QB-':'Queen','-KB-':'King','-CH-':'Chaise','-OS-':'Ottoman','-OB-':'Ottoman Bed','-RMST':'Armrest','-RMST-':'Armrest','-ARM-':'Armrest'} },
-  'cusb-ca':  { name: 'Cushie CA',              prefix: 'MULTI',  logo: 'cushie.png',        store: 'lifely', poDestination: 'Canada', salesCountry: 'CA', stockBranches: [61831], option1: ['Category Killer - Cushie V2', 'Category Killer - Cushie V2 - Discontinued', 'Category Killer - Cushie V3 Snuggle'], filter: sku => !isCushieSetBomSku(sku) && (sku.startsWith('V2-') || sku.startsWith('V3-')), excludeCV: true, sizes: {'-TB-':'Twin','-DB-':'Full','-QB-':'Queen','-KB-':'King','-CH-':'Chaise','-OS-':'Ottoman','-OB-':'Ottoman Bed','-RMST':'Armrest','-RMST-':'Armrest','-ARM-':'Armrest'} },
+  'cusb-ca':  { name: 'Cushie CA',              prefix: 'MULTI',  logo: 'cushie.png',        store: 'lifely', poDestination: 'Canada', salesCountry: 'CA', stockBranches: [61831], option1: ['Category Killer - Cushie V2', 'Category Killer - Cushie V2 - Discontinued', 'Category Killer - Cushie V3 Snuggle'], filter: sku => !isCushieSetBomSku(sku) && (sku.startsWith('V2-') || sku.startsWith('V3-')) && !isCushieCanadaExcludedSku(sku), excludeCV: true, sizes: {'-TB-':'Twin','-DB-':'Full','-QB-':'Queen','-KB-':'King','-CH-':'Chaise','-OS-':'Ottoman','-OB-':'Ottoman Bed','-RMST':'Armrest','-RMST-':'Armrest','-ARM-':'Armrest'} },
   'cusb-uk':  { name: 'Cushie UK',              prefix: 'MULTI',  logo: 'cushie.png',        store: 'lifely', salesCountry: 'GB', stockBranches: [62444], option1: ['Category Killer - Cushie V2', 'Category Killer - Cushie V2 - Discontinued', 'Category Killer - Cushie V3 Snuggle'], filter: sku => !isCushieSetBomSku(sku) && (sku.startsWith('CUSB') || sku.startsWith('LFSB')) && sku.includes('-UK'), excludeCV: true, sizes: {'-TW-':'Twin','-S-':'Single','-D-':'Double','-Q-':'Queen','-K-':'King','-CHS-':'Chaise','-SOTM-':'Ottoman','-AMST-':'Armrest'} },
 
   'cmss':     { name: 'Cushie Modular Sleeper', prefix: 'CMSS',   logo: 'cushie.png',        store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Cushie V2', sizes: {'-S-':'Single','-D-':'Double','-Q-':'Queen','-K-':'King'} },
@@ -102,6 +102,9 @@ function isCushieSetBomSku(sku) {
 }
 function isWfhChairSellableSku(sku) {
   return /^WFHCR-[A-Z0-9]+$/.test(String(sku || '').toUpperCase().trim());
+}
+function isCushieCanadaExcludedSku(sku) {
+  return /^V2-.*-DKGY$/.test(String(sku || '').toUpperCase().trim());
 }
 
 function loadCushieUsSkuMapping() {
@@ -2965,6 +2968,23 @@ function buildCKData(ckId) {
   }
   for (const sku of Object.keys(velocity)) {
     if (!keepInactiveForPanel && inactiveSet.has(sku)) { delete velocity[sku]; }
+  }
+
+  // Cushie V2 Dark Grey is intentionally excluded from the Canada panel.
+  // Remove it after demand explosion too, otherwise Canadian bundle velocity can
+  // reintroduce DKGY component rows after the initial Cin7 product filter.
+  if (ckId === 'cusb-ca') {
+    for (const sku of new Set([...Object.keys(cin7), ...Object.keys(shopify), ...Object.keys(velocity)])) {
+      if (!isCushieCanadaExcludedSku(sku)) continue;
+      delete cin7[sku];
+      delete cin7Available[sku];
+      delete shopify[sku];
+      delete openOrders[sku];
+      delete incoming[sku];
+      delete velocity[sku];
+      delete costs[sku];
+      delete cbmMap[sku];
+    }
   }
 
   // Final row guard: known bundle/config SKUs must not appear as CK rows.
