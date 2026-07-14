@@ -3402,6 +3402,251 @@ function getBrandSubgroup(id, def) {
 
 const HIDDEN_CK_TABS = new Set(['llau-cbcf', 'cmss']);
 
+let executiveSummaryCache = { key: null, value: null };
+
+function executiveVelocity(data, sku) {
+  const direct = Number(data?.velocity?.[sku] || 0);
+  if (direct > 0) return direct;
+  return Number(data?.trendData?.[sku]?.lastInStockVel || 0);
+}
+
+function executivePanelSummary(id) {
+  const def = CK_DEFS[id];
+  const data = buildCKData(id);
+  if (!def || !data) return null;
+
+  const mattressSkus = new Set(data.coverageAux?.mattressSkus || []);
+  const skus = [...new Set([
+    ...Object.keys(data.cin7 || {}),
+    ...Object.keys(data.velocity || {}).filter(sku => !String(sku).startsWith('_'))
+  ])].filter(sku => {
+    if (!sku || String(sku).startsWith('_')) return false;
+    // These country views intentionally hide mattress components; the dedicated
+    // mattress view owns that portfolio position.
+    if (['llau', 'llnz', 'lluk'].includes(id) && mattressSkus.has(sku)) return false;
+    return true;
+  });
+
+  const rows = skus.map(sku => {
+    const soh = Number(data.cin7?.[sku] || 0);
+    const openDemand = Object.prototype.hasOwnProperty.call(data.openOrders || {}, sku)
+      ? Number(data.openOrders[sku] || 0)
+      : Math.max(-Number(data.shopify?.[sku] || 0), 0);
+    const available = Object.prototype.hasOwnProperty.call(data.available || {}, sku)
+      ? Number(data.available[sku] || 0)
+      : soh - openDemand;
+    const incoming = Number(data.incoming?.[sku] || 0);
+    const velocity = executiveVelocity(data, sku);
+    const weeks = velocity > 0 ? Math.max(available, 0) / velocity : null;
+    const hasDemandSignal = velocity > 0 || openDemand > 0;
+    const stockout = available <= 0 && hasDemandSignal;
+    const demandBackedStockout = stockout && openDemand > 0;
+    const critical = !stockout && weeks !== null && weeks <= 2;
+    const low = !stockout && !critical && weeks !== null && weeks <= 4;
+    const newSku = data.trendData?.[sku]?.firstSeen
+      ? (Date.now() - Date.parse(data.trendData[sku].firstSeen)) / 864e5 < 30
+      : false;
+    const cost = Number(data.costs?.[sku] || 0);
+    const excessUnits = velocity > 0 ? Math.max(0, soh - velocity * 25) : 0;
+    const deadUnits = !newSku && velocity <= 0 && openDemand <= 0 ? Math.max(soh, 0) : 0;
+    const severity = demandBackedStockout ? 4 : critical ? 3 : (stockout || low) ? 2 : (deadUnits > 0 || excessUnits > 0) ? 1 : 0;
+    return {
+      sku,
+      soh,
+      available,
+      openDemand,
+      incoming,
+      velocity,
+      weeks: weeks === null ? null : Math.round(weeks * 10) / 10,
+      stockout,
+      demandBackedStockout,
+      critical,
+      low,
+      severity,
+      uncoveredDemand: Math.max(openDemand - Math.max(soh, 0) - incoming, 0),
+      excessValue: excessUnits * cost,
+      deadValue: deadUnits * cost
+    };
+  });
+
+  const stockouts = rows.filter(row => row.demandBackedStockout);
+  const zeroCover = rows.filter(row => row.stockout);
+  const critical = rows.filter(row => row.critical);
+  const low = rows.filter(row => row.low);
+  const totalVelocity = rows.reduce((sum, row) => sum + row.velocity, 0);
+  const totalAvailable = rows.reduce((sum, row) => sum + row.available, 0);
+  const openDemand = rows.reduce((sum, row) => sum + row.openDemand, 0);
+  const incoming = rows.reduce((sum, row) => sum + row.incoming, 0);
+  const uncoveredDemand = rows.reduce((sum, row) => sum + row.uncoveredDemand, 0);
+  const overstockValue = rows.reduce((sum, row) => sum + row.excessValue, 0);
+  const deadstockValue = rows.reduce((sum, row) => sum + row.deadValue, 0);
+  const status = stockouts.length || uncoveredDemand > 0
+    ? 'critical'
+    : zeroCover.length || critical.length || low.length || overstockValue > 0 || deadstockValue > 0
+      ? 'watch'
+      : 'healthy';
+  const brand = getBrandGroup(id, def);
+
+  return {
+    id,
+    name: def.name,
+    brand: brand.name,
+    status,
+    skuPositions: rows.length,
+    stockouts: stockouts.length,
+    zeroCover: zeroCover.length,
+    critical: critical.length,
+    low: low.length,
+    actionPositions: stockouts.length + critical.length,
+    openDemand: Math.round(openDemand),
+    incoming: Math.round(incoming),
+    uncoveredDemand: Math.round(uncoveredDemand),
+    weightedWeeks: totalVelocity > 0 ? Math.round((Math.max(totalAvailable, 0) / totalVelocity) * 10) / 10 : null,
+    overstockValue: Math.round(overstockValue),
+    deadstockValue: Math.round(deadstockValue),
+    topRisks: rows.filter(row => row.severity > 0).sort((a, b) =>
+      b.severity - a.severity
+      || b.uncoveredDemand - a.uncoveredDemand
+      || b.openDemand - a.openDemand
+      || a.sku.localeCompare(b.sku)
+    ).slice(0, 4).map(row => ({
+      sku: row.sku,
+      status: row.demandBackedStockout ? 'Stockout' : row.critical ? 'Critical' : row.stockout ? 'Zero cover' : row.low ? 'Low cover' : row.deadValue > 0 ? 'Dead stock' : 'Overstock',
+      available: Math.round(row.available),
+      openDemand: Math.round(row.openDemand),
+      incoming: Math.round(row.incoming),
+      weeks: row.weeks,
+      severity: row.severity
+    }))
+  };
+}
+
+function buildExecutiveSummary() {
+  const cacheKey = [dataCache.lastRefresh, dataCache.lastCin7Refresh, dataCache.lastPoRefresh, dataCache.lastShopifyRefresh, fxRate.USDAUD].join('|');
+  if (executiveSummaryCache.key === cacheKey && executiveSummaryCache.value) return executiveSummaryCache.value;
+
+  const panels = Object.keys(CK_DEFS)
+    .filter(id => !HIDDEN_CK_TABS.has(id))
+    .map(executivePanelSummary)
+    .filter(Boolean)
+    .sort((a, b) => {
+      const rank = { critical: 0, watch: 1, healthy: 2 };
+      return rank[a.status] - rank[b.status]
+        || b.uncoveredDemand - a.uncoveredDemand
+        || b.stockouts - a.stockouts
+        || b.actionPositions - a.actionPositions
+        || a.name.localeCompare(b.name);
+    });
+
+  const uniquePos = [...new Map((dataCache.cin7POs || []).map(po => [
+    String(po.id || po.orderId || po.purchaseOrderId || po.reference || crypto.randomUUID()),
+    po
+  ])).values()];
+  const openPos = uniquePos.filter(isOpenPO);
+  const now = new Date();
+  const poRows = openPos.map(po => {
+    const destination = inferDestination(po);
+    const landed = estimateLandedCost(po, destination);
+    const eta = poTabEtaDate(po) || poTabOriginalEtaDate(po);
+    const overdue = isPoOverdueForPoTab(po, now);
+    const inTransit = isPoInTransitForPoTab(po, now) && !overdue;
+    const daysOverdue = overdue && eta ? Math.max(0, Math.floor((now - eta) / 864e5)) : 0;
+    return {
+      reference: po.reference || 'Unreferenced PO',
+      supplier: po.company || 'Supplier not recorded',
+      destination,
+      eta: eta ? eta.toISOString() : null,
+      units: Math.round(Object.values(po.items || {}).reduce((sum, qty) => sum + Number(qty || 0), 0)),
+      landedValueAud: Math.round(Number(landed.landedTotal || 0)),
+      overdue,
+      inTransit,
+      daysOverdue
+    };
+  });
+  const overduePos = poRows.filter(po => po.overdue);
+  const transitPos = poRows.filter(po => po.inTransit);
+  const productionPos = poRows.filter(po => !po.overdue && !po.inTransit);
+  const poValue = rows => rows.reduce((sum, po) => sum + po.landedValueAud, 0);
+  const futureCutoff = new Date(now.getTime() + 30 * 864e5);
+  const upcomingAll = poRows.filter(po => !po.overdue && po.eta && new Date(po.eta) <= futureCutoff)
+    .sort((a, b) => new Date(a.eta) - new Date(b.eta));
+  const upcoming = upcomingAll.slice(0, 6);
+
+  const actions = overduePos
+    .sort((a, b) => b.daysOverdue - a.daysOverdue || b.landedValueAud - a.landedValueAud)
+    .slice(0, 3)
+    .map(po => ({
+      type: 'po',
+      severity: 'critical',
+      title: `${po.reference} is ${po.daysOverdue} day${po.daysOverdue === 1 ? '' : 's'} overdue`,
+      detail: `${po.supplier} · ${po.destination} · A$${Math.round(po.landedValueAud).toLocaleString('en-AU')}`,
+      filter: 'overdue'
+    }));
+
+  for (const panel of panels) {
+    if (actions.length >= 7) break;
+    if (panel.status === 'healthy') continue;
+    const parts = [];
+    if (panel.stockouts) parts.push(`${panel.stockouts} stockout${panel.stockouts === 1 ? '' : 's'}`);
+    if (panel.critical) parts.push(`${panel.critical} under 2 weeks`);
+    if (panel.uncoveredDemand) parts.push(`${panel.uncoveredDemand.toLocaleString('en-AU')} ${panel.uncoveredDemand === 1 ? 'unit' : 'units'} not covered by stock + incoming`);
+    if (!parts.length && panel.low) parts.push(`${panel.low} positions under 4 weeks`);
+    if (!parts.length && panel.deadstockValue) parts.push(`A$${panel.deadstockValue.toLocaleString('en-AU')} dead stock at FOB`);
+    if (!parts.length && panel.overstockValue) parts.push(`A$${panel.overstockValue.toLocaleString('en-AU')} above 25 weeks at FOB`);
+    actions.push({
+      type: 'ck',
+      severity: panel.status,
+      title: `${panel.name} needs review`,
+      detail: parts.join(' · '),
+      ckId: panel.id
+    });
+  }
+
+  const topRisks = panels.flatMap(panel => panel.topRisks.map(row => ({ ...row, ckId: panel.id, ckName: panel.name })))
+    .sort((a, b) => b.severity - a.severity || b.openDemand - a.openDemand || a.sku.localeCompare(b.sku))
+    .slice(0, 8);
+
+  const summary = {
+    headline: {
+      totalPanels: panels.length,
+      actionPanels: panels.filter(panel => panel.status === 'critical').length,
+      watchPanels: panels.filter(panel => panel.status === 'watch').length,
+      healthyPanels: panels.filter(panel => panel.status === 'healthy').length,
+      stockoutPositions: panels.reduce((sum, panel) => sum + panel.stockouts, 0),
+      actionPositions: panels.reduce((sum, panel) => sum + panel.actionPositions, 0),
+      atRiskOpenDemand: panels.reduce((sum, panel) => sum + panel.uncoveredDemand, 0)
+    },
+    po: {
+      active: poRows.length,
+      production: productionPos.length,
+      inTransit: transitPos.length,
+      overdue: overduePos.length,
+      noEta: poRows.filter(po => !po.eta).length,
+      incomingUnits: poRows.reduce((sum, po) => sum + po.units, 0),
+      pipelineValueAud: Math.round(poValue(poRows)),
+      productionValueAud: Math.round(poValue(productionPos)),
+      transitValueAud: Math.round(poValue(transitPos)),
+      overdueValueAud: Math.round(poValue(overduePos)),
+      arrivingWithin30Days: upcomingAll.length
+    },
+    actions,
+    panels,
+    topRisks,
+    upcoming,
+    lastRefresh: dataCache.lastRefresh,
+    lastCin7Refresh: dataCache.lastCin7Refresh,
+    lastPoRefresh: dataCache.lastPoRefresh,
+    lastShopifyRefresh: dataCache.lastShopifyRefresh
+  };
+  executiveSummaryCache = { key: cacheKey, value: summary };
+  return summary;
+}
+
+app.get('/api/executive-summary', requireAuth, (req, res) => {
+  reloadSnapshotIfNewer();
+  res.json(buildExecutiveSummary());
+});
+
 app.get('/api/ck-list', requireAuth, (req, res) => {
   reloadSnapshotIfNewer();
   const littleLifelyListOrder = { llau: 0, llna: 1, llca: 2, lluk: 3, llnz: 4, llsg: 5, 'll-mattresses': 6 };

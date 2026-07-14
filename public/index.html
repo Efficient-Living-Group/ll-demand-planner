@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Lifely Demand Planner</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
@@ -94,12 +94,74 @@ th[data-tip]{position:relative;cursor:help}th[data-tip]:after{content:' ⓘ';fon
   :root{--content-pad:12px}.sidebar{width:min(86vw,320px);transform:translateX(-100%);transition:transform 0.3s;position:fixed;z-index:200;box-shadow:4px 0 20px rgba(0,0,0,0.3);opacity:1!important}.sidebar.open{transform:translateX(0)}body.sidebar-collapsed .sidebar{opacity:1}.sidebar-close{display:flex;align-items:center;justify-content:center}.main,#allPOsView{margin-left:0!important}.main{width:100%}.mobile-menu{display:flex !important}.desktop-sidebar-toggle{display:none !important}.mobile-overlay.open{display:block}.header{align-items:flex-start}.header h1{font-size:16px;line-height:1.25}.header>div:first-child{align-items:flex-start!important}.header>div:last-child{max-width:42%;overflow:hidden}.tabs{padding:0;scrollbar-width:none}.tab{padding:10px 12px;white-space:nowrap}.container{padding:14px 10px}.cards{grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}.card{padding:14px}.card .value{font-size:22px}.chart-container{padding:14px}.table-wrap{max-height:none}.chat-panel{left:10px;right:10px;bottom:76px;width:auto;height:min(70vh,520px)}.chat-toggle{right:16px;bottom:16px}.po-page{padding:14px 10px}.po-page-header{flex-direction:column;align-items:stretch!important;margin-bottom:14px}.po-toolbar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}.po-toolbar button,.po-toolbar select,.po-toolbar input{width:100%!important;min-width:0}.po-toolbar #poSearch{grid-column:1/-1}.po-filter-btns{display:flex!important;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:14px!important}.po-filter-btns .filter-btn{white-space:nowrap;flex-shrink:0}.po-items{overflow-x:auto}.modal{width:94%;padding:20px}.drilldown{max-height:none;overflow-x:auto}}
 @media(max-width:520px){.header{flex-direction:column}.header>div:last-child{max-width:100%;text-align:left!important}.po-toolbar{grid-template-columns:1fr}.po-row{font-size:10px!important}.po-row>span{font-size:11px}.po-items table{min-width:620px}.heatmap-table td.sku-name{position:static}.cards{grid-template-columns:1fr 1fr}}
 @media(max-width:380px){.cards{grid-template-columns:1fr}}
+
+/* Executive summary */
+.exec-shell{max-width:1440px;margin:0 auto;padding:4px 0 40px;font-variant-numeric:tabular-nums}
+.exec-intro{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;padding:4px 0 20px;border-bottom:1px solid var(--border)}
+.exec-kicker{font-size:10px;line-height:1.2;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--text-dim);margin-bottom:8px}
+.exec-intro h2{font-size:24px;line-height:1.2;letter-spacing:-.02em;color:var(--text);margin:0}
+.exec-intro p{font-size:13px;line-height:1.6;color:var(--text-dim);max-width:62ch;margin-top:8px}
+.exec-asof{font-size:11px;line-height:1.5;color:var(--text-dim);text-align:right;white-space:nowrap}
+.exec-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:24px 0 36px;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.exec-kpi{padding:18px 22px;border-left:1px solid var(--border);min-width:0}
+.exec-kpi:first-child{border-left:none;padding-left:0}.exec-kpi:last-child{padding-right:0}
+.exec-kpi-label{font-size:10px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--text-dim);margin-bottom:8px}
+.exec-kpi-value{font-size:32px;line-height:1;font-weight:760;letter-spacing:-.04em;color:var(--text)}
+.exec-kpi-value.danger{color:#A72743}.exec-kpi-value.good{color:#3F7D25}
+.exec-kpi-sub{font-size:11px;line-height:1.45;color:var(--text-dim);margin-top:7px;white-space:normal}
+.exec-layout{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(310px,.75fr);gap:36px;align-items:start}
+.exec-section{margin-bottom:36px;min-width:0}
+.exec-section-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:12px}
+.exec-section-head h3{font-size:15px;line-height:1.3;color:var(--text);letter-spacing:-.01em}
+.exec-section-head p{font-size:11px;color:var(--text-dim);margin-top:3px}
+.exec-link{border:0;background:transparent;color:var(--blue);font:inherit;font-size:11px;font-weight:800;cursor:pointer;padding:8px 0;text-decoration:underline;text-decoration-color:#B7C8C8;text-underline-offset:3px}
+.exec-link:hover{color:var(--bg-accent)}
+.exec-link:focus-visible,.exec-action:focus-visible,.exec-panel-row:focus-visible,.exec-filter:focus-visible,.exec-risk-row:focus-visible{outline:2px solid var(--yellow);outline-offset:2px}
+.exec-action-list,.exec-panel-list,.exec-risk-list,.exec-arrival-list{border-top:1px solid var(--border)}
+.exec-action{width:100%;display:grid;grid-template-columns:10px minmax(0,1fr) auto;gap:14px;align-items:center;text-align:left;border:0;border-bottom:1px solid var(--border);background:transparent;padding:14px 4px;cursor:pointer;color:var(--text);min-height:64px}
+.exec-action:hover,.exec-panel-row:hover,.exec-risk-row:hover{background:#EDF2EC}
+.exec-action:active,.exec-panel-row:active,.exec-risk-row:active{background:#E4ECE4}
+.exec-signal{width:8px;height:8px;border-radius:50%;background:#5BAB31}.exec-signal.watch{background:#D4930D}.exec-signal.critical{background:#C33252}
+.exec-action-title{display:block;font-size:13px;line-height:1.35;font-weight:750;color:var(--text)}
+.exec-action-detail{display:block;font-size:11px;line-height:1.45;color:var(--text-dim);margin-top:3px}
+.exec-open{font-size:10px;font-weight:800;color:var(--blue);white-space:nowrap}
+.exec-empty{padding:22px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);font-size:13px;color:var(--text-dim)}
+.exec-filters{display:flex;gap:6px;flex-wrap:wrap;margin:2px 0 12px}
+.exec-filter{border:1px solid var(--border);background:transparent;color:var(--text-dim);border-radius:999px;padding:6px 11px;font-size:11px;font-weight:700;cursor:pointer;min-height:32px}
+.exec-filter.active,.exec-filter:hover{background:#E5ECE8;border-color:#90A7A9;color:var(--blue)}
+.exec-panel-head,.exec-panel-row{display:grid;grid-template-columns:minmax(190px,1.6fr) repeat(4,minmax(68px,.62fr)) 30px;gap:10px;align-items:center}
+.exec-panel-head{padding:7px 12px;font-size:9px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--text-dim)}
+.exec-panel-row{width:100%;border:0;border-bottom:1px solid var(--border);background:transparent;text-align:left;padding:12px;cursor:pointer;min-height:62px;color:var(--text)}
+.exec-panel-name{font-size:12px;font-weight:760;line-height:1.25}.exec-panel-brand{font-size:10px;color:var(--text-dim);margin-top:3px}
+.exec-status{display:inline-flex;align-items:center;gap:6px;font-size:9px;font-weight:850;letter-spacing:.05em;text-transform:uppercase;color:var(--text-dim);margin-top:5px}
+.exec-status:before{content:'';width:6px;height:6px;border-radius:50%;background:#5BAB31}.exec-status.watch:before{background:#D4930D}.exec-status.critical:before{background:#C33252}
+.exec-cell{font-size:12px;font-weight:720;color:var(--text);text-align:right}.exec-cell small{display:block;font-size:9px;font-weight:600;color:var(--text-dim);margin-top:2px}
+.exec-cell.danger{color:#A72743}.exec-cell.muted{color:var(--text-dim);font-weight:650}
+.exec-side-block{padding:0 0 28px;margin-bottom:28px;border-bottom:1px solid var(--border)}
+.exec-side-block:last-child{border-bottom:0}
+.exec-pipeline-row{display:grid;grid-template-columns:86px minmax(0,1fr) auto;gap:10px;align-items:center;margin:13px 0}
+.exec-pipeline-label{font-size:11px;color:var(--text-dim)}
+.exec-pipeline-track{height:6px;background:#E1E8DE;border-radius:999px;overflow:hidden}.exec-pipeline-fill{height:100%;background:var(--blue);border-radius:999px}.exec-pipeline-fill.transit{background:#5BAB31}.exec-pipeline-fill.overdue{background:#C33252}
+.exec-pipeline-value{font-size:11px;font-weight:800;color:var(--text);text-align:right;white-space:nowrap}
+.exec-risk-row{width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;border:0;border-bottom:1px solid var(--border);background:transparent;text-align:left;padding:11px 2px;cursor:pointer;color:var(--text)}
+.exec-risk-sku{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px;font-weight:750;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.exec-risk-meta{font-size:10px;color:var(--text-dim);margin-top:4px}
+.exec-risk-stat{text-align:right;font-size:11px;font-weight:800;color:#A72743}.exec-risk-stat small{display:block;color:var(--text-dim);font-size:9px;margin-top:3px}
+.exec-arrival{display:grid;grid-template-columns:72px minmax(0,1fr) auto;gap:10px;padding:11px 2px;border-bottom:1px solid var(--border);align-items:center}
+.exec-arrival-date{font-size:10px;font-weight:800;color:var(--blue)}.exec-arrival-title{font-size:11px;font-weight:750;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.exec-arrival-meta{font-size:9px;color:var(--text-dim);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.exec-arrival-units{font-size:10px;font-weight:800;text-align:right;color:var(--text)}
+.exec-note{font-size:10px;line-height:1.55;color:var(--text-dim);padding-top:12px}
+.exec-skeleton{display:grid;gap:14px;padding:18px 0}.exec-skeleton span{display:block;height:14px;border-radius:4px;background:linear-gradient(90deg,#E5EBE2 25%,#F2F5F0 50%,#E5EBE2 75%);background-size:200% 100%;animation:execShimmer 1.4s infinite}.exec-skeleton span:nth-child(2){width:70%}.exec-skeleton span:nth-child(3){width:86%}
+@keyframes execShimmer{to{background-position:-200% 0}}
+@media(max-width:1100px){.exec-layout{grid-template-columns:1fr;gap:8px}.exec-side{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:28px}.exec-side-block{border-bottom:0;border-top:1px solid var(--border);padding-top:18px}.exec-kpi{padding:16px}}
+@media(max-width:760px){.exec-intro{align-items:flex-start;flex-direction:column;gap:10px}.exec-asof{text-align:left}.exec-kpis{grid-template-columns:1fr 1fr;margin:20px 0 28px}.exec-kpi{border-left:1px solid var(--border);border-bottom:1px solid var(--border);padding:15px 12px}.exec-kpi:nth-child(odd){border-left:0;padding-left:0}.exec-kpi:nth-child(n+3){border-bottom:0}.exec-kpi-value{font-size:27px}.exec-layout{gap:0}.exec-side{grid-template-columns:1fr;gap:0}.exec-panel-head{display:none}.exec-panel-row{grid-template-columns:minmax(0,1fr) repeat(2,64px) 22px;gap:8px}.exec-panel-row .exec-cell:nth-of-type(4),.exec-panel-row .exec-cell:nth-of-type(5){display:none}.exec-action{grid-template-columns:9px minmax(0,1fr);padding:14px 2px}.exec-action .exec-open{display:none}.exec-section{margin-bottom:30px}}
+@media(pointer:coarse){.exec-action,.exec-panel-row,.exec-risk-row,.exec-filter,.exec-link{min-height:44px}}
 </style>
 </head>
 <body>
 <nav class="sidebar" id="sidebar">
   <div class="sidebar-main">
     <div class="sidebar-brand"><div><h2>Lifely</h2><small>Demand Planner</small></div><button class="sidebar-close" onclick="closeMobileMenu()" aria-label="Close menu">×</button></div>
+    <div class="sidebar-label">Portfolio</div>
+    <div class="sidebar-item active" role="button" tabindex="0" onclick="showExecutiveSummary()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showExecutiveSummary()}" id="executiveNavItem" style="grid-template-columns:24px minmax(0,1fr);margin:0 8px 8px"><span aria-hidden="true" style="font-size:15px">◫</span><span>Executive Summary</span></div>
     <div class="sidebar-label">Category Killers</div>
     <div id="sidebarNav"></div>
   </div>
@@ -124,15 +186,16 @@ th[data-tip]{position:relative;cursor:help}th[data-tip]:after{content:' ⓘ';fon
     <div style="text-align:right;flex-shrink:0"><div style="font-size:11px;color:#A8C5C8" id="headerMeta"></div>
     <button onclick="exportCurrentViewExcel()" class="btn btn-ghost" style="padding:2px 10px;font-size:11px;margin-top:4px;color:#A8C5C8;border-color:#A8C5C8" id="exportExcelBtn">📥 Export Excel</button> <button onclick="manualRefresh()" class="btn btn-ghost" style="padding:2px 10px;font-size:11px;margin-top:4px;color:#A8C5C8;border-color:#A8C5C8" id="refreshBtn">🔄 Refresh</button></div>
   </div>
-  <div class="tabs">
+  <div class="tabs" id="categoryTabs" style="display:none">
     <div class="tab active" data-view="dashboard">📊 Dashboard</div>
     <div class="tab" data-view="stockout">📉 Stockout</div>
     <div class="tab" data-view="reorder">🚨 Reorder</div>
     <div class="tab" data-view="forecast">📈 Forecast</div>
   </div>
   <div class="container">
-    <div id="loadingScreen" class="loading"><div class="spinner"></div><br>Loading data from CIN7 + Shopify...</div>
+    <div id="loadingScreen" class="loading" style="display:none"><div class="spinner"></div><br>Loading data from CIN7 + Shopify...</div>
     <div id="freshnessWarning" class="freshness-warning"></div>
+    <div id="executiveSummary" class="view active"><div class="exec-shell" id="executiveSummaryContent"><div class="exec-skeleton" aria-label="Loading executive summary"><span></span><span></span><span></span></div></div></div>
     <div id="dashboard" class="view">
       <div class="cards" id="summary-cards"></div>
       <div class="drilldown" id="inboundDrilldown"></div>
@@ -205,12 +268,12 @@ th[data-tip]{position:relative;cursor:help}th[data-tip]:after{content:' ⓘ';fon
       </div>
     </div>
     <div class="po-filter-btns" style="display:flex;gap:6px;margin-bottom:20px" id="poFilterBtns">
-      <button class="filter-btn active" onclick="setPoFilter('all',this)">All</button>
-      <button class="filter-btn" onclick="setPoFilter('active',this)">📦 Active</button>
-      <button class="filter-btn" onclick="setPoFilter('production',this)">🏭 In Production</button>
-      <button class="filter-btn" onclick="setPoFilter('transit',this)">🚢 In Transit</button>
-      <button class="filter-btn" onclick="setPoFilter('overdue',this)">⚠️ Overdue</button>
-      <button class="filter-btn" onclick="setPoFilter('received',this)">✅ Received</button>
+      <button class="filter-btn active" data-po-filter="all" onclick="setPoFilter('all',this)">All</button>
+      <button class="filter-btn" data-po-filter="active" onclick="setPoFilter('active',this)">📦 Active</button>
+      <button class="filter-btn" data-po-filter="production" onclick="setPoFilter('production',this)">🏭 In Production</button>
+      <button class="filter-btn" data-po-filter="transit" onclick="setPoFilter('transit',this)">🚢 In Transit</button>
+      <button class="filter-btn" data-po-filter="overdue" onclick="setPoFilter('overdue',this)">⚠️ Overdue</button>
+      <button class="filter-btn" data-po-filter="received" onclick="setPoFilter('received',this)">✅ Received</button>
     </div>
     <div id="poSummaryCards" class="cards" style="margin-bottom:20px"></div>
     <div id="poList"></div>
@@ -264,6 +327,7 @@ async function fetchJsonNoCache(path, attempts=2){
   throw lastErr||new Error('Load failed');
 }
 let DATA={cin7:{},shopify:{},openOrders:{},available:{},incoming:{},velocity:{},pos:[],allPos:[],names:{},sizes:{},cbmMap:{},suppliers:{},landedCosts:{},productTypes:{},mattressRegions:null,warehouseOptions:null,warehouseViews:null,_base:null},currentCK=null,charts={},dashFilter={size:'All',region:'All',warehouse:'All',productType:'All',color:'All'},heatmapSortMode='sku';
+let EXECUTIVE_DATA=null,currentMode='executive',executiveLoaded=false,_execPanelFilter='all';
 const LOGO_VERSION='20260521b';
 function logoSrc(logo){return '/logos/'+encodeURIComponent(logo||'')+'?v='+LOGO_VERSION}
 function logoFallback(img){img.style.display='none'}
@@ -611,6 +675,84 @@ document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
   if(t.dataset.view==='reorder')renderReorder();if(t.dataset.view==='forecast')renderForecast();
 }));
 
+function execNumber(value){return Number(value||0).toLocaleString('en-AU',{maximumFractionDigits:0})}
+function execMoney(value){const n=Number(value||0);if(Math.abs(n)>=1000000)return 'A$'+(n/1000000).toFixed(n>=10000000?0:1)+'M';if(Math.abs(n)>=1000)return 'A$'+Math.round(n/1000).toLocaleString('en-AU')+'K';return 'A$'+Math.round(n).toLocaleString('en-AU')}
+function execDate(value){if(!value)return 'No ETA';const d=new Date(value);return Number.isNaN(d.getTime())?'No ETA':d.toLocaleDateString('en-AU',{day:'numeric',month:'short'})}
+function execStatusLabel(status){return status==='critical'?'Needs action':status==='watch'?'Watch':'Healthy'}
+function execPanelFilterMatch(panel){return _execPanelFilter==='all'||panel.status===_execPanelFilter}
+function setExecutivePanelFilter(filter){_execPanelFilter=filter;renderExecutivePanelList()}
+function renderExecutivePanelList(){
+  const root=document.getElementById('executivePanelList');if(!root||!EXECUTIVE_DATA)return;
+  document.querySelectorAll('.exec-filter').forEach(btn=>btn.classList.toggle('active',btn.dataset.filter===_execPanelFilter));
+  const panels=(EXECUTIVE_DATA.panels||[]).filter(execPanelFilterMatch);
+  if(!panels.length){root.innerHTML='<div class="exec-empty">No Category Killers match this filter.</div>';return;}
+  root.innerHTML=panels.map(panel=>`<button class="exec-panel-row" onclick="selectCK('${escHtml(panel.id)}')" aria-label="Open ${escHtml(panel.name)} dashboard">
+    <span><span class="exec-panel-name">${escHtml(panel.name)}</span><span class="exec-panel-brand">${escHtml(panel.brand)}</span><span class="exec-status ${escHtml(panel.status)}">${execStatusLabel(panel.status)}</span></span>
+    <span class="exec-cell ${panel.stockouts?'danger':'muted'}">${execNumber(panel.stockouts)}<small>stockouts</small></span>
+    <span class="exec-cell ${panel.critical?'danger':'muted'}">${execNumber(panel.critical+panel.low)}<small>under 4 wks</small></span>
+    <span class="exec-cell">${execNumber(panel.openDemand)}<small>open demand</small></span>
+    <span class="exec-cell">${execNumber(panel.incoming)}<small>incoming</small></span>
+    <span class="exec-open" aria-hidden="true">›</span>
+  </button>`).join('');
+}
+async function openExecutivePOs(filter='all'){
+  _poFilter=filter;
+  await showAllPOs();
+  document.querySelectorAll('#poFilterBtns [data-po-filter]').forEach(btn=>btn.classList.toggle('active',btn.dataset.poFilter===filter));
+  renderPurchaseOrders(_allPOsCache);
+}
+function renderExecutiveSummary(data){
+  EXECUTIVE_DATA=data;executiveLoaded=true;
+  const h=data.headline||{},po=data.po||{},actions=data.actions||[],risks=data.topRisks||[],upcoming=data.upcoming||[];
+  const content=document.getElementById('executiveSummaryContent');
+  const maxPipeline=Math.max(po.production||0,po.inTransit||0,po.overdue||0,1);
+  const actionHtml=actions.length?actions.map(action=>`<button class="exec-action" onclick="${action.type==='po'?`openExecutivePOs('${escHtml(action.filter||'overdue')}')`:`selectCK('${escHtml(action.ckId)}')`}" aria-label="${escHtml(action.title)}">
+    <span class="exec-signal ${escHtml(action.severity)}" aria-hidden="true"></span><span><span class="exec-action-title">${escHtml(action.title)}</span><span class="exec-action-detail">${escHtml(action.detail)}</span></span><span class="exec-open">Open ›</span>
+  </button>`).join(''):'<div class="exec-empty">No urgent inventory or PO actions detected.</div>';
+  const riskHtml=risks.length?risks.slice(0,6).map(row=>`<button class="exec-risk-row" onclick="selectCK('${escHtml(row.ckId)}')"><span><span class="exec-risk-sku">${escHtml(row.sku)}</span><span class="exec-risk-meta">${escHtml(row.ckName)} · ${escHtml(row.status)}</span></span><span class="exec-risk-stat">${execNumber(row.openDemand)}<small>open demand</small></span></button>`).join(''):'<div class="exec-empty">No high-risk SKU positions.</div>';
+  const arrivalHtml=upcoming.length?upcoming.map(row=>`<div class="exec-arrival"><span class="exec-arrival-date">${execDate(row.eta)}</span><span><span class="exec-arrival-title">${escHtml(row.reference)}</span><span class="exec-arrival-meta">${escHtml(row.destination)} · ${escHtml(row.supplier)}</span></span><span class="exec-arrival-units">${execNumber(row.units)}<br><small>units</small></span></div>`).join(''):'<div class="exec-empty">No arrivals scheduled in the next 30 days.</div>';
+  content.innerHTML=`
+    <div class="exec-intro"><div><div class="exec-kicker">Portfolio command view</div><h2>What needs attention now</h2><p>Inventory risk and supply-chain movement across every Category Killer. Open a row to move from signal to detail.</p></div><div class="exec-asof">As of ${data.lastRefresh?new Date(data.lastRefresh).toLocaleString('en-AU'):'latest available snapshot'}<br>Cin7 + Shopify</div></div>
+    <div class="exec-kpis">
+      <div class="exec-kpi"><div class="exec-kpi-label">Category Killers needing action</div><div class="exec-kpi-value ${h.actionPanels?'danger':'good'}">${execNumber(h.actionPanels)}</div><div class="exec-kpi-sub">of ${execNumber(h.totalPanels)} · ${execNumber(h.watchPanels)} on watch</div></div>
+      <div class="exec-kpi"><div class="exec-kpi-label">Stockouts with open demand</div><div class="exec-kpi-value ${h.stockoutPositions?'danger':'good'}">${execNumber(h.stockoutPositions)}</div><div class="exec-kpi-sub">${execNumber(h.actionPositions)} market-SKU positions need action</div></div>
+      <div class="exec-kpi"><div class="exec-kpi-label">Active PO pipeline</div><div class="exec-kpi-value">${execNumber(po.active)}</div><div class="exec-kpi-sub">${execMoney(po.pipelineValueAud)} est. landed · ${execNumber(po.incomingUnits)} units</div></div>
+      <div class="exec-kpi"><div class="exec-kpi-label">Overdue POs</div><div class="exec-kpi-value ${po.overdue?'danger':'good'}">${execNumber(po.overdue)}</div><div class="exec-kpi-sub">${execMoney(po.overdueValueAud)} est. landed value</div></div>
+    </div>
+    <div class="exec-layout">
+      <div class="exec-main">
+        <section class="exec-section"><div class="exec-section-head"><div><h3>Priority queue</h3><p>Sorted by overdue supply first, then uncovered demand and stock cover.</p></div></div><div class="exec-action-list">${actionHtml}</div></section>
+        <section class="exec-section"><div class="exec-section-head"><div><h3>Category Killer health</h3><p>Market-level positions; open demand may represent component commitments.</p></div></div>
+          <div class="exec-filters"><button class="exec-filter active" data-filter="all" onclick="setExecutivePanelFilter('all')">All ${execNumber(h.totalPanels)}</button><button class="exec-filter" data-filter="critical" onclick="setExecutivePanelFilter('critical')">Needs action ${execNumber(h.actionPanels)}</button><button class="exec-filter" data-filter="watch" onclick="setExecutivePanelFilter('watch')">Watch ${execNumber(h.watchPanels)}</button><button class="exec-filter" data-filter="healthy" onclick="setExecutivePanelFilter('healthy')">Healthy ${execNumber(h.healthyPanels)}</button></div>
+          <div class="exec-panel-head"><span>Category Killer</span><span style="text-align:right">Stockouts</span><span style="text-align:right">Under 4 wks</span><span style="text-align:right">Demand</span><span style="text-align:right">Incoming</span><span></span></div><div class="exec-panel-list" id="executivePanelList"></div>
+        </section>
+      </div>
+      <aside class="exec-side">
+        <section class="exec-side-block"><div class="exec-section-head"><div><h3>Supply pipeline</h3><p>Active POs by current operating stage.</p></div><button class="exec-link" onclick="openExecutivePOs('active')">View POs</button></div>
+          <div class="exec-pipeline-row"><span class="exec-pipeline-label">Production</span><span class="exec-pipeline-track"><span class="exec-pipeline-fill" style="display:block;width:${Math.round((po.production||0)/maxPipeline*100)}%"></span></span><span class="exec-pipeline-value">${execNumber(po.production)} · ${execMoney(po.productionValueAud)}</span></div>
+          <div class="exec-pipeline-row"><span class="exec-pipeline-label">In transit</span><span class="exec-pipeline-track"><span class="exec-pipeline-fill transit" style="display:block;width:${Math.round((po.inTransit||0)/maxPipeline*100)}%"></span></span><span class="exec-pipeline-value">${execNumber(po.inTransit)} · ${execMoney(po.transitValueAud)}</span></div>
+          <div class="exec-pipeline-row"><span class="exec-pipeline-label">Overdue</span><span class="exec-pipeline-track"><span class="exec-pipeline-fill overdue" style="display:block;width:${Math.round((po.overdue||0)/maxPipeline*100)}%"></span></span><span class="exec-pipeline-value">${execNumber(po.overdue)} · ${execMoney(po.overdueValueAud)}</span></div>
+          <div class="exec-note">Pipeline values include product value plus estimated freight and configured tariff/charges, converted to AUD. ${po.noEta?execNumber(po.noEta)+' active POs have no ETA.':'All active POs have an ETA.'}</div>
+        </section>
+        <section class="exec-side-block"><div class="exec-section-head"><div><h3>Highest-risk positions</h3><p>Open demand on the most urgent SKU positions.</p></div></div><div class="exec-risk-list">${riskHtml}</div></section>
+        <section class="exec-side-block"><div class="exec-section-head"><div><h3>Next 30 days</h3><p>Earliest scheduled arrivals.</p></div><button class="exec-link" onclick="openExecutivePOs('active')">All arrivals</button></div><div class="exec-arrival-list">${arrivalHtml}</div></section>
+      </aside>
+    </div>`;
+  renderExecutivePanelList();
+}
+async function showExecutiveSummary(force=false){
+  closeMobileMenu();currentMode='executive';currentCK=null;
+  document.getElementById('allPOsView').style.display='none';document.querySelector('.main').style.display='block';
+  document.getElementById('categoryTabs').style.display='none';document.getElementById('loadingScreen').style.display='none';
+  document.querySelectorAll('.view').forEach(view=>view.classList.remove('active'));document.getElementById('executiveSummary').classList.add('active');
+  document.querySelectorAll('.sidebar-item').forEach(el=>el.classList.remove('active'));document.getElementById('executiveNavItem').classList.add('active');
+  document.getElementById('poNavItem').classList.remove('active');document.getElementById('exportExcelBtn').style.display='none';
+  document.getElementById('headerTitle').innerHTML='<span>Executive Summary</span>';document.getElementById('headerSub').textContent='Portfolio inventory risk and supply-chain movement';
+  if(EXECUTIVE_DATA&&!force){renderExecutiveSummary(EXECUTIVE_DATA);return;}
+  document.getElementById('executiveSummaryContent').innerHTML='<div class="exec-skeleton" aria-label="Loading executive summary"><span></span><span></span><span></span></div>';
+  try{const data=await fetchJsonNoCache('/api/executive-summary');if(!data)return;DATA.lastRefresh=data.lastRefresh;DATA.lastCin7Refresh=data.lastCin7Refresh;DATA.lastPoRefresh=data.lastPoRefresh;DATA.lastShopifyRefresh=data.lastShopifyRefresh;document.getElementById('headerMeta').textContent=data.lastRefresh?'Last refresh: '+new Date(data.lastRefresh).toLocaleString():'';renderFreshnessWarning();renderExecutiveSummary(data)}catch(error){document.getElementById('executiveSummaryContent').innerHTML=`<div class="exec-empty" style="color:var(--alert)">Executive summary could not load. ${escHtml(error.message||'Please try again.')} <button class="exec-link" onclick="showExecutiveSummary(true)">Retry</button></div>`;}
+}
+
 function toggleBrandGroup(brandId){
   brandOpenState[brandId]=!(brandOpenState[brandId]!==false);
   const el=document.querySelector(`[data-brand-group="${brandId}"]`);
@@ -650,11 +792,14 @@ async function loadSidebar(){
       </div>
     </div>`).join('');
   document.getElementById('sidebarFooter').textContent=d.lastRefresh?'Updated: '+new Date(d.lastRefresh).toLocaleTimeString():'Loading...';
-  if(!currentCK&&d.list.length>0)selectCK(d.list[0].id);else if(currentCK)document.querySelectorAll('.sidebar-item').forEach(el=>el.classList.toggle('active',el.dataset.ck===currentCK));}catch(e){document.getElementById('sidebarNav').innerHTML='<div style="padding:12px;color:#C33252">Failed to load</div>'}}
+  if(currentMode==='executive'){document.getElementById('executiveNavItem').classList.add('active');if(!executiveLoaded)showExecutiveSummary();}
+  else if(currentCK)document.querySelectorAll('.sidebar-item').forEach(el=>el.classList.toggle('active',el.dataset.ck===currentCK));}catch(e){document.getElementById('sidebarNav').innerHTML='<div style="padding:12px;color:#C33252">Failed to load</div>'}}
 
 async function selectCK(ckId){
+  currentMode='ck';
   document.getElementById('allPOsView').style.display='none';document.querySelector('.main').style.display='block';
-  document.getElementById('poNavItem').classList.remove('active');
+  document.getElementById('categoryTabs').style.display='flex';document.getElementById('exportExcelBtn').style.display='inline-block';
+  document.getElementById('poNavItem').classList.remove('active');document.getElementById('executiveNavItem').classList.remove('active');
   currentCK=ckId;document.querySelectorAll('.sidebar-item').forEach(el=>el.classList.toggle('active',el.dataset.ck===ckId));
   const activeItem=document.querySelector(`.sidebar-item[data-ck="${ckId}"]`);const groupEl=activeItem?.closest('.sidebar-brand-group');if(groupEl){groupEl.classList.remove('collapsed');brandOpenState[groupEl.dataset.brandGroup]=true;const caret=groupEl.querySelector('.sidebar-brand-caret');if(caret)caret.textContent='▾';}const subgroupEl=activeItem?.closest('.sidebar-subgroup');if(subgroupEl){subgroupEl.classList.remove('collapsed');subgroupOpenState[subgroupEl.dataset.subgroup]=true;const subCaret=subgroupEl.querySelector('.sidebar-subgroup-caret');if(subCaret)subCaret.textContent='▾';}
   document.getElementById('loadingScreen').style.display='block';document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
@@ -1185,14 +1330,14 @@ async function sendChat(){const i=document.getElementById('chatInput'),m=i.value
 ms.innerHTML+=`<div class="chat-msg user">${escapeHtml(m)}</div><div class="chat-msg bot" id="typing"><span style="opacity:0.6">Thinking...</span></div>`;ms.scrollTop=ms.scrollHeight;chatHistory.push({role:'user',text:m});
 try{const r=await fetch('/api/chat',{method:'POST',headers:H(),body:JSON.stringify({message:m,history:chatHistory.slice(-10),ckId:currentCK})});const d=await r.json();document.getElementById('typing')?.remove();
 ms.innerHTML+=`<div class="chat-msg bot">${d.reply||'Error'}</div>`;chatHistory.push({role:'assistant',text:d.reply})}catch(e){document.getElementById('typing')?.remove();ms.innerHTML+=`<div class="chat-msg bot">Connection error.</div>`}ms.scrollTop=ms.scrollHeight}
-async function manualRefresh(){document.getElementById('refreshBtn').textContent='⏳...';try{await fetch('/api/refresh',{method:'POST',headers:H()});if(document.getElementById('allPOsView').style.display==='block'){await loadAllPOs(true)}else if(currentCK){await selectCK(currentCK)}loadSidebar()}catch(e){}document.getElementById('refreshBtn').textContent='🔄 Refresh'}
+async function manualRefresh(){document.getElementById('refreshBtn').textContent='⏳...';try{await fetch('/api/refresh',{method:'POST',headers:H()});EXECUTIVE_DATA=null;executiveLoaded=false;if(currentMode==='po'){await loadAllPOs(true)}else if(currentMode==='executive'){await showExecutiveSummary(true)}else if(currentCK){await selectCK(currentCK)}loadSidebar()}catch(e){}document.getElementById('refreshBtn').textContent='🔄 Refresh'}
 // Forecast Accuracy (WMAPE)
 async function showAllPOs() {
-  closeMobileMenu();
+  closeMobileMenu();currentMode='po';
   document.querySelector('.main').style.display = 'none';
   document.getElementById('allPOsView').style.display = 'block';
   document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
-  document.getElementById('poNavItem').classList.add('active');
+  document.getElementById('executiveNavItem').classList.remove('active');document.getElementById('poNavItem').classList.add('active');
   await loadAllPOs();
 }
 function hideAllPOs() {
