@@ -137,6 +137,14 @@ th[data-tip]{position:relative;cursor:help}th[data-tip]:after{content:' ⓘ';fon
 .exec-status:before{content:'';width:6px;height:6px;border-radius:50%;background:#5BAB31}.exec-status.watch:before{background:#D4930D}.exec-status.critical:before{background:#C33252}
 .exec-cell{font-size:12px;font-weight:720;color:var(--text);text-align:right}.exec-cell small{display:block;font-size:9px;font-weight:600;color:var(--text-dim);margin-top:2px}
 .exec-cell.danger{color:#A72743}.exec-cell.muted{color:var(--text-dim);font-weight:650}
+.exec-velocity-list{border-top:1px solid var(--border)}
+.exec-velocity-head,.exec-velocity-row{display:grid;grid-template-columns:minmax(190px,1.55fr) 76px 76px 82px 72px minmax(110px,.8fr) 22px;gap:10px;align-items:center}
+.exec-velocity-head{padding:7px 10px;font-size:9px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--text-dim)}
+.exec-velocity-row{width:100%;border:0;border-bottom:1px solid var(--border);background:transparent;text-align:left;padding:12px 10px;cursor:pointer;min-height:58px;color:var(--text)}
+.exec-velocity-row:hover{background:#EDF2EC}.exec-velocity-row:active{background:#E4ECE4}.exec-velocity-row:focus-visible{outline:2px solid var(--yellow);outline-offset:2px}
+.exec-velocity-sku{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.exec-velocity-meta{font-size:9px;color:var(--text-dim);margin-top:4px}
+.exec-velocity-stat{font-size:12px;font-weight:760;text-align:right;color:var(--text)}.exec-velocity-stat small{display:block;font-size:9px;font-weight:600;color:var(--text-dim);margin-top:3px}.exec-velocity-lift{color:#3F7D25}
+.exec-oos{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;padding:5px 8px;font-size:9px;font-weight:850;letter-spacing:.02em;white-space:nowrap;background:#E4EEE1;color:#376C22}.exec-oos.watch{background:#FFF0C9;color:#805B08}.exec-oos.urgent,.exec-oos.out{background:#F8DDE3;color:#9A203D}.exec-oos.out{box-shadow:inset 0 0 0 1px #E8A9B7}
 .exec-side-block{padding:0 0 28px;margin-bottom:28px;border-bottom:1px solid var(--border)}
 .exec-side-block:last-child{border-bottom:0}
 .exec-pipeline-row{display:grid;grid-template-columns:86px minmax(0,1fr) auto;gap:10px;align-items:center;margin:13px 0}
@@ -152,8 +160,8 @@ th[data-tip]{position:relative;cursor:help}th[data-tip]:after{content:' ⓘ';fon
 .exec-skeleton{display:grid;gap:14px;padding:18px 0}.exec-skeleton span{display:block;height:14px;border-radius:4px;background:linear-gradient(90deg,#E5EBE2 25%,#F2F5F0 50%,#E5EBE2 75%);background-size:200% 100%;animation:execShimmer 1.4s infinite}.exec-skeleton span:nth-child(2){width:70%}.exec-skeleton span:nth-child(3){width:86%}
 @keyframes execShimmer{to{background-position:-200% 0}}
 @media(max-width:1100px){.exec-layout{grid-template-columns:1fr;gap:8px}.exec-side{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:28px}.exec-side-block{border-bottom:0;border-top:1px solid var(--border);padding-top:18px}.exec-kpi{padding:16px}}
-@media(max-width:760px){.exec-intro{align-items:flex-start;flex-direction:column;gap:10px}.exec-asof{text-align:left}.exec-kpis{grid-template-columns:1fr 1fr;margin:20px 0 28px}.exec-kpi{border-left:1px solid var(--border);border-bottom:1px solid var(--border);padding:15px 12px}.exec-kpi:nth-child(odd){border-left:0;padding-left:0}.exec-kpi:nth-child(n+3){border-bottom:0}.exec-kpi-value{font-size:27px}.exec-layout{gap:0}.exec-side{grid-template-columns:1fr;gap:0}.exec-panel-head{display:none}.exec-panel-row{grid-template-columns:minmax(0,1fr) repeat(2,64px) 22px;gap:8px}.exec-panel-row .exec-cell:nth-of-type(4),.exec-panel-row .exec-cell:nth-of-type(5){display:none}.exec-action{grid-template-columns:9px minmax(0,1fr);padding:14px 2px}.exec-action .exec-open{display:none}.exec-section{margin-bottom:30px}}
-@media(pointer:coarse){.exec-action,.exec-panel-row,.exec-risk-row,.exec-filter,.exec-link{min-height:44px}}
+@media(max-width:760px){.exec-intro{align-items:flex-start;flex-direction:column;gap:10px}.exec-asof{text-align:left}.exec-kpis{grid-template-columns:1fr 1fr;margin:20px 0 28px}.exec-kpi{border-left:1px solid var(--border);border-bottom:1px solid var(--border);padding:15px 12px}.exec-kpi:nth-child(odd){border-left:0;padding-left:0}.exec-kpi:nth-child(n+3){border-bottom:0}.exec-kpi-value{font-size:27px}.exec-layout{gap:0}.exec-side{grid-template-columns:1fr;gap:0}.exec-panel-head,.exec-velocity-head{display:none}.exec-panel-row{grid-template-columns:minmax(0,1fr) repeat(2,64px) 22px;gap:8px}.exec-panel-row .exec-cell:nth-of-type(4),.exec-panel-row .exec-cell:nth-of-type(5){display:none}.exec-velocity-row{grid-template-columns:minmax(0,1fr) 58px 86px 18px;gap:8px;padding:12px 2px}.exec-velocity-row .velocity-prior,.exec-velocity-row .velocity-change,.exec-velocity-row .velocity-net{display:none}.exec-action{grid-template-columns:9px minmax(0,1fr);padding:14px 2px}.exec-action .exec-open{display:none}.exec-section{margin-bottom:30px}}
+@media(pointer:coarse){.exec-action,.exec-panel-row,.exec-velocity-row,.exec-risk-row,.exec-filter,.exec-link{min-height:44px}}
 </style>
 </head>
 <body>
@@ -327,7 +335,7 @@ async function fetchJsonNoCache(path, attempts=2){
   throw lastErr||new Error('Load failed');
 }
 let DATA={cin7:{},shopify:{},openOrders:{},available:{},incoming:{},velocity:{},pos:[],allPos:[],names:{},sizes:{},cbmMap:{},suppliers:{},landedCosts:{},productTypes:{},mattressRegions:null,warehouseOptions:null,warehouseViews:null,_base:null},currentCK=null,charts={},dashFilter={size:'All',region:'All',warehouse:'All',productType:'All',color:'All'},heatmapSortMode='sku';
-let EXECUTIVE_DATA=null,currentMode='executive',executiveLoaded=false,_execPanelFilter='all';
+let EXECUTIVE_DATA=null,currentMode='executive',executiveLoaded=false,_execPanelFilter='all',_execVelocityFilter='all';
 const LOGO_VERSION='20260521b';
 function logoSrc(logo){return '/logos/'+encodeURIComponent(logo||'')+'?v='+LOGO_VERSION}
 function logoFallback(img){img.style.display='none'}
@@ -695,6 +703,23 @@ function renderExecutivePanelList(){
     <span class="exec-open" aria-hidden="true">›</span>
   </button>`).join('');
 }
+function setExecutiveVelocityFilter(filter){_execVelocityFilter=filter;renderExecutiveVelocityList()}
+function execVelocityRiskText(row){if(row.riskLevel==='out')return 'Out now';if(row.daysToStockout!==null&&row.daysToStockout<=28)return 'Out in '+row.daysToStockout+'d';return row.weeksAtCurrentPace!==null?row.weeksAtCurrentPace.toFixed(1)+' wks cover':'No forecast'}
+function renderExecutiveVelocityList(){
+  const root=document.getElementById('executiveVelocityList');if(!root||!EXECUTIVE_DATA)return;
+  document.querySelectorAll('.exec-velocity-filter').forEach(btn=>btn.classList.toggle('active',btn.dataset.filter===_execVelocityFilter));
+  const rows=(EXECUTIVE_DATA.velocitySurges||[]).filter(row=>_execVelocityFilter==='all'||row.stockoutRisk);
+  if(!rows.length){root.innerHTML='<div class="exec-empty">No SKUs match this velocity filter.</div>';return;}
+  root.innerHTML=rows.map(row=>`<button class="exec-velocity-row" onclick="selectCK('${escHtml(row.ckId)}')" aria-label="Open ${escHtml(row.sku)} in ${escHtml(row.ckName)}">
+    <span><span class="exec-velocity-sku">${escHtml(row.sku)}</span><span class="exec-velocity-meta">${escHtml(row.ckName)} · ${escHtml(row.brand)}</span></span>
+    <span class="exec-velocity-stat">${execNumber(row.currentWeekly)}<small>units/wk</small></span>
+    <span class="exec-velocity-stat velocity-prior">${Number(row.priorWeekly||0).toFixed(1)}<small>prior pace</small></span>
+    <span class="exec-velocity-stat exec-velocity-lift velocity-change">${row.reactivated?'Revival':'+'+execNumber(row.increasePct)+'%'}<small>+${Number(row.weeklyLift||0).toFixed(1)}/wk</small></span>
+    <span class="exec-velocity-stat velocity-net ${row.available<=0?'danger':''}">${execNumber(row.available)}<small>net available</small></span>
+    <span class="exec-velocity-stat velocity-risk"><span class="exec-oos ${escHtml(row.riskLevel)}">${execVelocityRiskText(row)}</span>${row.incoming>0?'<small>+'+execNumber(row.incoming)+' incoming</small>':'<small>before incoming POs</small>'}</span>
+    <span class="exec-open" aria-hidden="true">›</span>
+  </button>`).join('');
+}
 async function openExecutivePOs(filter='all'){
   _poFilter=filter;
   await showAllPOs();
@@ -703,7 +728,7 @@ async function openExecutivePOs(filter='all'){
 }
 function renderExecutiveSummary(data){
   EXECUTIVE_DATA=data;executiveLoaded=true;
-  const h=data.headline||{},po=data.po||{},actions=data.actions||[],risks=data.topRisks||[],upcoming=data.upcoming||[];
+  const h=data.headline||{},po=data.po||{},actions=data.actions||[],velocity=data.velocity||{},risks=data.topRisks||[],upcoming=data.upcoming||[];
   const content=document.getElementById('executiveSummaryContent');
   const maxPipeline=Math.max(po.production||0,po.inTransit||0,po.overdue||0,1);
   const actionHtml=actions.length?actions.map(action=>`<button class="exec-action" onclick="${action.type==='po'?`openExecutivePOs('${escHtml(action.filter||'overdue')}')`:`selectCK('${escHtml(action.ckId)}')`}" aria-label="${escHtml(action.title)}">
@@ -722,6 +747,10 @@ function renderExecutiveSummary(data){
     <div class="exec-layout">
       <div class="exec-main">
         <section class="exec-section"><div class="exec-section-head"><div><h3>Priority queue</h3><p>Sorted by overdue supply first, then uncovered demand and stock cover.</p></div></div><div class="exec-action-list">${actionHtml}</div></section>
+        <section class="exec-section"><div class="exec-section-head"><div><h3>Sales velocity shifts</h3><p>Last 7 days versus the preceding 23-day weekly pace. Stockout timing uses current net stock before incoming POs.</p></div></div>
+          <div class="exec-filters"><button class="exec-filter exec-velocity-filter active" data-filter="all" onclick="setExecutiveVelocityFilter('all')">Accelerating ${execNumber(velocity.surgeCount)}</button><button class="exec-filter exec-velocity-filter" data-filter="risk" onclick="setExecutiveVelocityFilter('risk')">Out within 4 weeks ${execNumber(velocity.stockoutRiskCount)}</button></div>
+          <div class="exec-velocity-head"><span>SKU</span><span style="text-align:right">Last 7d</span><span style="text-align:right">Prior pace</span><span style="text-align:right">Change</span><span style="text-align:right">Net</span><span style="text-align:right">Projected stockout</span><span></span></div><div class="exec-velocity-list" id="executiveVelocityList"></div>
+        </section>
         <section class="exec-section"><div class="exec-section-head"><div><h3>Category Killer health</h3><p>Market-level positions; open demand may represent component commitments.</p></div></div>
           <div class="exec-filters"><button class="exec-filter active" data-filter="all" onclick="setExecutivePanelFilter('all')">All ${execNumber(h.totalPanels)}</button><button class="exec-filter" data-filter="critical" onclick="setExecutivePanelFilter('critical')">Needs action ${execNumber(h.actionPanels)}</button><button class="exec-filter" data-filter="watch" onclick="setExecutivePanelFilter('watch')">Watch ${execNumber(h.watchPanels)}</button><button class="exec-filter" data-filter="healthy" onclick="setExecutivePanelFilter('healthy')">Healthy ${execNumber(h.healthyPanels)}</button></div>
           <div class="exec-panel-head"><span>Category Killer</span><span style="text-align:right">Stockouts</span><span style="text-align:right">Under 4 wks</span><span style="text-align:right">Demand</span><span style="text-align:right">Incoming</span><span></span></div><div class="exec-panel-list" id="executivePanelList"></div>
@@ -738,6 +767,7 @@ function renderExecutiveSummary(data){
         <section class="exec-side-block"><div class="exec-section-head"><div><h3>Next 30 days</h3><p>Earliest scheduled arrivals.</p></div><button class="exec-link" onclick="openExecutivePOs('active')">All arrivals</button></div><div class="exec-arrival-list">${arrivalHtml}</div></section>
       </aside>
     </div>`;
+  renderExecutiveVelocityList();
   renderExecutivePanelList();
 }
 async function showExecutiveSummary(force=false){

@@ -773,7 +773,42 @@ function skuMatchesOption1(sku, def, override = '') {
   return allowed.some(value => normalizeOption1(value) === actual);
 }
 
+function isPlannerExcludedSku(sku) {
+  return /CSTM$/i.test(String(sku || '').trim());
+}
+
+function visiblePlannerSkuMap(map = {}) {
+  return Object.fromEntries(Object.entries(map || {}).filter(([sku]) => !isPlannerExcludedSku(sku)));
+}
+
+function visiblePlannerPo(po) {
+  return {
+    ...po,
+    items: visiblePlannerSkuMap(po?.items),
+    analyticsItems: visiblePlannerSkuMap(po?.analyticsItems),
+    itemNames: visiblePlannerSkuMap(po?.itemNames),
+    itemOption1: visiblePlannerSkuMap(po?.itemOption1)
+  };
+}
+
+function sanitizePlannerSkuData(value) {
+  if (Array.isArray(value)) {
+    return value.map(sanitizePlannerSkuData).filter(item => item !== undefined);
+  }
+  if (!value || typeof value !== 'object' || value instanceof Date) return value;
+  const identitySku = value.sku || value.productSku || value.productCode;
+  if (isPlannerExcludedSku(identitySku)) return undefined;
+  const clean = {};
+  for (const [key, child] of Object.entries(value)) {
+    if (isPlannerExcludedSku(key)) continue;
+    const sanitized = sanitizePlannerSkuData(child);
+    if (sanitized !== undefined) clean[key] = sanitized;
+  }
+  return clean;
+}
+
 function skuMatchesDef(sku, def, option1Override = '') {
+  if (isPlannerExcludedSku(sku)) return false;
   const filter = def.filter || (() => true);
   const prefix = def.prefix;
   if (prefix === 'MULTI') {
@@ -3242,7 +3277,7 @@ function buildCKData(ckId) {
     }
   }
 
-  return {
+  return sanitizePlannerSkuData({
     ck: def,
     cin7,
     shopify,
@@ -3349,7 +3384,7 @@ function buildCKData(ckId) {
     lastCin7Refresh: dataCache.lastCin7Refresh,
     lastPoRefresh: dataCache.lastPoRefresh,
     lastShopifyRefresh: dataCache.lastShopifyRefresh
-  };
+  });
 }
 
 // ===== ROUTES =====
@@ -3437,15 +3472,27 @@ function executivePanelSummary(id) {
       : soh - openDemand;
     const incoming = Number(data.incoming?.[sku] || 0);
     const velocity = executiveVelocity(data, sku);
+    const trend = data.trendData?.[sku] || {};
+    const v7 = Number(trend.v7 || 0);
+    const v30 = Number(trend.v30 || 0);
+    // v30 includes the latest week, so back it out to compare the last 7 days
+    // against the preceding 23-day weekly pace rather than against itself.
+    const prior23Weekly = Math.max(0, ((v30 * 30 / 7) - v7) / 23 * 7);
+    const weeklyLift = v7 - prior23Weekly;
+    const increasePct = prior23Weekly >= 0.5 ? Math.round((weeklyLift / prior23Weekly) * 100) : null;
     const weeks = velocity > 0 ? Math.max(available, 0) / velocity : null;
+    const weeksAtCurrentPace = v7 > 0 ? Math.max(available, 0) / v7 : null;
+    const daysToStockout = weeksAtCurrentPace === null ? null : available <= 0 ? 0 : Math.ceil(weeksAtCurrentPace * 7);
     const hasDemandSignal = velocity > 0 || openDemand > 0;
     const stockout = available <= 0 && hasDemandSignal;
     const demandBackedStockout = stockout && openDemand > 0;
     const critical = !stockout && weeks !== null && weeks <= 2;
     const low = !stockout && !critical && weeks !== null && weeks <= 4;
-    const newSku = data.trendData?.[sku]?.firstSeen
-      ? (Date.now() - Date.parse(data.trendData[sku].firstSeen)) / 864e5 < 30
+    const newSku = trend.firstSeen
+      ? (Date.now() - Date.parse(trend.firstSeen)) / 864e5 < 30
       : false;
+    const reactivated = prior23Weekly < 0.5 && v7 >= 3;
+    const velocitySurge = !newSku && v7 >= 3 && weeklyLift >= 2 && (reactivated || increasePct >= 35);
     const cost = Number(data.costs?.[sku] || 0);
     const excessUnits = velocity > 0 ? Math.max(0, soh - velocity * 25) : 0;
     const deadUnits = !newSku && velocity <= 0 && openDemand <= 0 ? Math.max(soh, 0) : 0;
@@ -3457,6 +3504,14 @@ function executivePanelSummary(id) {
       openDemand,
       incoming,
       velocity,
+      v7: Math.round(v7 * 10) / 10,
+      prior23Weekly: Math.round(prior23Weekly * 10) / 10,
+      weeklyLift: Math.round(weeklyLift * 10) / 10,
+      increasePct,
+      reactivated,
+      velocitySurge,
+      daysToStockout,
+      weeksAtCurrentPace: weeksAtCurrentPace === null ? null : Math.round(weeksAtCurrentPace * 10) / 10,
       weeks: weeks === null ? null : Math.round(weeks * 10) / 10,
       stockout,
       demandBackedStockout,
@@ -3504,6 +3559,27 @@ function executivePanelSummary(id) {
     weightedWeeks: totalVelocity > 0 ? Math.round((Math.max(totalAvailable, 0) / totalVelocity) * 10) / 10 : null,
     overstockValue: Math.round(overstockValue),
     deadstockValue: Math.round(deadstockValue),
+    velocitySurges: rows.filter(row => row.velocitySurge).sort((a, b) => {
+      const aRisk = a.daysToStockout !== null && a.daysToStockout <= 28 ? 1 : 0;
+      const bRisk = b.daysToStockout !== null && b.daysToStockout <= 28 ? 1 : 0;
+      return bRisk - aRisk
+        || (a.daysToStockout ?? 9999) - (b.daysToStockout ?? 9999)
+        || b.weeklyLift - a.weeklyLift
+        || a.sku.localeCompare(b.sku);
+    }).map(row => ({
+      sku: row.sku,
+      currentWeekly: row.v7,
+      priorWeekly: row.prior23Weekly,
+      weeklyLift: row.weeklyLift,
+      increasePct: row.increasePct,
+      reactivated: row.reactivated,
+      available: Math.round(row.available),
+      incoming: Math.round(row.incoming),
+      weeksAtCurrentPace: row.weeksAtCurrentPace,
+      daysToStockout: row.daysToStockout,
+      stockoutRisk: row.daysToStockout !== null && row.daysToStockout <= 28,
+      riskLevel: row.daysToStockout === 0 ? 'out' : row.daysToStockout !== null && row.daysToStockout <= 14 ? 'urgent' : row.daysToStockout !== null && row.daysToStockout <= 28 ? 'watch' : 'stable'
+    })),
     topRisks: rows.filter(row => row.severity > 0).sort((a, b) =>
       b.severity - a.severity
       || b.uncoveredDemand - a.uncoveredDemand
@@ -3538,10 +3614,23 @@ function buildExecutiveSummary() {
         || a.name.localeCompare(b.name);
     });
 
-  const uniquePos = [...new Map((dataCache.cin7POs || []).map(po => [
-    String(po.id || po.orderId || po.purchaseOrderId || po.reference || crypto.randomUUID()),
-    po
-  ])).values()];
+  const allVelocitySurges = panels.flatMap(panel => (panel.velocitySurges || []).map(row => ({
+    ...row,
+    ckId: panel.id,
+    ckName: panel.name,
+    brand: panel.brand
+  }))).sort((a, b) => {
+    const riskRank = { out: 0, urgent: 1, watch: 2, stable: 3 };
+    return riskRank[a.riskLevel] - riskRank[b.riskLevel]
+      || (a.daysToStockout ?? 9999) - (b.daysToStockout ?? 9999)
+      || b.weeklyLift - a.weeklyLift
+      || a.sku.localeCompare(b.sku);
+  });
+
+  const uniquePos = [...new Map((dataCache.cin7POs || []).map(rawPo => {
+    const po = visiblePlannerPo(rawPo);
+    return [String(po.id || po.orderId || po.purchaseOrderId || po.reference || crypto.randomUUID()), po];
+  })).values()].filter(po => Object.keys(po.items || {}).length > 0);
   const openPos = uniquePos.filter(isOpenPO);
   const now = new Date();
   const poRows = openPos.map(po => {
@@ -3631,6 +3720,13 @@ function buildExecutiveSummary() {
     },
     actions,
     panels,
+    velocity: {
+      surgeCount: allVelocitySurges.length,
+      stockoutRiskCount: allVelocitySurges.filter(row => row.stockoutRisk).length,
+      outNowCount: allVelocitySurges.filter(row => row.riskLevel === 'out').length,
+      urgentCount: allVelocitySurges.filter(row => row.riskLevel === 'urgent').length
+    },
+    velocitySurges: allVelocitySurges.slice(0, 40),
     topRisks,
     upcoming,
     lastRefresh: dataCache.lastRefresh,
@@ -3854,7 +3950,8 @@ function scorePO(po) {
 app.get('/api/all-pos', requireAuth, (req, res) => {
   reloadSnapshotIfNewer();
   const sourcePos = dataCache.cin7POs || [];
-  const pos = sourcePos.map(po => {
+  const pos = sourcePos.map(rawPo => {
+    const po = visiblePlannerPo(rawPo);
     const destination = inferDestination(po);
     const landed = estimateLandedCost(po, destination);
     const quality = scorePO(po);
@@ -3899,7 +3996,7 @@ app.get('/api/all-pos', requireAuth, (req, res) => {
       itemCategories: cin7Option1CategoriesForPoItems(po.items || {}),
       items: po.items || {}
     };
-  });
+  }).filter(po => Object.keys(po.items || {}).length > 0);
   res.json({ pos, lastRefresh: dataCache.lastPoRefresh || dataCache.lastRefresh, poSource: CIN7_DATA_SOURCE, poSnapshotExportedAt: null, fx: { USDAUD: fxRate.USDAUD, lastFetch: fxRate.lastFetch } });
 });
 
@@ -4183,8 +4280,10 @@ function buildShipmentData() {
   const shipments = [];
   const now = new Date();
 
-  for (const po of dataCache.cin7POs) {
+  for (const rawPo of dataCache.cin7POs) {
     // Include active POs (we already filter out Received in fetchCin7POs)
+    const po = visiblePlannerPo(rawPo);
+    if (Object.keys(po.items || {}).length === 0) continue;
     const origin = getSupplierOrigin(po.company || '');
     const dest = getDestination(po);
 
@@ -4505,6 +4604,7 @@ const DD_21CM_SKUS = new Set(['DD-21107CF','DD-21137CF','DD-21153CF','DD-21183CF
 
 function classifySKU(code, destCountry) {
   const c = (code || '').toUpperCase();
+  if (isPlannerExcludedSku(c)) return null;
   // NZ uses LLAU- SKUs - check destination first
   if (destCountry === 'NZ' && c.startsWith('LLAU-') && !c.includes('-CV')) return 'LL Beds - NZ';
   if (destCountry === 'NZ' && c.startsWith('LLAU-') && c.includes('-CV')) return 'LL Covers - NZ';

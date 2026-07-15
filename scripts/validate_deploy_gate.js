@@ -66,6 +66,7 @@ function optionAllowed(actual, allowed) {
 }
 function matchesDef(sku, option1, def) {
   const s = String(sku || '').toUpperCase();
+  if (/CSTM$/i.test(s.trim())) return false;
   const filter = def.filter || (() => true);
   if (def.prefix === 'MULTI') { if (!filter(s)) return false; }
   else if (!(s.startsWith(def.prefix) && filter(s))) return false;
@@ -126,7 +127,8 @@ const fixtures = [
   { sku: 'DD-21153CF', expected: 'Deep Dream' },
   { sku: 'DD-34183K-SFM', expected: 'Deep Dream' },
   { sku: 'DDUK-2190CF', expected: 'LL Mattresses' },
-  { sku: 'CAT-EDT-NAL', expected: 'Caterpillar Dining' }
+  { sku: 'CAT-EDT-NAL', expected: 'Caterpillar Dining' },
+  { sku: 'LLAU-CB-S-MSM-CV-CSTM', expected: 'Uncategorised' }
 ];
 for (const fixture of fixtures) {
   const actual = routeSku(fixture.sku, products);
