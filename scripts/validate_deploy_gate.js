@@ -4,6 +4,8 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
 const CACHE_PATH = path.join(ROOT, 'data', 'cache-snapshot.json');
+const SERVER_PATH = path.join(ROOT, 'server.js');
+const FRONTEND_PATH = path.join(ROOT, 'public', 'index.html');
 const WARN_STALE_HOURS = 6;
 const MIN_PRODUCTS = 1000;
 const MIN_POS = 50;
@@ -84,6 +86,30 @@ const blockers = [];
 const warnings = [];
 let cache;
 try { cache = readJson(CACHE_PATH); } catch (err) { blockers.push(err.message); cache = {}; }
+const serverSource = fs.readFileSync(SERVER_PATH, 'utf8');
+const frontendSource = fs.readFileSync(FRONTEND_PATH, 'utf8');
+const cushieCoverageMeta = {
+  'cusb-au': { label: 'AU', place: 'Australia' },
+  'cusb-us': { label: 'US', place: 'United States' },
+  'cusb-ca': { label: 'CA', place: 'Canada' },
+  'cusb-uk': { label: 'UK', place: 'United Kingdom' }
+};
+for (const [id, meta] of Object.entries(cushieCoverageMeta)) {
+  const marker = `'${id}':{label:'${meta.label}', place:'${meta.place}'}`;
+  if (!frontendSource.includes(marker)) blockers.push(`Cushie coverage columns are not enabled for ${id}`);
+}
+if (!frontendSource.includes("nextPO:next?.reference||null,nextETA:next?.etaRaw||null,nextQty:next?.qty||0")) {
+  blockers.push('Next PO/ETA must remain visible when incoming stock exists without preorder demand');
+}
+if (!frontendSource.includes("if(!dated.length) return {preorderUnits,nextPO:next?.reference||null,nextETA:null,nextQty:next?.qty||0")) {
+  blockers.push('Undated incoming POs must expose their reference without fabricating an ETA');
+}
+if (!/['\"]cusb-us['\"]:\s*\{[^\n]*poDestination:\s*['\"]United States['\"]/.test(serverSource)) {
+  blockers.push('Cushie US must filter POs to United States');
+}
+if (!/['\"]cusb-uk['\"]:\s*\{[^\n]*poDestination:\s*['\"]United Kingdom['\"]/.test(serverSource)) {
+  blockers.push('Cushie UK must filter POs to United Kingdom');
+}
 const products = cache.cin7Products || {};
 const stockByBranch = cache.cin7StockByBranch || {};
 const pos = cache.cin7POs || [];

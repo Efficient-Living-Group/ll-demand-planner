@@ -404,10 +404,11 @@ function buildPreorderCoverage(s){
   const computeFromRows=(preorderUnits, rows=[])=>{
     const normalized=(rows||[]).map(row=>({reference:row.reference||'—',qty:Number(row.qty||0),etaRaw:row.eta||null,eta:row.eta?new Date(row.eta):null})).filter(row=>row.qty>0);
     const dated=normalized.filter(row=>row.eta && !Number.isNaN(row.eta.getTime())).sort((a,b)=>a.eta-b.eta||a.reference.localeCompare(b.reference));
-    const undatedIncoming=normalized.filter(row=>!row.eta || Number.isNaN(row.eta.getTime())).reduce((sum,row)=>sum+row.qty,0);
-    if(preorderUnits<=0) return {preorderUnits,nextPO:null,nextETA:null,nextQty:0,coveragePO:null,coverageETA:null,status:'In stock'};
-    if(!dated.length) return {preorderUnits,nextPO:null,nextETA:null,nextQty:0,coveragePO:null,coverageETA:null,status:undatedIncoming>0?'ETA missing':'No incoming PO'};
-    const next=dated[0];
+    const undated=normalized.filter(row=>!row.eta || Number.isNaN(row.eta.getTime())).sort((a,b)=>a.reference.localeCompare(b.reference));
+    const undatedIncoming=undated.reduce((sum,row)=>sum+row.qty,0);
+    const next=dated[0]||undated[0]||null;
+    if(preorderUnits<=0) return {preorderUnits,nextPO:next?.reference||null,nextETA:next?.etaRaw||null,nextQty:next?.qty||0,coveragePO:null,coverageETA:null,status:'In stock'};
+    if(!dated.length) return {preorderUnits,nextPO:next?.reference||null,nextETA:null,nextQty:next?.qty||0,coveragePO:null,coverageETA:null,status:undatedIncoming>0?'ETA missing':'No incoming PO'};
     let running=0,coverage=null;
     for(const row of dated){running+=row.qty;if(running>=preorderUnits){coverage=row;break;}}
     if(next.qty>=preorderUnits) return {preorderUnits,nextPO:next.reference,nextETA:next.etaRaw,nextQty:next.qty,coveragePO:next.reference,coverageETA:next.etaRaw,status:'Covered by next shipment'};
@@ -1105,6 +1106,10 @@ function renderDashboard(){
     llau:{label:'AU', place:'Australia'},
     llnz:{label:'NZ', place:'New Zealand'},
     lluk:{label:'UK', place:'United Kingdom'},
+    'cusb-au':{label:'AU', place:'Australia'},
+    'cusb-us':{label:'US', place:'United States'},
+    'cusb-ca':{label:'CA', place:'Canada'},
+    'cusb-uk':{label:'UK', place:'United Kingdom'},
     dd:{label:'Lifely', place:'Lifely'},
     cocoon:{label:'Lifely', place:'Lifely'},
     rdnt:{label:'Lifely', place:'Lifely'},
