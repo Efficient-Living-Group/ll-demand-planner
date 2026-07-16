@@ -31,6 +31,7 @@ const SESSION_SECRET = process.env.SESSION_SECRET || crypto.createHash('sha256')
 const LL_AU_BRANCH_IDS = [3, 60976];
 const LL_NZ_BRANCH_IDS = [48391];
 const LL_US_BRANCH_IDS = [60701, 63764, 65158];
+const LL_PERSONALISED_COVER_BRANCH_IDS = [74276];
 
 // Shopify stores
 const SHOPIFY_STORES = {
@@ -57,6 +58,7 @@ const CK_DEFS = {
   'llca':     { name: 'Little Lifely CA',       prefix: 'LLNA',   logo: 'little-lifely.png', store: 'lifely', excludeCV: false, poDestination: 'Canada', salesCountry: 'CA', stockBranches: [61831], option1: 'Category Killer - Little Lifely', filter: sku => !isLittleLifelyBundleSku(sku), sizes: {'-TWX-':'Twin XL','-TW-':'Twin','-F-':'Full'} },
   'lluk':     { name: 'Little Lifely UK',       prefix: 'LLUK-CB-',   logo: 'little-lifely.png', store: 'lifely', excludeCV: false, salesCountry: 'GB', stockBranches: [62444], option1: 'Category Killer - Little Lifely', filter: isLittleLifelyUkComponentSku, sizes: {'-S-':'Single','-SD-':'Small Double','-D-':'Double'} },
   'llsg':     { name: 'Little Lifely SG',       prefix: 'LLSG',   logo: 'little-lifely.png', store: 'lifely', excludeCV: false, salesCountry: 'SG', stockBranches: [57843], strictStockBranches: true, option1: 'Category Killer - Little Lifely', filter: sku => !isLittleLifelyBundleSku(sku), sizes: {'-SS-':'Super Single','-S-':'Single','-Q-':'Queen'} },
+  'll-personalised-cover': { name: 'Personalised Cover', prefix: 'MULTI', logo: 'little-lifely.png', store: 'lifely', stockBranches: LL_PERSONALISED_COVER_BRANCH_IDS, strictStockBranches: true, requireBranchMatch: true, filterPosByStockBranches: true, option1: 'Category Killer - Little Lifely', filter: isLittleLifelyCoverSku, sizes: {'-TWX-':'Twin XL','-TW-':'Twin','-SS-':'Super Single','-SD-':'Small Double','-KS-':'King Single','-Q-':'Queen','-F-':'Full','-S-':'Single','-D-':'Double'} },
   'll-mattresses': { name: 'LL Mattresses',     prefix: 'MULTI',  logo: 'little-lifely.png', store: 'lifely', option1: ['Category Killer - 21cm Mattress', 'Category Killer - Deep Dream'], option1Bypass: sku => sku.startsWith('DDUK'), filter: sku => ['DD-21915CF','DD-21107CF','DD-21137CF'].includes(sku) || sku.startsWith('DDUK'), sizes: {'21915':'Single','21107':'King Single','21137':'Double','2190':'Single UK','21120':'Small Double UK','21135':'Double UK'} },
   'dd':       { name: 'Deep Dream',             prefix: 'MULTI',  logo: 'deep-dream.png',    store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Deepdream', sizes: {'915':'Single','107':'King Single','137':'Double','153':'Queen','183':'King'} },
   'cocoon':   { name: 'Cocoon Bed',             prefix: 'COCOON', logo: 'cocoon-bed.png',    store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Cocoon Bed', sizes: {'-DOUBLE-':'Double','-QUEEN-':'Queen','-KING-':'King'} },
@@ -91,6 +93,10 @@ function isLittleLifelySetBomSku(sku) {
 function isLittleLifelyBundleSku(sku) {
   const s = String(sku || '').toUpperCase().trim();
   return isLittleLifelySetBomSku(s) || LITTLE_LIFELY_BUNDLE_RE.test(s);
+}
+
+function isLittleLifelyCoverSku(sku) {
+  return /^(LLAU|LLNA|LLSG|LLUK)-CB-[A-Z0-9]+-[A-Z0-9]+-CV$/i.test(String(sku || '').trim());
 }
 
 function isCushiePhysicalArmrestSetSku(sku) {
@@ -1602,6 +1608,7 @@ async function fetchCin7POs() {
           fullyReceivedDate: po.fullyReceivedDate || null,
           customFields: po.customFields || {},
           company: po.company || '',
+          branchId: Number(po.branchId || 0) || null,
           total: po.total || 0,
           currencyCode: po.currencyCode || 'USD',
           deliveryCountry: po.deliveryCountry || '',
@@ -2164,6 +2171,7 @@ function buildCKData(ckId) {
           acc.matched += 1;
           return acc;
         }, { soh: 0, virtual: 0, available: 0, openSales: 0, matched: 0 });
+        if (def.requireBranchMatch && branchData.matched === 0) continue;
         const displaySoh = ckId === 'case-goods' && dataCache.cin7BOMs?.[sku] ? branchData.virtual : branchData.soh;
         cin7Raw[sku] = branchData.matched > 0
           ? { ...data, soh: displaySoh, virtual: branchData.virtual, available: branchData.available }
@@ -2233,7 +2241,9 @@ function buildCKData(ckId) {
   // inventory signal is pushed down to component SKUs when a BOM is known.
   const shopify = {};
   const openOrders = {};
-  const panelHasSku = (sku) => cin7[sku] !== undefined || shopify[sku] !== undefined || skuMatchesDef(sku, def);
+  const panelHasSku = (sku) => def.requireBranchMatch
+    ? cin7[sku] !== undefined
+    : cin7[sku] !== undefined || shopify[sku] !== undefined || skuMatchesDef(sku, def);
   const addToPanelMap = (map, sku, qty) => {
     if (!sku || !panelHasSku(sku)) return false;
     map[sku] = (map[sku] || 0) + Number(qty || 0);
@@ -2253,6 +2263,7 @@ function buildCKData(ckId) {
       if (ckId === 'cocoon' && isCocoonComboSku(sku)) { addExplodedToPanelMap(shopify, sku, qty); continue; }
       if (addExplodedToPanelMap(shopify, sku, qty)) continue;
       if (!skuMatchesDef(sku, def)) continue;
+      if (def.requireBranchMatch && cin7[sku] === undefined) continue;
       shopify[sku] = (shopify[sku] || 0) + qty;
     }
   }
@@ -2361,6 +2372,7 @@ function buildCKData(ckId) {
       }
       if (ckId === 'cocoon' && isCocoonComboSku(sku)) continue;
       if (!skuMatchesDef(sku, def)) continue;
+      if (def.requireBranchMatch && cin7[sku] === undefined) continue;
       velocity[sku] = (velocity[sku] || 0) + Number(vel || 0);
     }
   };
@@ -2409,6 +2421,7 @@ function buildCKData(ckId) {
   const allPos = [];
   for (const po of dataCache.cin7POs) {
     if (poDestination && resolvePoDestination(po) !== poDestination) continue;
+    if (def.filterPosByStockBranches && !(stockBranches || []).includes(Number(po.branchId || 0))) continue;
     const relevantItems = {};
     for (const [sku, qty] of Object.entries(po.items)) {
       if (ckId === 'cocoon' && isCocoonComboSku(sku)) continue;
@@ -3745,7 +3758,7 @@ app.get('/api/executive-summary', requireAuth, (req, res) => {
 
 app.get('/api/ck-list', requireAuth, (req, res) => {
   reloadSnapshotIfNewer();
-  const littleLifelyListOrder = { llau: 0, llna: 1, llca: 2, lluk: 3, llnz: 4, llsg: 5, 'll-mattresses': 6 };
+  const littleLifelyListOrder = { llau: 0, llna: 1, llca: 2, lluk: 3, llnz: 4, llsg: 5, 'll-personalised-cover': 6, 'll-mattresses': 7 };
   const list = Object.entries(CK_DEFS).filter(([id]) => !HIDDEN_CK_TABS.has(id)).map(([id, def]) => {
     const data = buildCKData(id);
     const skuCount = data ? new Set([...Object.keys(data.cin7 || {}), ...Object.keys(data.velocity || {}).filter(k => !String(k).startsWith('_'))]).size : 0;

@@ -569,6 +569,7 @@ def build_purchase_orders(pos_raw: list[dict[str, Any]]) -> list[dict[str, Any]]
             "fullyReceivedDate": po.get("fullyReceivedDate"),
             "customFields": po.get("customFields") or {},
             "company": po.get("company") or "",
+            "branchId": int(po.get("branchId") or 0) or None,
             "total": po.get("total") or 0,
             "currencyCode": po.get("currencyCode") or "USD",
             "deliveryCountry": po.get("deliveryCountry") or "",

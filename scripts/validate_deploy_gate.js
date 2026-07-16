@@ -6,10 +6,12 @@ const ROOT = path.resolve(__dirname, '..');
 const CACHE_PATH = path.join(ROOT, 'data', 'cache-snapshot.json');
 const SERVER_PATH = path.join(ROOT, 'server.js');
 const FRONTEND_PATH = path.join(ROOT, 'public', 'index.html');
+const REFRESH_SCRIPT_PATH = path.join(ROOT, 'scripts', 'refresh_live_cin7_cache.py');
 const WARN_STALE_HOURS = 6;
 const MIN_PRODUCTS = 1000;
 const MIN_POS = 50;
 const EXPECTED_STORES = ['lifely', 'cushie', 'littlelifely'];
+const PERSONALISED_COVER_BRANCH_ID = 74276;
 const REQUIRED_OPTION1 = [
   'Category Killer - Little Lifely',
   'Category Killer - 21cm Mattress',
@@ -47,6 +49,7 @@ function isCaseGoodsSku(sku) {
 const CK_DEFS = {
   llau: { name:'Little Lifely AU', prefix:'LLAU-CB-', option1:'Category Killer - Little Lifely', filter:s=>!s.includes('CBCF') },
   llnz: { name:'Little Lifely NZ', prefix:'LLAU-CB-', option1:'Category Killer - Little Lifely', filter:s=>!s.includes('CBCF') },
+  'll-personalised-cover': { name:'Personalised Cover', prefix:'MULTI', stockBranches:[PERSONALISED_COVER_BRANCH_ID], requireBranchMatch:true, filterPosByStockBranches:true, option1:'Category Killer - Little Lifely', filter:s=>/^(LLAU|LLNA|LLSG|LLUK)-CB-[A-Z0-9]+-[A-Z0-9]+-CV$/i.test(s) },
   'll-mattresses': { name:'LL Mattresses', prefix:'MULTI', option1:['Category Killer - 21cm Mattress','Category Killer - Deep Dream'], option1Bypass:s=>s.startsWith('DDUK'), filter:s=>['DD-21915CF','DD-21107CF','DD-21137CF'].includes(s)||s.startsWith('DDUK') },
   dd: { name:'Deep Dream', prefix:'MULTI', option1:'Category Killer - Deepdream' },
   cocoon: { name:'Cocoon Bed', prefix:'COCOON', option1:'Category Killer - Cocoon Bed' },
@@ -88,6 +91,26 @@ let cache;
 try { cache = readJson(CACHE_PATH); } catch (err) { blockers.push(err.message); cache = {}; }
 const serverSource = fs.readFileSync(SERVER_PATH, 'utf8');
 const frontendSource = fs.readFileSync(FRONTEND_PATH, 'utf8');
+const refreshScriptSource = fs.readFileSync(REFRESH_SCRIPT_PATH, 'utf8');
+const personalisedCoverDefLine = serverSource.split('\n').find(line => line.includes("'ll-personalised-cover':")) || '';
+if (!serverSource.includes('const LL_PERSONALISED_COVER_BRANCH_IDS = [74276];')) {
+  blockers.push('Personalised Cover warehouse branch must be Cin7 branch 74276');
+}
+if (!personalisedCoverDefLine.includes('stockBranches: LL_PERSONALISED_COVER_BRANCH_IDS') || !personalisedCoverDefLine.includes('requireBranchMatch: true') || !personalisedCoverDefLine.includes('filterPosByStockBranches: true')) {
+  blockers.push('Personalised Cover must require branch-matched stock and branch-matched POs');
+}
+if (personalisedCoverDefLine.includes('supplier:')) blockers.push('Personalised Cover must not filter by supplier');
+if (!refreshScriptSource.includes('"branchId": int(po.get("branchId") or 0) or None')) {
+  blockers.push('Durable Cin7 cache must preserve PO branchId for warehouse-isolated incoming stock');
+}
+const syntheticBranchRows = {
+  74276: { soh: 11, available: 8, openSales: 3 },
+  60976: { soh: 999, available: 999, openSales: 0 }
+};
+const selectedBranch = syntheticBranchRows[PERSONALISED_COVER_BRANCH_ID];
+if (!selectedBranch || selectedBranch.soh !== 11 || selectedBranch.available !== 8 || selectedBranch.openSales !== 3) {
+  blockers.push('Personalised Cover branch isolation fixture failed');
+}
 const cushieCoverageMeta = {
   'cusb-au': { label: 'AU', place: 'Australia' },
   'cusb-us': { label: 'US', place: 'United States' },
@@ -143,6 +166,14 @@ for (const [id, def] of Object.entries(CK_DEFS)) {
   let count = 0;
   for (const [sku, data] of Object.entries(products)) if (matchesDef(sku, data.option1 || '', def)) count += 1;
   if (count === 0) blockers.push(`CK panel has zero matching Cin7 SKUs: ${id}`);
+}
+
+const personalisedCoverDef = CK_DEFS['ll-personalised-cover'];
+for (const sku of ['LLAU-CB-S-DGY-CV', 'LLNA-CB-TW-PST-CV', 'LLSG-CB-Q-BABL-CV', 'LLUK-CB-S-CTCN-CV']) {
+  if (!matchesDef(sku, 'Category Killer - Little Lifely', personalisedCoverDef)) blockers.push(`Personalised Cover rejected valid cover SKU: ${sku}`);
+}
+for (const sku of ['LLAU-CB-S-DGY', 'LLUK-CB-S-FRM', 'LLAU-CB-S-DGY-CV-CSTM']) {
+  if (matchesDef(sku, 'Category Killer - Little Lifely', personalisedCoverDef)) blockers.push(`Personalised Cover accepted invalid SKU: ${sku}`);
 }
 
 const fixtures = [
