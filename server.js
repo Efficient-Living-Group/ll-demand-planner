@@ -58,7 +58,7 @@ const CK_DEFS = {
   'llca':     { name: 'Little Lifely CA',       prefix: 'LLNA',   logo: 'little-lifely.png', store: 'lifely', excludeCV: false, poDestination: 'Canada', salesCountry: 'CA', stockBranches: [61831], option1: 'Category Killer - Little Lifely', filter: sku => !isLittleLifelyBundleSku(sku), sizes: {'-TWX-':'Twin XL','-TW-':'Twin','-F-':'Full'} },
   'lluk':     { name: 'Little Lifely UK',       prefix: 'LLUK-CB-',   logo: 'little-lifely.png', store: 'lifely', excludeCV: false, salesCountry: 'GB', stockBranches: [62444], option1: 'Category Killer - Little Lifely', filter: isLittleLifelyUkComponentSku, sizes: {'-S-':'Single','-SD-':'Small Double','-D-':'Double'} },
   'llsg':     { name: 'Little Lifely SG',       prefix: 'LLSG',   logo: 'little-lifely.png', store: 'lifely', excludeCV: false, salesCountry: 'SG', stockBranches: [57843], strictStockBranches: true, option1: 'Category Killer - Little Lifely', filter: sku => !isLittleLifelyBundleSku(sku), sizes: {'-SS-':'Super Single','-S-':'Single','-Q-':'Queen'} },
-  'll-personalised-cover': { name: 'Personalised Cover', prefix: 'MULTI', logo: 'little-lifely.png', store: 'lifely', stockBranches: LL_PERSONALISED_COVER_BRANCH_IDS, strictStockBranches: true, requireBranchMatch: true, filterPosByStockBranches: true, option1: 'Category Killer - Little Lifely', filter: isLittleLifelyCoverSku, sizes: {'-TWX-':'Twin XL','-TW-':'Twin','-SS-':'Super Single','-SD-':'Small Double','-KS-':'King Single','-Q-':'Queen','-F-':'Full','-S-':'Single','-D-':'Double'} },
+  'll-personalised-cover': { name: 'Personalised Cover', prefix: 'MULTI', logo: 'little-lifely.png', store: 'lifely', stockBranches: LL_PERSONALISED_COVER_BRANCH_IDS, strictStockBranches: true, requireBranchMatch: true, filterPosByStockBranches: true, allowEmptyBranchPanel: true, option1: 'Category Killer - Little Lifely', filter: isLittleLifelyCoverSku, sizes: {'-TWX-':'Twin XL','-TW-':'Twin','-SS-':'Super Single','-SD-':'Small Double','-KS-':'King Single','-Q-':'Queen','-F-':'Full','-S-':'Single','-D-':'Double'} },
   'll-mattresses': { name: 'LL Mattresses',     prefix: 'MULTI',  logo: 'little-lifely.png', store: 'lifely', option1: ['Category Killer - 21cm Mattress', 'Category Killer - Deep Dream'], option1Bypass: sku => sku.startsWith('DDUK'), filter: sku => ['DD-21915CF','DD-21107CF','DD-21137CF'].includes(sku) || sku.startsWith('DDUK'), sizes: {'21915':'Single','21107':'King Single','21137':'Double','2190':'Single UK','21120':'Small Double UK','21135':'Double UK'} },
   'dd':       { name: 'Deep Dream',             prefix: 'MULTI',  logo: 'deep-dream.png',    store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Deepdream', sizes: {'915':'Single','107':'King Single','137':'Double','153':'Queen','183':'King'} },
   'cocoon':   { name: 'Cocoon Bed',             prefix: 'COCOON', logo: 'cocoon-bed.png',    store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Cocoon Bed', sizes: {'-DOUBLE-':'Double','-QUEEN-':'Queen','-KING-':'King'} },
@@ -4545,7 +4545,10 @@ function buildHealthStatus() {
   const badFixtures = fixtureRoutes.filter(row => row.actual !== row.expected);
   if (badFixtures.length) critical.push(`SKU route fixture mismatch: ${badFixtures.map(row => `${row.sku} expected ${row.expected}, got ${row.actual}`).join('; ')}`);
   const zeroPanels = Object.entries(ckPanelSkuCounts).filter(([, count]) => count === 0).map(([id]) => id);
-  if (zeroPanels.length) critical.push(`CK panels returned zero Cin7 SKUs: ${zeroPanels.join(', ')}`);
+  const expectedEmptyBranchPanels = zeroPanels.filter(id => CK_DEFS[id]?.allowEmptyBranchPanel);
+  const unexpectedZeroPanels = zeroPanels.filter(id => !CK_DEFS[id]?.allowEmptyBranchPanel);
+  if (expectedEmptyBranchPanels.length) warnings.push(`Branch-scoped panels have no cached stock rows yet: ${expectedEmptyBranchPanels.join(', ')}`);
+  if (unexpectedZeroPanels.length) critical.push(`CK panels returned zero Cin7 SKUs: ${unexpectedZeroPanels.join(', ')}`);
 
   for (const [store, storeChecks] of Object.entries(checks.shopifyStores)) {
     for (const [name, ok] of Object.entries(storeChecks)) {

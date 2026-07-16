@@ -99,6 +99,7 @@ if (!serverSource.includes('const LL_PERSONALISED_COVER_BRANCH_IDS = [74276];'))
 if (!personalisedCoverDefLine.includes('stockBranches: LL_PERSONALISED_COVER_BRANCH_IDS') || !personalisedCoverDefLine.includes('requireBranchMatch: true') || !personalisedCoverDefLine.includes('filterPosByStockBranches: true')) {
   blockers.push('Personalised Cover must require branch-matched stock and branch-matched POs');
 }
+if (!personalisedCoverDefLine.includes('allowEmptyBranchPanel: true')) blockers.push('New branch 74276 must warn rather than fail health until its first stock rows arrive');
 if (personalisedCoverDefLine.includes('supplier:')) blockers.push('Personalised Cover must not filter by supplier');
 if (!refreshScriptSource.includes('"branchId": int(po.get("branchId") or 0) or None')) {
   blockers.push('Durable Cin7 cache must preserve PO branchId for warehouse-isolated incoming stock');
