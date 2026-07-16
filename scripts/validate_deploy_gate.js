@@ -10,6 +10,7 @@ const WARN_STALE_HOURS = 6;
 const MIN_PRODUCTS = 1000;
 const MIN_POS = 50;
 const EXPECTED_STORES = ['lifely', 'cushie', 'littlelifely'];
+const PERSONALISED_COVER_SUPPLIER = 'Shaoxing Xilinmen Import & Export Co., Ltd.';
 const REQUIRED_OPTION1 = [
   'Category Killer - Little Lifely',
   'Category Killer - 21cm Mattress',
@@ -47,6 +48,7 @@ function isCaseGoodsSku(sku) {
 const CK_DEFS = {
   llau: { name:'Little Lifely AU', prefix:'LLAU-CB-', option1:'Category Killer - Little Lifely', filter:s=>!s.includes('CBCF') },
   llnz: { name:'Little Lifely NZ', prefix:'LLAU-CB-', option1:'Category Killer - Little Lifely', filter:s=>!s.includes('CBCF') },
+  'll-personalised-cover': { name:'Personalised Cover', prefix:'MULTI', option1:'Category Killer - Little Lifely', supplier:PERSONALISED_COVER_SUPPLIER, filter:s=>/^(LLAU|LLNA|LLSG|LLUK)-CB-[A-Z0-9]+-[A-Z0-9]+-CV$/i.test(s) },
   'll-mattresses': { name:'LL Mattresses', prefix:'MULTI', option1:['Category Killer - 21cm Mattress','Category Killer - Deep Dream'], option1Bypass:s=>s.startsWith('DDUK'), filter:s=>['DD-21915CF','DD-21107CF','DD-21137CF'].includes(s)||s.startsWith('DDUK') },
   dd: { name:'Deep Dream', prefix:'MULTI', option1:'Category Killer - Deepdream' },
   cocoon: { name:'Cocoon Bed', prefix:'COCOON', option1:'Category Killer - Cocoon Bed' },
@@ -66,7 +68,7 @@ function optionAllowed(actual, allowed) {
   const list = Array.isArray(allowed) ? allowed : [allowed];
   return list.some(v => norm(v) === norm(actual));
 }
-function matchesDef(sku, option1, def) {
+function matchesDef(sku, option1, def, pos = []) {
   const s = String(sku || '').toUpperCase();
   if (/CSTM$/i.test(s.trim())) return false;
   const filter = def.filter || (() => true);
@@ -74,7 +76,9 @@ function matchesDef(sku, option1, def) {
   else if (!(s.startsWith(def.prefix) && filter(s))) return false;
   if (def.excludeCV && s.includes('-CV')) return false;
   if (def.option1Bypass && def.option1Bypass(s)) return true;
-  return optionAllowed(option1, def.option1);
+  if (!optionAllowed(option1, def.option1)) return false;
+  if (def.supplier && !pos.some(po => norm(po?.company) === norm(def.supplier) && Object.prototype.hasOwnProperty.call(po?.items || {}, sku))) return false;
+  return true;
 }
 function routeSku(sku, products) {
   const option1 = products[sku]?.option1 || products[String(sku).toUpperCase()]?.option1 || '';
@@ -141,8 +145,20 @@ for (const [name, value] of Object.entries({ overall: cache.lastRefresh, cin7: c
 
 for (const [id, def] of Object.entries(CK_DEFS)) {
   let count = 0;
-  for (const [sku, data] of Object.entries(products)) if (matchesDef(sku, data.option1 || '', def)) count += 1;
+  for (const [sku, data] of Object.entries(products)) if (matchesDef(sku, data.option1 || '', def, pos)) count += 1;
   if (count === 0) blockers.push(`CK panel has zero matching Cin7 SKUs: ${id}`);
+}
+
+const personalisedCoverDef = CK_DEFS['ll-personalised-cover'];
+const personalisedCoverSkus = Object.entries(products)
+  .filter(([sku, data]) => matchesDef(sku, data.option1 || '', personalisedCoverDef, pos))
+  .map(([sku]) => sku);
+if (!personalisedCoverSkus.length) blockers.push('Personalised Cover panel has no Shaoxing cover SKUs');
+if (personalisedCoverSkus.some(sku => !/^(LLAU|LLNA|LLSG|LLUK)-CB-[A-Z0-9]+-[A-Z0-9]+-CV$/i.test(sku))) {
+  blockers.push('Personalised Cover panel includes a non-Little-Lifely cover SKU');
+}
+if (personalisedCoverSkus.some(sku => !pos.some(po => norm(po?.company) === norm(PERSONALISED_COVER_SUPPLIER) && Object.prototype.hasOwnProperty.call(po?.items || {}, sku)))) {
+  blockers.push('Personalised Cover panel includes a SKU not supplied by Shaoxing Xilinmen');
 }
 
 const fixtures = [
