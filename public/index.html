@@ -808,7 +808,7 @@ async function loadSidebar(){
   const groups=[];const byBrand={};
   d.list.forEach(ck=>{const b=ck.brand||{id:'other',name:'Other',logo:ck.logo};if(!byBrand[b.id]){byBrand[b.id]={brand:b,items:[],subgroups:{},subgroupOrder:[]};groups.push(byBrand[b.id]);if(!(b.id in brandOpenState)) brandOpenState[b.id]=false;}const group=byBrand[b.id];if(ck.subgroup){if(!group.subgroups[ck.subgroup.id]){group.subgroups[ck.subgroup.id]={meta:ck.subgroup,items:[]};group.subgroupOrder.push(ck.subgroup.id);if(!(ck.subgroup.id in subgroupOpenState)) subgroupOpenState[ck.subgroup.id]=false;}group.subgroups[ck.subgroup.id].items.push(ck);}else{group.items.push(ck);}});
   const brandOrder={'little-lifely':0,'cushie':1,'lifely-home':2,'case-goods':3};
-  const littleLifelyOrder={llau:0,llna:1,llca:2,lluk:3,llnz:4,llsg:5,'ll-personalised-cover':6,'ll-mattresses':7};
+  const littleLifelyOrder={llau:0,llna:1,llca:2,lluk:3,llnz:4,llsg:5};
   groups.forEach(group=>{if(group.brand.id==='little-lifely')group.items.sort((a,b)=>(littleLifelyOrder[a.id]??99)-(littleLifelyOrder[b.id]??99)||String(a.name||'').localeCompare(String(b.name||'')));});
   groups.sort((a,b)=>(brandOrder[a.brand.id]??99)-(brandOrder[b.brand.id]??99)||String(a.brand.name||'').localeCompare(String(b.brand.name||'')));
   document.getElementById('sidebarNav').innerHTML=groups.map(group=>`
