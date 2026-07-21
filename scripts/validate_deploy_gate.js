@@ -137,6 +137,15 @@ if (!frontendSource.includes('po?.arrival||po?.estimatedArrivalDate||po?.customF
 if (!frontendSource.includes('aria-expanded="${expanded}"') || !frontendSource.includes('aria-controls="stockTable"')) {
   blockers.push('Incoming date-column toggle must expose its expanded state accessibly');
 }
+if (!frontendSource.includes('onclick="return toggleIncomingDateColumns(event)"') || !frontendSource.includes("if(event){event.preventDefault();event.stopPropagation();}")) {
+  blockers.push('Incoming date-column toggle must not bubble into table sorting');
+}
+if (!frontendSource.includes('data-sortable="false"') || !frontendSource.includes("if (th.dataset.sortable === 'false'")) {
+  blockers.push('Incoming total and ETA headers must be excluded from global table sorting');
+}
+if (!frontendSource.includes('window.scrollTo(viewState.windowX,viewState.windowY)') || !frontendSource.includes('nextWrap.scrollLeft=viewState.tableLeft')) {
+  blockers.push('Incoming date-column expansion must preserve the page and table scroll positions');
+}
 if (!frontendSource.includes("fullLabel:displayDate?displayDate.toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}):'ETA missing'")) {
   blockers.push('Incoming quantities without a valid PO ETA must remain visible as ETA missing');
 }

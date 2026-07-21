@@ -414,16 +414,27 @@ function buildIncomingDateBreakdown(){
   });
   return [...buckets.values()].filter(bucket=>Object.values(bucket.bySku).some(qty=>Number(qty)>0)).sort((a,b)=>a.sort-b.sort||a.key.localeCompare(b.key));
 }
-function toggleIncomingDateColumns(){
+function toggleIncomingDateColumns(event){
+  if(event){event.preventDefault();event.stopPropagation();}
+  const currentTable=document.getElementById('stockTable');
+  const currentWrap=currentTable?.closest('.table-wrap');
+  const viewState={windowX:window.scrollX,windowY:window.scrollY,tableLeft:currentWrap?.scrollLeft||0,tableTop:currentWrap?.scrollTop||0};
   window._incomingDateColumnsExpanded=!window._incomingDateColumnsExpanded;
   if(DATA.bomData&&!DATA.bomData._separateFromMain)renderBOM();else renderDashboard();
+  requestAnimationFrame(()=>{
+    const nextWrap=document.getElementById('stockTable')?.closest('.table-wrap');
+    if(nextWrap){nextWrap.scrollLeft=viewState.tableLeft;nextWrap.scrollTop=viewState.tableTop;}
+    window.scrollTo(viewState.windowX,viewState.windowY);
+    document.querySelector('#stockTable .incoming-toggle')?.focus({preventScroll:true});
+  });
+  return false;
 }
 function incomingHeaderHtml(buckets){
   const expanded=Boolean(window._incomingDateColumnsExpanded&&buckets.length);
   const action=expanded?'Collapse incoming stock dates':'Expand incoming stock by ETA date';
-  const total=`<th class="incoming-total-head" data-col="Incoming"><button type="button" class="incoming-toggle" onclick="toggleIncomingDateColumns()" aria-expanded="${expanded}" aria-controls="stockTable" aria-label="${action}" title="${action}" ${buckets.length?'':'disabled'}><span>Incoming</span><span class="incoming-toggle-icon" aria-hidden="true">${expanded?'▾':'▸'}</span></button></th>`;
+  const total=`<th class="incoming-total-head" data-col="Incoming" data-sortable="false"><button type="button" class="incoming-toggle" onclick="return toggleIncomingDateColumns(event)" aria-expanded="${expanded}" aria-controls="stockTable" aria-label="${action}" title="${action}" ${buckets.length?'':'disabled'}><span>Incoming</span><span class="incoming-toggle-icon" aria-hidden="true">${expanded?'▾':'▸'}</span></button></th>`;
   if(!expanded)return total;
-  return total+buckets.map(bucket=>`<th class="incoming-date-head" data-col="Incoming · ${escHtml(bucket.fullLabel)}" scope="col" title="${escHtml(bucket.fullLabel)} · ${bucket.poCount} open PO${bucket.poCount===1?'':'s'}"><span class="incoming-date-label">${escHtml(bucket.label)}</span>${bucket.year?`<span class="incoming-date-year">${bucket.year}</span>`:''}</th>`).join('');
+  return total+buckets.map(bucket=>`<th class="incoming-date-head" data-col="Incoming · ${escHtml(bucket.fullLabel)}" data-sortable="false" scope="col" title="${escHtml(bucket.fullLabel)} · ${bucket.poCount} open PO${bucket.poCount===1?'':'s'}"><span class="incoming-date-label">${escHtml(bucket.label)}</span>${bucket.year?`<span class="incoming-date-year">${bucket.year}</span>`:''}</th>`).join('');
 }
 function incomingDateCellsHtml(sku,buckets){
   if(!window._incomingDateColumnsExpanded||!buckets.length)return'';
@@ -2142,6 +2153,7 @@ function sortTable(tableId, colIdx, type) {
 document.addEventListener('click', function(e) {
   const th = e.target.closest('th');
   if (!th) return;
+  if (th.dataset.sortable === 'false' || e.target.closest('button,a,input,select,textarea,[role="button"]')) return;
   const table = th.closest('table');
   if (!table || !table.id) return;
   const colIdx = Array.from(th.parentElement.children).indexOf(th);

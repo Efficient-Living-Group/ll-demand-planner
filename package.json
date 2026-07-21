@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "npm run validate && node server.js",
-    "validate": "node --check server.js && node scripts/validate_deploy_gate.js"
+    "validate": "node --check server.js && node scripts/test_incoming_toggle_interaction.js && node scripts/validate_deploy_gate.js"
   },
   "dependencies": {
     "express": "^4.18.2",
