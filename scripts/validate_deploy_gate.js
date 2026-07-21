@@ -128,6 +128,21 @@ if (!frontendSource.includes("nextPO:next?.reference||null,nextETA:next?.etaRaw|
 if (!frontendSource.includes("if(!dated.length) return {preorderUnits,nextPO:next?.reference||null,nextETA:null,nextQty:next?.qty||0")) {
   blockers.push('Undated incoming POs must expose their reference without fabricating an ETA');
 }
+if (!frontendSource.includes('function buildIncomingDateBreakdown()')) {
+  blockers.push('Incoming stock must support an ETA-date column breakdown');
+}
+if (!frontendSource.includes('po?.arrival||po?.estimatedArrivalDate||po?.customFields?.orders_1000||null')) {
+  blockers.push('Incoming date columns must use the full PO ETA fallback chain');
+}
+if (!frontendSource.includes('aria-expanded="${expanded}"') || !frontendSource.includes('aria-controls="stockTable"')) {
+  blockers.push('Incoming date-column toggle must expose its expanded state accessibly');
+}
+if (!frontendSource.includes("fullLabel:displayDate?displayDate.toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}):'ETA missing'")) {
+  blockers.push('Incoming quantities without a valid PO ETA must remain visible as ETA missing');
+}
+if (!frontendSource.includes('incomingDateCellsHtml(s,incomingDateBuckets)') || !frontendSource.includes('incomingDateCellsHtml(sku,incomingDateBuckets)')) {
+  blockers.push('Incoming ETA cells must render in both standard and component stock tables');
+}
 if (!/['\"]cusb-us['\"]:\s*\{[^\n]*poDestination:\s*['\"]United States['\"]/.test(serverSource)) {
   blockers.push('Cushie US must filter POs to United States');
 }
