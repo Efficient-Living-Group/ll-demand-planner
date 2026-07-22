@@ -29,8 +29,8 @@ const ENABLE_RENDER_CIN7_SCHEDULER = process.env.ENABLE_RENDER_CIN7_SCHEDULER ==
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.createHash('sha256').update(`${APP_PASSWORD}|ll-demand-planner-session-v1`).digest('hex');
 const LL_AU_BRANCH_IDS = [3, 60976];
-const LL_NZ_BRANCH_IDS = [48391];
-const LL_US_BRANCH_IDS = [60701, 63764, 65158];
+const LL_NZ_BRANCH_IDS = [48391, 68865];
+const LL_US_BRANCH_IDS = [60701, 63764];
 const LL_PERSONALISED_COVER_BRANCH_IDS = [74276];
 
 // Shopify stores
@@ -67,13 +67,13 @@ const CK_DEFS = {
   'airflow-pad': { name: 'Airflow Pad',           prefix: 'PAD-',   logo: null,               mark: 'AIR',  store: 'lifely', option1: 'Airflow Pad', sizes: {} },
   'caterpillar': { name: 'Caterpillar Dining',    prefix: 'MULTI',  logo: null,               mark: 'CAT',  store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Caterpillar', sizes: {'EDT':'Dining Table','EDB':'Dining Chair'} },
   'cusb-au':  { name: 'Cushie AU',              prefix: 'MULTI',  logo: 'cushie.png',        store: 'lifely', poDestination: 'Australia', salesCountry: 'AU', stockBranches: LL_AU_BRANCH_IDS, option1: ['Category Killer - Cushie V3 Snuggle', 'Category Killer - Cushie V2', 'Category Killer - Cushie V2 - Discontinued', 'Category Killer - Lifely Sofa'], filter: sku => !isCushieSetBomSku(sku) && ((sku.startsWith('CUSB') && !sku.includes('-UK') && !sku.includes('SGE')) || (sku.startsWith('LFSB') && !sku.includes('-UK'))), excludeCV: true, sizes: {'ARST':'Armrest','-TW-':'Twin','-S-':'Single','-D-':'Double','-Q-':'Queen','-K-':'King','-CHS-':'Chaise','-SOTM-':'Ottoman','-AMST-':'Armrest'} },
-  'cusb-us':  { name: 'Cushie US',              prefix: 'MULTI',  logo: 'cushie.png',        store: 'lifely', poDestination: 'United States', salesCountry: 'US', stockBranches: [60701], option1: ['Category Killer - Cushie V2', 'Category Killer - Cushie V2 - Discontinued', 'Category Killer - Cushie V3 Snuggle'], filter: sku => !isCushieSetBomSku(sku) && (sku.startsWith('V2-') || sku.startsWith('V3-')), excludeCV: true, sizes: {'-TB-':'Twin','-DB-':'Full','-QB-':'Queen','-KB-':'King','-CH-':'Chaise','-OS-':'Ottoman','-OB-':'Ottoman Bed','-RMST':'Armrest','-RMST-':'Armrest','-ARM-':'Armrest'} },
+  'cusb-us':  { name: 'Cushie US',              prefix: 'MULTI',  logo: 'cushie.png',        store: 'lifely', poDestination: 'United States', salesCountry: 'US', stockBranches: LL_US_BRANCH_IDS, option1: ['Category Killer - Cushie V2', 'Category Killer - Cushie V2 - Discontinued', 'Category Killer - Cushie V3 Snuggle'], filter: sku => !isCushieSetBomSku(sku) && (sku.startsWith('V2-') || sku.startsWith('V3-')), excludeCV: true, sizes: {'-TB-':'Twin','-DB-':'Full','-QB-':'Queen','-KB-':'King','-CH-':'Chaise','-OS-':'Ottoman','-OB-':'Ottoman Bed','-RMST':'Armrest','-RMST-':'Armrest','-ARM-':'Armrest'} },
   'cusb-ca':  { name: 'Cushie CA',              prefix: 'MULTI',  logo: 'cushie.png',        store: 'lifely', poDestination: 'Canada', salesCountry: 'CA', stockBranches: [61831], option1: ['Category Killer - Cushie V2', 'Category Killer - Cushie V2 - Discontinued', 'Category Killer - Cushie V3 Snuggle'], filter: sku => !isCushieSetBomSku(sku) && (sku.startsWith('V2-') || sku.startsWith('V3-')) && !isCushieCanadaExcludedSku(sku), excludeCV: true, sizes: {'-TB-':'Twin','-DB-':'Full','-QB-':'Queen','-KB-':'King','-CH-':'Chaise','-OS-':'Ottoman','-OB-':'Ottoman Bed','-RMST':'Armrest','-RMST-':'Armrest','-ARM-':'Armrest'} },
   'cusb-uk':  { name: 'Cushie UK',              prefix: 'MULTI',  logo: 'cushie.png',        store: 'lifely', poDestination: 'United Kingdom', salesCountry: 'GB', stockBranches: [62444], option1: ['Category Killer - Cushie V2', 'Category Killer - Cushie V2 - Discontinued', 'Category Killer - Cushie V3 Snuggle'], filter: sku => !isCushieSetBomSku(sku) && (sku.startsWith('CUSB') || sku.startsWith('LFSB')) && sku.includes('-UK'), excludeCV: true, sizes: {'-TW-':'Twin','-S-':'Single','-D-':'Double','-Q-':'Queen','-K-':'King','-CHS-':'Chaise','-SOTM-':'Ottoman','-AMST-':'Armrest'} },
 
   'cmss':     { name: 'Cushie Modular Sleeper', prefix: 'CMSS',   logo: 'cushie.png',        store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Cushie V2', sizes: {'-S-':'Single','-D-':'Double','-Q-':'Queen','-K-':'King'} },
   'lifely-sofa': { name: 'Lifely Sofa',         prefix: 'MULTI',  logo: 'lifely-sofa.png',   store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: ['Category Killer - Lifely Sofa', 'Category Killer - Lifely Sofa - Discontinued'], filter: isLifelySofaComponentSku, sizes: {} },
-  'case-goods': { name: 'Case Goods',           prefix: 'MULTI',  logo: null,                mark: 'CASE', store: 'lifely', option1: 'Case goods - Active', filter: isCaseGoodsSku, sizes: {} }
+  'case-goods': { name: 'Case Goods',           prefix: 'MULTI',  logo: null,                mark: 'CASE', store: 'lifely', poDestination: 'Australia', salesCountry: 'AU', stockBranches: LL_AU_BRANCH_IDS, option1: 'Case goods - Active', filter: isCaseGoodsSku, sizes: {} }
 };
 
 // ===== COMBO BOM (Bill of Materials) =====
@@ -2189,7 +2189,9 @@ function buildCKData(ckId) {
   if (ckId === 'case-goods') {
     for (const sku of Object.keys(cin7Normalized)) {
       if (!dataCache.cin7BOMs?.[sku]) continue;
-      const source = dataCache.cin7Products?.[sku] || cin7Normalized[sku] || {};
+      const source = stockBranches
+        ? (cin7Raw[sku] || cin7Normalized[sku] || {})
+        : (dataCache.cin7Products?.[sku] || cin7Normalized[sku] || {});
       const virtual = Number(source.virtual ?? source.soh ?? 0);
       cin7Normalized[sku] = { ...(typeof cin7Normalized[sku] === 'object' ? cin7Normalized[sku] : {}), ...source, soh: virtual, virtual };
     }
@@ -2421,6 +2423,7 @@ function buildCKData(ckId) {
   const allPos = [];
   for (const po of dataCache.cin7POs) {
     if (poDestination && resolvePoDestination(po) !== poDestination) continue;
+    if (stockBranches && Number(po.branchId || 0) && !(stockBranches || []).includes(Number(po.branchId || 0))) continue;
     if (def.filterPosByStockBranches && !(stockBranches || []).includes(Number(po.branchId || 0))) continue;
     const relevantItems = {};
     for (const [sku, qty] of Object.entries(po.items)) {
@@ -2649,6 +2652,7 @@ function buildCKData(ckId) {
   }
   const warehouseBranchConfigs = {
     llau: LL_AU_BRANCH_IDS,
+    llnz: LL_NZ_BRANCH_IDS,
     llna: LL_US_BRANCH_IDS
   };
   if (warehouseBranchConfigs[ckId]) {

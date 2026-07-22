@@ -93,8 +93,32 @@ const serverSource = fs.readFileSync(SERVER_PATH, 'utf8');
 const frontendSource = fs.readFileSync(FRONTEND_PATH, 'utf8');
 const refreshScriptSource = fs.readFileSync(REFRESH_SCRIPT_PATH, 'utf8');
 const personalisedCoverDefLine = serverSource.split('\n').find(line => line.includes("'ll-personalised-cover':")) || '';
+const littleLifelyNzDefLine = serverSource.split('\n').find(line => line.includes("'llnz':")) || '';
+const cushieUsDefLine = serverSource.split('\n').find(line => line.includes("'cusb-us':")) || '';
+const caseGoodsDefLine = serverSource.split('\n').find(line => line.includes("'case-goods':")) || '';
+if (!serverSource.includes('const LL_NZ_BRANCH_IDS = [48391, 68865];')) {
+  blockers.push('New Zealand scope must include Malcove NZ 48391 and Pacificomm NZ 68865');
+}
+if (!serverSource.includes('const LL_US_BRANCH_IDS = [60701, 63764];')) {
+  blockers.push('United States scope must include CA 60701 and NJ 63764 only; stopped PA 65158 must remain excluded');
+}
+if (!littleLifelyNzDefLine.includes('stockBranches: LL_NZ_BRANCH_IDS')) {
+  blockers.push('Little Lifely NZ must use the shared two-warehouse New Zealand scope');
+}
+if (!cushieUsDefLine.includes('stockBranches: LL_US_BRANCH_IDS')) {
+  blockers.push('Cushie US must use the shared active CA + NJ warehouse scope');
+}
+if (!caseGoodsDefLine.includes("poDestination: 'Australia'") || !caseGoodsDefLine.includes("salesCountry: 'AU'") || !caseGoodsDefLine.includes('stockBranches: LL_AU_BRANCH_IDS')) {
+  blockers.push('Case Goods must use the AU Malcove + Capital warehouse scope rather than global Cin7 stock');
+}
+if (!/const warehouseBranchConfigs = \{[\s\S]*?llnz: LL_NZ_BRANCH_IDS,/.test(serverSource)) {
+  blockers.push('Little Lifely NZ warehouse selector must expose both configured New Zealand warehouses');
+}
 if (!serverSource.includes('const LL_PERSONALISED_COVER_BRANCH_IDS = [74276];')) {
   blockers.push('Personalised Cover warehouse branch must be Cin7 branch 74276');
+}
+if (!serverSource.includes('if (stockBranches && Number(po.branchId || 0) && !(stockBranches || []).includes(Number(po.branchId || 0))) continue;')) {
+  blockers.push('Scoped panels must exclude purchase orders assigned to warehouses outside their configured market');
 }
 if (!personalisedCoverDefLine.includes('stockBranches: LL_PERSONALISED_COVER_BRANCH_IDS') || !personalisedCoverDefLine.includes('requireBranchMatch: true') || !personalisedCoverDefLine.includes('filterPosByStockBranches: true')) {
   blockers.push('Personalised Cover must require branch-matched stock and branch-matched POs');
