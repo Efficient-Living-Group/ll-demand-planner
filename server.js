@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { cartonAvailableQuantity } = require('./lib/inventory');
+const { summarizeSalesVolume } = require('./lib/executive-sales');
 const { exec } = require('child_process');
 const WebSocket = require('ws');
 
@@ -3463,6 +3464,48 @@ function executiveVelocity(data, sku) {
   return Number(data?.trendData?.[sku]?.lastInStockVel || 0);
 }
 
+function executiveSourceSkuBelongsToPanel(sourceSku, panel) {
+  const def = CK_DEFS[panel.id];
+  if (!def || !panel._skuSet?.size) return false;
+  const candidates = new Set([
+    String(sourceSku || '').toUpperCase().trim(),
+    canonicalDemandSku(sourceSku, def.salesCountry || '')
+  ]);
+  for (const candidate of candidates) {
+    if (panel._skuSet.has(candidate)) return true;
+    const exploded = explodeDemandSkuForCk(candidate, panel.id);
+    if (exploded?.some(componentSku => panel._skuSet.has(componentSku))) return true;
+  }
+  return false;
+}
+
+function buildExecutiveSalesVolume(panels) {
+  const salesByWeek = {};
+  const matchers = panels.map(panel => ({
+    panel,
+    stores: new Set(getStoreKeysForCk(panel.id, CK_DEFS[panel.id]?.store))
+  }));
+
+  for (const [store, velocity] of Object.entries(dataCache.shopifyVelocity || {})) {
+    const weekly = velocity?._weeklyBreakdown || {};
+    const storeMatchers = matchers.filter(matcher => matcher.stores.has(store));
+    for (const [sourceSku, weeks] of Object.entries(weekly)) {
+      if (!storeMatchers.some(matcher => executiveSourceSkuBelongsToPanel(sourceSku, matcher.panel))) continue;
+      for (const [week, rawQty] of Object.entries(weeks || {})) {
+        const qty = Number(rawQty || 0);
+        if (!Number.isFinite(qty)) continue;
+        salesByWeek[week] = (salesByWeek[week] || 0) + qty;
+      }
+    }
+  }
+
+  return summarizeSalesVolume(
+    salesByWeek,
+    dataCache.lastShopifyRefresh || dataCache.lastRefresh || new Date(),
+    8
+  );
+}
+
 function executivePanelSummary(id) {
   const def = CK_DEFS[id];
   const data = buildCKData(id);
@@ -3564,6 +3607,7 @@ function executivePanelSummary(id) {
     id,
     name: def.name,
     brand: brand.name,
+    _skuSet: new Set(skus),
     status,
     skuPositions: rows.length,
     stockouts: stockouts.length,
@@ -3712,6 +3756,8 @@ function buildExecutiveSummary() {
   const topRisks = panels.flatMap(panel => panel.topRisks.map(row => ({ ...row, ckId: panel.id, ckName: panel.name })))
     .sort((a, b) => b.severity - a.severity || b.openDemand - a.openDemand || a.sku.localeCompare(b.sku))
     .slice(0, 8);
+  const salesVolume = buildExecutiveSalesVolume(panels);
+  const publicPanels = panels.map(({ _skuSet, ...panel }) => panel);
 
   const summary = {
     headline: {
@@ -3723,6 +3769,7 @@ function buildExecutiveSummary() {
       actionPositions: panels.reduce((sum, panel) => sum + panel.actionPositions, 0),
       atRiskOpenDemand: panels.reduce((sum, panel) => sum + panel.uncoveredDemand, 0)
     },
+    salesVolume,
     po: {
       active: poRows.length,
       production: productionPos.length,
@@ -3737,7 +3784,7 @@ function buildExecutiveSummary() {
       arrivingWithin30Days: upcomingAll.length
     },
     actions,
-    panels,
+    panels: publicPanels,
     velocity: {
       surgeCount: allVelocitySurges.length,
       stockoutRiskCount: allVelocitySurges.filter(row => row.stockoutRisk).length,

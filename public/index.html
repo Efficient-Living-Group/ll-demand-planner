@@ -110,6 +110,43 @@ th[data-tip]{position:relative;cursor:help}th[data-tip]:after{content:' ⓘ';fon
 .exec-kpi-value{font-size:32px;line-height:1;font-weight:760;letter-spacing:-.04em;color:var(--text)}
 .exec-kpi-value.danger{color:#A72743}.exec-kpi-value.good{color:#3F7D25}
 .exec-kpi-sub{font-size:11px;line-height:1.45;color:var(--text-dim);margin-top:7px;white-space:normal}
+.exec-momentum{margin:26px 0 24px;padding:0 0 28px;border-bottom:1px solid var(--border)}
+.exec-momentum-head{display:grid;grid-template-columns:minmax(260px,1fr) auto;gap:28px;align-items:end;margin-bottom:22px}
+.exec-momentum-title h3{font-size:18px;line-height:1.25;letter-spacing:-.02em;color:var(--text)}
+.exec-momentum-title p{font-size:11px;line-height:1.55;color:var(--text-dim);margin-top:5px;max-width:70ch}
+.exec-momentum-metrics{display:flex;align-items:flex-end}
+.exec-momentum-metric{min-width:126px;padding:0 18px;border-left:1px solid var(--border)}
+.exec-momentum-metric:last-child{padding-right:0}.exec-momentum-metric:first-child{padding-left:0;border-left:0}
+.exec-metric-label{display:block;font-size:9px;font-weight:850;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim);margin-bottom:6px}
+.exec-metric-value{display:block;font-size:22px;line-height:1;font-weight:780;letter-spacing:-.035em;color:var(--text);white-space:nowrap}
+.exec-metric-value.good{color:#3F7D25}.exec-metric-value.danger{color:#A72743}.exec-metric-value.neutral{color:var(--blue)}
+.exec-momentum-charts{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(320px,.9fr);gap:28px}
+.exec-chart-block{min-width:0}
+.exec-chart-label{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:10px;font-weight:820;letter-spacing:.07em;text-transform:uppercase;color:var(--text-dim);margin-bottom:10px}
+.exec-chart-label small{font-size:9px;font-weight:650;letter-spacing:0;text-transform:none}
+.exec-volume-bars,.exec-rate-columns{display:grid;grid-template-columns:repeat(var(--week-count),minmax(0,1fr));gap:8px;min-width:0}
+.exec-volume-bars{height:208px;align-items:end;background:repeating-linear-gradient(to bottom,transparent 0,transparent 50px,#E5EAE3 51px);border-bottom:1px solid #BFCAC0;padding:0 6px}
+.exec-volume-column{height:100%;display:grid;grid-template-rows:24px minmax(0,1fr) 25px;align-items:end;text-align:center;min-width:0}
+.exec-volume-value{font-size:9px;font-weight:760;color:var(--text-dim);align-self:center;overflow:hidden;text-overflow:ellipsis}
+.exec-volume-bar-area{height:100%;display:flex;align-items:flex-end;justify-content:center;min-height:0}
+.exec-volume-bar{display:block;width:min(32px,72%);min-height:2px;background:#6F8F8B;border-radius:3px 3px 0 0;transition:transform .25s ease-out,background .25s ease-out;transform-origin:bottom}
+.exec-volume-column:nth-last-child(2) .exec-volume-bar{background:#436E6C}.exec-volume-column:last-child .exec-volume-bar{background:#255758}
+.exec-volume-column:hover .exec-volume-bar{background:#CEAA41;transform:scaleX(1.08)}
+.exec-week-label{font-size:9px;font-weight:760;color:var(--text-dim);align-self:end;padding-bottom:6px}
+.exec-rate-columns{height:208px;position:relative;border-bottom:1px solid #BFCAC0;background:linear-gradient(to bottom,transparent 49.7%,#BFCAC0 49.7%,#BFCAC0 50.3%,transparent 50.3%);padding:0 6px}
+.exec-rate-column{position:relative;height:100%;min-width:0;text-align:center}
+.exec-rate-value{position:absolute;top:7px;left:50%;transform:translateX(-50%);font-size:9px;font-weight:820;color:var(--text-dim);white-space:nowrap}
+.exec-rate-bar{position:absolute;left:22%;width:56%;min-height:2px;border-radius:3px;background:#6A9B55;bottom:50%;transform-origin:bottom}
+.exec-rate-bar.negative{top:50%;bottom:auto;background:#C8576D;transform-origin:top}
+.exec-rate-bar.neutral{background:#98AAA3}
+.exec-rate-column .exec-week-label{position:absolute;left:0;right:0;bottom:0}
+.exec-chart-note{font-size:9px;line-height:1.5;color:var(--text-dim);margin-top:9px}
+.exec-signal-strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin:0 0 34px}
+.exec-signal-item{padding:15px 20px;border-left:1px solid var(--border);min-width:0}
+.exec-signal-item:first-child{border-left:0;padding-left:0}.exec-signal-item:last-child{padding-right:0}
+.exec-signal-label{font-size:9px;font-weight:850;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim)}
+.exec-signal-value{font-size:20px;line-height:1.1;font-weight:780;letter-spacing:-.025em;color:var(--text);margin-top:5px}
+.exec-signal-value.danger{color:#A72743}.exec-signal-detail{font-size:10px;line-height:1.45;color:var(--text-dim);margin-top:4px}
 .exec-layout{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(310px,.75fr);gap:36px;align-items:start}
 .exec-section{margin-bottom:36px;min-width:0}
 .exec-section-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:12px}
@@ -145,6 +182,13 @@ th[data-tip]{position:relative;cursor:help}th[data-tip]:after{content:' ⓘ';fon
 .exec-velocity-row:hover{background:#EDF2EC}.exec-velocity-row:active{background:#E4ECE4}.exec-velocity-row:focus-visible{outline:2px solid var(--yellow);outline-offset:2px}
 .exec-velocity-sku{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.exec-velocity-meta{font-size:9px;color:var(--text-dim);margin-top:4px}
 .exec-velocity-stat{font-size:12px;font-weight:760;text-align:right;color:var(--text)}.exec-velocity-stat small{display:block;font-size:9px;font-weight:600;color:var(--text-dim);margin-top:3px}.exec-velocity-lift{color:#3F7D25}
+.exec-mover-row{width:100%;display:grid;grid-template-columns:minmax(155px,220px) minmax(120px,1fr) 90px minmax(105px,auto) 20px;gap:12px;align-items:center;border:0;border-bottom:1px solid var(--border);background:transparent;text-align:left;padding:12px 4px;color:var(--text);cursor:pointer;min-height:62px}
+.exec-mover-row:hover{background:#EDF2EC}.exec-mover-row:focus-visible{outline:2px solid var(--yellow);outline-offset:2px}
+.exec-mover-track{height:9px;border-radius:2px;background:#E0E7DD;overflow:hidden}.exec-mover-fill{display:block;height:100%;min-width:3px;border-radius:2px;background:#5E9180}
+.exec-mover-value{font-size:11px;font-weight:800;text-align:right;color:#3F7D25;white-space:nowrap}.exec-mover-value small{display:block;font-size:9px;font-weight:650;color:var(--text-dim);margin-top:3px}
+.exec-health-overview{margin:4px 0 16px}.exec-health-bar{display:flex;height:10px;overflow:hidden;border-radius:2px;background:#E1E7DE}
+.exec-health-bar span{display:block;min-width:0}.exec-health-critical{background:#C8576D}.exec-health-watch{background:#D7A637}.exec-health-healthy{background:#69A554}
+.exec-health-key{display:flex;flex-wrap:wrap;gap:14px;margin-top:8px;font-size:9px;color:var(--text-dim)}.exec-health-key b{color:var(--text);font-weight:800}
 .exec-oos{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;padding:5px 8px;font-size:9px;font-weight:850;letter-spacing:.02em;white-space:nowrap;background:#E4EEE1;color:#376C22}.exec-oos.watch{background:#FFF0C9;color:#805B08}.exec-oos.urgent,.exec-oos.out{background:#F8DDE3;color:#9A203D}.exec-oos.out{box-shadow:inset 0 0 0 1px #E8A9B7}
 .exec-side-block{padding:0 0 28px;margin-bottom:28px;border-bottom:1px solid var(--border)}
 .exec-side-block:last-child{border-bottom:0}
@@ -156,12 +200,12 @@ th[data-tip]{position:relative;cursor:help}th[data-tip]:after{content:' ⓘ';fon
 .exec-risk-sku{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px;font-weight:750;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.exec-risk-meta{font-size:10px;color:var(--text-dim);margin-top:4px}
 .exec-risk-stat{text-align:right;font-size:11px;font-weight:800;color:#A72743}.exec-risk-stat small{display:block;color:var(--text-dim);font-size:9px;margin-top:3px}
 .exec-arrival{display:grid;grid-template-columns:72px minmax(0,1fr) auto;gap:10px;padding:11px 2px;border-bottom:1px solid var(--border);align-items:center}
-.exec-arrival-date{font-size:10px;font-weight:800;color:var(--blue)}.exec-arrival-title{font-size:11px;font-weight:750;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.exec-arrival-meta{font-size:9px;color:var(--text-dim);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.exec-arrival-units{font-size:10px;font-weight:800;text-align:right;color:var(--text)}
+.exec-arrival>span:nth-child(2){display:block;min-width:0}.exec-arrival-date{font-size:10px;font-weight:800;color:var(--blue)}.exec-arrival-title{display:block;max-width:100%;font-size:11px;font-weight:750;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.exec-arrival-meta{display:block;max-width:100%;font-size:9px;color:var(--text-dim);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.exec-arrival-units{font-size:10px;font-weight:800;text-align:right;color:var(--text)}
 .exec-note{font-size:10px;line-height:1.55;color:var(--text-dim);padding-top:12px}
 .exec-skeleton{display:grid;gap:14px;padding:18px 0}.exec-skeleton span{display:block;height:14px;border-radius:4px;background:linear-gradient(90deg,#E5EBE2 25%,#F2F5F0 50%,#E5EBE2 75%);background-size:200% 100%;animation:execShimmer 1.4s infinite}.exec-skeleton span:nth-child(2){width:70%}.exec-skeleton span:nth-child(3){width:86%}
 @keyframes execShimmer{to{background-position:-200% 0}}
-@media(max-width:1100px){.exec-layout{grid-template-columns:1fr;gap:8px}.exec-side{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:28px}.exec-side-block{border-bottom:0;border-top:1px solid var(--border);padding-top:18px}.exec-kpi{padding:16px}}
-@media(max-width:760px){.exec-intro{align-items:flex-start;flex-direction:column;gap:10px}.exec-asof{text-align:left}.exec-kpis{grid-template-columns:1fr 1fr;margin:20px 0 28px}.exec-kpi{border-left:1px solid var(--border);border-bottom:1px solid var(--border);padding:15px 12px}.exec-kpi:nth-child(odd){border-left:0;padding-left:0}.exec-kpi:nth-child(n+3){border-bottom:0}.exec-kpi-value{font-size:27px}.exec-layout{gap:0}.exec-side{grid-template-columns:1fr;gap:0}.exec-panel-head,.exec-velocity-head{display:none}.exec-panel-row{grid-template-columns:minmax(0,1fr) repeat(2,64px) 22px;gap:8px}.exec-panel-row .exec-cell:nth-of-type(4),.exec-panel-row .exec-cell:nth-of-type(5){display:none}.exec-velocity-row{grid-template-columns:minmax(0,1fr) 58px 86px 18px;gap:8px;padding:12px 2px}.exec-velocity-row .velocity-prior,.exec-velocity-row .velocity-change,.exec-velocity-row .velocity-net{display:none}.exec-action{grid-template-columns:9px minmax(0,1fr);padding:14px 2px}.exec-action .exec-open{display:none}.exec-section{margin-bottom:30px}}
+@media(max-width:1100px){.exec-momentum-charts{grid-template-columns:1fr}.exec-layout{grid-template-columns:1fr;gap:8px}.exec-side{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:28px}.exec-side-block{border-bottom:0;border-top:1px solid var(--border);padding-top:18px}.exec-kpi{padding:16px}}
+@media(max-width:760px){.exec-intro{align-items:flex-start;flex-direction:column;gap:10px}.exec-asof{text-align:left}.exec-momentum-head{grid-template-columns:1fr;gap:18px;align-items:start}.exec-momentum-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%}.exec-momentum-metric{min-width:0;padding:0 10px}.exec-metric-value{font-size:18px}.exec-volume-bars,.exec-rate-columns{gap:4px;padding-left:2px;padding-right:2px}.exec-volume-value,.exec-rate-value{font-size:8px}.exec-signal-strip{grid-template-columns:1fr;margin-bottom:28px}.exec-signal-item,.exec-signal-item:first-child,.exec-signal-item:last-child{border-left:0;border-top:1px solid var(--border);padding:12px 0}.exec-signal-item:first-child{border-top:0}.exec-kpis{grid-template-columns:1fr 1fr;margin:20px 0 28px}.exec-kpi{border-left:1px solid var(--border);border-bottom:1px solid var(--border);padding:15px 12px}.exec-kpi:nth-child(odd){border-left:0;padding-left:0}.exec-kpi:nth-child(n+3){border-bottom:0}.exec-kpi-value{font-size:27px}.exec-layout{gap:0}.exec-side{grid-template-columns:1fr;gap:0}.exec-panel-head,.exec-velocity-head{display:none}.exec-panel-row{grid-template-columns:minmax(0,1fr) repeat(2,64px) 22px;gap:8px}.exec-panel-row .exec-cell:nth-of-type(4),.exec-panel-row .exec-cell:nth-of-type(5){display:none}.exec-mover-row{grid-template-columns:minmax(0,1fr) auto 18px;gap:8px;padding:12px 2px}.exec-mover-track{grid-column:1/3;grid-row:2}.exec-mover-value{grid-column:2;grid-row:1}.exec-mover-risk{display:none}.exec-action{grid-template-columns:9px minmax(0,1fr);padding:14px 2px}.exec-action .exec-open{display:none}.exec-section{margin-bottom:30px}}
 @media(pointer:coarse){.exec-action,.exec-panel-row,.exec-velocity-row,.exec-risk-row,.exec-filter,.exec-link{min-height:44px}}
 </style>
 </head>
@@ -731,6 +775,34 @@ document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
 function execNumber(value){return Number(value||0).toLocaleString('en-AU',{maximumFractionDigits:0})}
 function execMoney(value){const n=Number(value||0);if(Math.abs(n)>=1000000)return 'A$'+(n/1000000).toFixed(n>=10000000?0:1)+'M';if(Math.abs(n)>=1000)return 'A$'+Math.round(n/1000).toLocaleString('en-AU')+'K';return 'A$'+Math.round(n).toLocaleString('en-AU')}
 function execDate(value){if(!value)return 'No ETA';const d=new Date(value);return Number.isNaN(d.getTime())?'No ETA':d.toLocaleDateString('en-AU',{day:'numeric',month:'short'})}
+function execDelta(value){if(value===null||value===undefined||!Number.isFinite(Number(value)))return{label:'Not comparable',short:'—',className:'neutral'};const n=Number(value);if(Math.abs(n)<.05)return{label:'No change',short:'0%',className:'neutral'};return{label:(n>0?'Up ':'Down ')+Math.abs(n).toFixed(Math.abs(n)>=10?0:1)+'%',short:(n>0?'+':'−')+Math.abs(n).toFixed(Math.abs(n)>=10?0:1)+'%',className:n>0?'good':'danger'}}
+function renderExecutiveSalesMomentum(sales){
+  const weeks=sales?.completedWeeks||[];
+  if(!weeks.length)return'<section class="exec-momentum"><div class="exec-empty">Weekly sales history is not available yet.</div></section>';
+  const maxUnits=Math.max(...weeks.map(row=>Number(row.units||0)),1);
+  const deltas=weeks.map(row=>row.changePct).filter(value=>value!==null&&Number.isFinite(Number(value)));
+  const maxDelta=Math.max(...deltas.map(value=>Math.abs(Number(value))),10);
+  const latestDelta=execDelta(sales.changePct),baselineDelta=execDelta(sales.vs4WeekPct);
+  const volumeLabel=weeks.map(row=>`${row.label} ${execNumber(row.units)} units`).join(', ');
+  const rateLabel=weeks.map(row=>`${row.label} ${execDelta(row.changePct).label}`).join(', ');
+  const volumeBars=weeks.map(row=>`<div class="exec-volume-column" title="${escHtml(row.label)}: ${execNumber(row.units)} units"><span class="exec-volume-value">${execNumber(row.units)}</span><span class="exec-volume-bar-area"><span class="exec-volume-bar" style="height:${Math.max(2,Math.round(Number(row.units||0)/maxUnits*100))}%"></span></span><span class="exec-week-label">${escHtml(row.label)}</span></div>`).join('');
+  const rateBars=weeks.map(row=>{const delta=execDelta(row.changePct);const raw=row.changePct===null?0:Number(row.changePct||0);const height=Math.max(raw===0?0:2,Math.round(Math.min(Math.abs(raw)/maxDelta,1)*40));return`<div class="exec-rate-column" title="${escHtml(row.label)}: ${escHtml(delta.label)}"><span class="exec-rate-value">${escHtml(delta.short)}</span>${raw===0?'':`<span class="exec-rate-bar ${raw<0?'negative':'good'}" style="height:${height}%"></span>`}<span class="exec-week-label">${escHtml(row.label)}</span></div>`}).join('');
+  return`<section class="exec-momentum" aria-labelledby="salesMomentumTitle">
+    <div class="exec-momentum-head">
+      <div class="exec-momentum-title"><div class="exec-kicker">Sales momentum</div><h3 id="salesMomentumTitle">How fast unit sales are changing</h3><p>Eight completed Shopify weeks. ${sales.currentWeek?.label?`${escHtml(sales.currentWeek.label)} is still in progress at ${execNumber(sales.currentWeek.units)} units and is excluded from the comparison.`:'The current partial week is excluded.'}</p></div>
+      <div class="exec-momentum-metrics">
+        <div class="exec-momentum-metric"><span class="exec-metric-label">${escHtml((sales.latestWeek||'Latest week').replace(/^\d{4}-/,''))} complete</span><span class="exec-metric-value">${execNumber(sales.latestWeekUnits)} units</span></div>
+        <div class="exec-momentum-metric"><span class="exec-metric-label">Week on week</span><span class="exec-metric-value ${latestDelta.className}">${escHtml(latestDelta.short)}</span></div>
+        <div class="exec-momentum-metric"><span class="exec-metric-label">Vs 4-week average</span><span class="exec-metric-value ${baselineDelta.className}">${escHtml(baselineDelta.short)}</span></div>
+      </div>
+    </div>
+    <div class="exec-momentum-charts">
+      <div class="exec-chart-block"><div class="exec-chart-label"><span>Weekly sales volume</span><small>ordered units</small></div><div class="exec-volume-bars" style="--week-count:${weeks.length}" role="img" aria-label="${escHtml(volumeLabel)}">${volumeBars}</div></div>
+      <div class="exec-chart-block"><div class="exec-chart-label"><span>Rate of change</span><small>versus prior week</small></div><div class="exec-rate-columns" style="--week-count:${weeks.length}" role="img" aria-label="${escHtml(rateLabel)}">${rateBars}</div></div>
+    </div>
+    <div class="exec-chart-note">Uses the same Shopify ordered-unit feed as planner velocity. Fully refunded and voided orders are excluded; other adjustments follow the existing planner rules.</div>
+  </section>`;
+}
 function execStatusLabel(status){return status==='critical'?'Needs action':status==='watch'?'Watch':'Healthy'}
 function execPanelFilterMatch(panel){return _execPanelFilter==='all'||panel.status===_execPanelFilter}
 function setExecutivePanelFilter(filter){_execPanelFilter=filter;renderExecutivePanelList()}
@@ -753,15 +825,14 @@ function execVelocityRiskText(row){if(row.riskLevel==='out')return 'Out now';if(
 function renderExecutiveVelocityList(){
   const root=document.getElementById('executiveVelocityList');if(!root||!EXECUTIVE_DATA)return;
   document.querySelectorAll('.exec-velocity-filter').forEach(btn=>btn.classList.toggle('active',btn.dataset.filter===_execVelocityFilter));
-  const rows=(EXECUTIVE_DATA.velocitySurges||[]).filter(row=>_execVelocityFilter==='all'||row.stockoutRisk);
+  const rows=(EXECUTIVE_DATA.velocitySurges||[]).filter(row=>_execVelocityFilter==='all'||row.stockoutRisk).slice(0,10);
   if(!rows.length){root.innerHTML='<div class="exec-empty">No SKUs match this velocity filter.</div>';return;}
-  root.innerHTML=rows.map(row=>`<button class="exec-velocity-row" onclick="selectCK('${escHtml(row.ckId)}')" aria-label="Open ${escHtml(row.sku)} in ${escHtml(row.ckName)}">
+  const maxLift=Math.max(...rows.map(row=>Number(row.weeklyLift||0)),1);
+  root.innerHTML=rows.map(row=>`<button class="exec-mover-row" onclick="selectCK('${escHtml(row.ckId)}')" aria-label="Open ${escHtml(row.sku)} in ${escHtml(row.ckName)}">
     <span><span class="exec-velocity-sku">${escHtml(row.sku)}</span><span class="exec-velocity-meta">${escHtml(row.ckName)} · ${escHtml(row.brand)}</span></span>
-    <span class="exec-velocity-stat">${execNumber(row.currentWeekly)}<small>units/wk</small></span>
-    <span class="exec-velocity-stat velocity-prior">${Number(row.priorWeekly||0).toFixed(1)}<small>prior pace</small></span>
-    <span class="exec-velocity-stat exec-velocity-lift velocity-change">${row.reactivated?'Revival':'+'+execNumber(row.increasePct)+'%'}<small>+${Number(row.weeklyLift||0).toFixed(1)}/wk</small></span>
-    <span class="exec-velocity-stat velocity-net ${row.available<=0?'danger':''}">${execNumber(row.available)}<small>net available</small></span>
-    <span class="exec-velocity-stat velocity-risk"><span class="exec-oos ${escHtml(row.riskLevel)}">${execVelocityRiskText(row)}</span>${row.incoming>0?'<small>+'+execNumber(row.incoming)+' incoming</small>':'<small>before incoming POs</small>'}</span>
+    <span class="exec-mover-track" aria-hidden="true"><span class="exec-mover-fill" style="width:${Math.max(4,Math.round(Number(row.weeklyLift||0)/maxLift*100))}%"></span></span>
+    <span class="exec-mover-value">+${Number(row.weeklyLift||0).toFixed(1)}<small>units/week</small></span>
+    <span class="exec-mover-risk"><span class="exec-oos ${escHtml(row.riskLevel)}">${execVelocityRiskText(row)}</span></span>
     <span class="exec-open" aria-hidden="true">›</span>
   </button>`).join('');
 }
@@ -773,30 +844,33 @@ async function openExecutivePOs(filter='all'){
 }
 function renderExecutiveSummary(data){
   EXECUTIVE_DATA=data;executiveLoaded=true;
-  const h=data.headline||{},po=data.po||{},actions=data.actions||[],velocity=data.velocity||{},risks=data.topRisks||[],upcoming=data.upcoming||[];
+  const h=data.headline||{},sales=data.salesVolume||{},po=data.po||{},actions=data.actions||[],velocity=data.velocity||{},risks=data.topRisks||[],upcoming=data.upcoming||[];
   const content=document.getElementById('executiveSummaryContent');
   const maxPipeline=Math.max(po.production||0,po.inTransit||0,po.overdue||0,1);
+  const totalPanels=Math.max(Number(h.totalPanels||0),1);
+  const healthWidths={critical:Math.round(Number(h.actionPanels||0)/totalPanels*100),watch:Math.round(Number(h.watchPanels||0)/totalPanels*100),healthy:Math.round(Number(h.healthyPanels||0)/totalPanels*100)};
   const actionHtml=actions.length?actions.map(action=>`<button class="exec-action" onclick="${action.type==='po'?`openExecutivePOs('${escHtml(action.filter||'overdue')}')`:`selectCK('${escHtml(action.ckId)}')`}" aria-label="${escHtml(action.title)}">
     <span class="exec-signal ${escHtml(action.severity)}" aria-hidden="true"></span><span><span class="exec-action-title">${escHtml(action.title)}</span><span class="exec-action-detail">${escHtml(action.detail)}</span></span><span class="exec-open">Open ›</span>
   </button>`).join(''):'<div class="exec-empty">No urgent inventory or PO actions detected.</div>';
   const riskHtml=risks.length?risks.slice(0,6).map(row=>`<button class="exec-risk-row" onclick="selectCK('${escHtml(row.ckId)}')"><span><span class="exec-risk-sku">${escHtml(row.sku)}</span><span class="exec-risk-meta">${escHtml(row.ckName)} · ${escHtml(row.status)}</span></span><span class="exec-risk-stat">${execNumber(row.openDemand)}<small>open demand</small></span></button>`).join(''):'<div class="exec-empty">No high-risk SKU positions.</div>';
   const arrivalHtml=upcoming.length?upcoming.map(row=>`<div class="exec-arrival"><span class="exec-arrival-date">${execDate(row.eta)}</span><span><span class="exec-arrival-title">${escHtml(row.reference)}</span><span class="exec-arrival-meta">${escHtml(row.destination)} · ${escHtml(row.supplier)}</span></span><span class="exec-arrival-units">${execNumber(row.units)}<br><small>units</small></span></div>`).join(''):'<div class="exec-empty">No arrivals scheduled in the next 30 days.</div>';
   content.innerHTML=`
-    <div class="exec-intro"><div><div class="exec-kicker">Portfolio command view</div><h2>What needs attention now</h2><p>Inventory risk and supply-chain movement across every Category Killer. Open a row to move from signal to detail.</p></div><div class="exec-asof">As of ${data.lastRefresh?new Date(data.lastRefresh).toLocaleString('en-AU'):'latest available snapshot'}<br>Cin7 + Shopify</div></div>
-    <div class="exec-kpis">
-      <div class="exec-kpi"><div class="exec-kpi-label">Category Killers needing action</div><div class="exec-kpi-value ${h.actionPanels?'danger':'good'}">${execNumber(h.actionPanels)}</div><div class="exec-kpi-sub">of ${execNumber(h.totalPanels)} · ${execNumber(h.watchPanels)} on watch</div></div>
-      <div class="exec-kpi"><div class="exec-kpi-label">Stockouts with open demand</div><div class="exec-kpi-value ${h.stockoutPositions?'danger':'good'}">${execNumber(h.stockoutPositions)}</div><div class="exec-kpi-sub">${execNumber(h.actionPositions)} market-SKU positions need action</div></div>
-      <div class="exec-kpi"><div class="exec-kpi-label">Active PO pipeline</div><div class="exec-kpi-value">${execNumber(po.active)}</div><div class="exec-kpi-sub">${execMoney(po.pipelineValueAud)} est. landed · ${execNumber(po.incomingUnits)} units</div></div>
-      <div class="exec-kpi"><div class="exec-kpi-label">Overdue POs</div><div class="exec-kpi-value ${po.overdue?'danger':'good'}">${execNumber(po.overdue)}</div><div class="exec-kpi-sub">${execMoney(po.overdueValueAud)} est. landed value</div></div>
+    <div class="exec-intro"><div><div class="exec-kicker">Portfolio command view</div><h2>Sales momentum and supply risk</h2><p>See the direction of unit sales first, then move into the inventory and PO exceptions that need a decision.</p></div><div class="exec-asof">As of ${data.lastRefresh?new Date(data.lastRefresh).toLocaleString('en-AU'):'latest available snapshot'}<br>Cin7 + Shopify</div></div>
+    ${renderExecutiveSalesMomentum(sales)}
+    <div class="exec-signal-strip" aria-label="Current operating signals">
+      <div class="exec-signal-item"><div class="exec-signal-label">Inventory attention</div><div class="exec-signal-value ${h.actionPanels?'danger':''}">${execNumber(h.actionPanels)} categories</div><div class="exec-signal-detail">${execNumber(h.actionPositions)} market-SKU positions need action · ${execNumber(h.stockoutPositions)} stockouts with demand</div></div>
+      <div class="exec-signal-item"><div class="exec-signal-label">PO risk</div><div class="exec-signal-value ${po.overdue?'danger':''}">${execNumber(po.overdue)} overdue</div><div class="exec-signal-detail">${execMoney(po.overdueValueAud)} estimated landed value · ${execNumber(po.noEta)} without ETA</div></div>
+      <div class="exec-signal-item"><div class="exec-signal-label">Incoming pipeline</div><div class="exec-signal-value">${execNumber(po.incomingUnits)} units</div><div class="exec-signal-detail">${execNumber(po.active)} active POs · ${execMoney(po.pipelineValueAud)} estimated landed</div></div>
     </div>
     <div class="exec-layout">
       <div class="exec-main">
         <section class="exec-section"><div class="exec-section-head"><div><h3>Priority queue</h3><p>Sorted by overdue supply first, then uncovered demand and stock cover.</p></div></div><div class="exec-action-list">${actionHtml}</div></section>
-        <section class="exec-section"><div class="exec-section-head"><div><h3>Sales velocity shifts</h3><p>Last 7 days versus the preceding 23-day weekly pace. Stockout timing uses current net stock before incoming POs.</p></div></div>
+        <section class="exec-section"><div class="exec-section-head"><div><h3>Fastest sales-volume movers</h3><p>Added units per week, comparing the last 7 days with the preceding 23-day weekly pace. Stockout timing uses current net stock before incoming POs.</p></div></div>
           <div class="exec-filters"><button class="exec-filter exec-velocity-filter active" data-filter="all" onclick="setExecutiveVelocityFilter('all')">Accelerating ${execNumber(velocity.surgeCount)}</button><button class="exec-filter exec-velocity-filter" data-filter="risk" onclick="setExecutiveVelocityFilter('risk')">Out within 4 weeks ${execNumber(velocity.stockoutRiskCount)}</button></div>
-          <div class="exec-velocity-head"><span>SKU</span><span style="text-align:right">Last 7d</span><span style="text-align:right">Prior pace</span><span style="text-align:right">Change</span><span style="text-align:right">Net</span><span style="text-align:right">Projected stockout</span><span></span></div><div class="exec-velocity-list" id="executiveVelocityList"></div>
+          <div class="exec-velocity-list" id="executiveVelocityList"></div>
         </section>
         <section class="exec-section"><div class="exec-section-head"><div><h3>Category Killer health</h3><p>Market-level positions; open demand may represent component commitments.</p></div></div>
+          <div class="exec-health-overview" role="img" aria-label="${execNumber(h.actionPanels)} categories need action, ${execNumber(h.watchPanels)} are on watch, ${execNumber(h.healthyPanels)} are healthy"><div class="exec-health-bar"><span class="exec-health-critical" style="width:${healthWidths.critical}%"></span><span class="exec-health-watch" style="width:${healthWidths.watch}%"></span><span class="exec-health-healthy" style="width:${healthWidths.healthy}%"></span></div><div class="exec-health-key"><span><b>${execNumber(h.actionPanels)}</b> need action</span><span><b>${execNumber(h.watchPanels)}</b> watch</span><span><b>${execNumber(h.healthyPanels)}</b> healthy</span></div></div>
           <div class="exec-filters"><button class="exec-filter active" data-filter="all" onclick="setExecutivePanelFilter('all')">All ${execNumber(h.totalPanels)}</button><button class="exec-filter" data-filter="critical" onclick="setExecutivePanelFilter('critical')">Needs action ${execNumber(h.actionPanels)}</button><button class="exec-filter" data-filter="watch" onclick="setExecutivePanelFilter('watch')">Watch ${execNumber(h.watchPanels)}</button><button class="exec-filter" data-filter="healthy" onclick="setExecutivePanelFilter('healthy')">Healthy ${execNumber(h.healthyPanels)}</button></div>
           <div class="exec-panel-head"><span>Category Killer</span><span style="text-align:right">Stockouts</span><span style="text-align:right">Under 4 wks</span><span style="text-align:right">Demand</span><span style="text-align:right">Incoming</span><span></span></div><div class="exec-panel-list" id="executivePanelList"></div>
         </section>
