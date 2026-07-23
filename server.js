@@ -4,6 +4,7 @@ const http = require('http');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const { cartonAvailableQuantity } = require('./lib/inventory');
 const { exec } = require('child_process');
 const WebSocket = require('ws');
 
@@ -2011,7 +2012,7 @@ function normalizeCIN7(cin7Raw) {
   // For box-split products, buildable = min across all boxes
   for (const [base, boxes] of Object.entries(boxGroups)) {
     const soh = Math.min(...boxes.map(b => typeof b === 'object' ? b.soh : b));
-    const available = Math.min(...boxes.map(b => typeof b === 'object' ? (b.available || b.soh) : b));
+    const available = Math.min(...boxes.map(cartonAvailableQuantity));
     // Sum costs across all boxes (each box is a separate shipped piece)
     const costAUD = boxes.reduce((sum, b) => sum + (typeof b === 'object' ? (b.costAUD || 0) : 0), 0);
     const cbm = boxes.reduce((sum, b) => sum + (typeof b === 'object' ? (b.cbm || 0) : 0), 0);
