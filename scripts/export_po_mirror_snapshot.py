@@ -207,9 +207,14 @@ def build_purchase_orders(cur):
           po.currency_code,
           po.tracking_code,
           po.raw_payload,
-          coalesce(jsonb_object_agg(pol.sku, pol.qty) filter (where pol.sku is not null and coalesce(pol.qty,0) > 0), '{}'::jsonb) as items
+          coalesce(jsonb_object_agg(pol.sku, pol.qty) filter (where pol.sku is not null), '{}'::jsonb) as items
         from cin7_core.purchase_orders po
-        left join cin7_core.purchase_order_lines pol on pol.purchase_order_id = po.purchase_order_id
+        left join (
+          select purchase_order_id, sku, sum(qty) as qty
+          from cin7_core.purchase_order_lines
+          where sku is not null and coalesce(qty, 0) > 0
+          group by purchase_order_id, sku
+        ) pol on pol.purchase_order_id = po.purchase_order_id
         where not coalesce(po.is_void, false)
         group by po.purchase_order_id
         order by po.purchase_order_id
@@ -257,6 +262,53 @@ def build_purchase_orders(cur):
     return rows
 
 
+def validate_purchase_order_item_totals(cur, purchase_orders):
+    """Fail closed unless every exported PO/SKU equals its summed mirror lines."""
+    cur.execute(
+        """
+        select
+          po.purchase_order_id,
+          pol.sku,
+          count(*) as line_count,
+          sum(pol.qty) as qty
+        from cin7_core.purchase_orders po
+        join cin7_core.purchase_order_lines pol on pol.purchase_order_id = po.purchase_order_id
+        where not coalesce(po.is_void, false)
+          and pol.sku is not null
+          and coalesce(pol.qty, 0) > 0
+        group by po.purchase_order_id, pol.sku
+        order by po.purchase_order_id, pol.sku
+        """
+    )
+    expected = {
+        (row["purchase_order_id"], row["sku"]): (Decimal(str(row["qty"])), int(row["line_count"]))
+        for row in cur.fetchall()
+    }
+    actual = {
+        (po["id"], sku): Decimal(str(qty))
+        for po in purchase_orders
+        for sku, qty in po.get("items", {}).items()
+    }
+    mismatches = []
+    for key, (expected_qty, line_count) in expected.items():
+        actual_qty = actual.get(key)
+        if actual_qty != expected_qty:
+            mismatches.append((key, expected_qty, actual_qty, line_count))
+    unexpected = sorted(set(actual) - set(expected))
+    if mismatches or unexpected:
+        examples = mismatches[:5]
+        raise RuntimeError(
+            f"PO snapshot item validation failed: {len(mismatches)} mismatches, "
+            f"{len(unexpected)} unexpected items; examples={examples}"
+        )
+    return {
+        "poSkuPairs": len(expected),
+        "duplicateSkuPairs": sum(1 for _, line_count in expected.values() if line_count > 1),
+        "rawPositiveUnits": sum(qty for qty, _ in expected.values()),
+        "exportedPositiveUnits": sum(actual.values()),
+    }
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true")
@@ -265,6 +317,7 @@ def main():
     with connect() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             purchase_orders = build_purchase_orders(cur)
+            validation = validate_purchase_order_item_totals(cur, purchase_orders)
             latest_pos = fetch_one(
                 cur,
                 """
@@ -287,7 +340,12 @@ def main():
         "cin7MirrorExportedAt": snapshot_ts,
     }
 
-    print(f"PO mirror snapshot ready: {len(purchase_orders):,} POs, po_ts={po_ts}")
+    print(
+        f"PO mirror snapshot ready: {len(purchase_orders):,} POs, po_ts={po_ts}; "
+        f"verified {validation['poSkuPairs']:,} PO/SKU totals including "
+        f"{validation['duplicateSkuPairs']:,} duplicate-line pairs; "
+        f"units={validation['exportedPositiveUnits']}"
+    )
     if args.dry_run:
         return
 
