@@ -7,12 +7,15 @@ const path = require('path');
 const { cartonAvailableQuantity } = require('./lib/inventory');
 const { summarizeSalesVolume } = require('./lib/executive-sales');
 const {
-  addLlnaFrameVelocity,
-  addLlnaFrameTrend,
   littleLifelyCtpComponentsForDemandSku,
   cocoonPhysicalComponentsForDemandSku,
   caseGoodsBundleComponentsForDemandSku
 } = require('./lib/little-lifely-demand');
+const {
+  resolveBomMasterLeaves,
+  expandResolvedComponentMap,
+  bomMasterComponentsForPanel
+} = require('./lib/bom-master-demand');
 const {
   normalizeContainerNumber,
   isValidContainerNumber,
@@ -204,15 +207,16 @@ function explodeComboBOM(comboSku) {
   };
 }
 
-function explodeRadiantSetSku(setSku) {
-  if (!setSku.startsWith('RDNT-') || !setSku.endsWith('-SET')) return null;
-  const parts = setSku.split('-');
-  const size = parts[1];
-  const types = parts.slice(2, -1);
-  if (!['D', 'Q', 'K'].includes(size) || types.length === 0) return null;
+function explodeRadiantSetSku(setSku, bomMap = dataCache.cin7BOMs) {
+  const s = String(setSku || '').toUpperCase().trim();
+  if (!/^RDNT-(D|Q|K)-[A-Z0-9-]+-SET$/.test(s)) return null;
+  const resolved = resolveBomMasterLeaves(s, bomMap);
+  if (!resolved.ok) return null;
   return {
-    size,
-    components: ['RDNT-' + size + '-BASE', ...types.map(type => 'RDNT-' + size + '-' + type)]
+    size: s.split('-')[1],
+    components: expandResolvedComponentMap(resolved.components),
+    bomSku: resolved.bomSku,
+    provenance: resolved.provenance
   };
 }
 
@@ -263,70 +267,19 @@ function isLifelySofaComponentSku(sku) {
   return false;
 }
 
-function lifelySofaColourFromSku(sku) {
-  const parts = String(sku || '').toUpperCase().trim().split('-').filter(Boolean);
-  if (!parts.length) return '';
-  if (parts[parts.length - 1] === 'CVR') return parts[parts.length - 2] || '';
-  return parts[parts.length - 1] || '';
-}
-
-function pushLifelySofaModules(out, module, colour, qty, includeFrame, includeCover) {
-  const q = Math.max(0, Number(qty || 0));
-  if (!q) return;
-  if (includeFrame) out.push({ sku: `LFSF-${module}-FC`, qty: q });
-  if (includeCover && colour) out.push({ sku: `LFSF-${module}-CV-${colour}`, qty: q });
-}
-
-function explodeLifelySofaSku(sku) {
+function explodeLifelySofaSku(sku, bomMap = dataCache.cin7BOMs) {
   const s = String(sku || '').toUpperCase().trim();
   if (!s || isLifelySofaComponentSku(s)) return null;
   // Swatch packs are fulfilment freebies/marketing stock, not sofa component
   // preorder commitments. Do not fan one pack order into every swatch colour,
   // otherwise the sofa preorder view is dominated by fabric-swatch backlog.
   if (s === 'LIFELY-FS-PACK') return null;
-
-  const colour = lifelySofaColourFromSku(s);
-  if (!colour) return null;
-  const coverOnly = s.endsWith('-CVR');
-  const includeFrame = !coverOnly;
-  const includeCover = true;
-  const out = [];
-
-  let m = s.match(/^LIFELY-OTM-[A-Z0-9]+(?:-CVR)?$/);
-  if (m) {
-    pushLifelySofaModules(out, 'OTM', colour, 1, includeFrame, includeCover);
-    return out;
-  }
-
-  m = s.match(/^LIFELY-SOFA-(AMLS|AMCR|CRNR)-[A-Z0-9]+(?:-CVR)?$/);
-  if (m) {
-    const direct = s.replace(/-CVR$/, '');
-    return [{ sku: direct + '-1', qty: 1 }, { sku: direct + '-2', qty: 1 }];
-  }
-
-  m = s.match(/^LIFELY-SOFA-(\d+)S(?:-(LEFT|RIGHT|OTM))?-[A-Z0-9]+(?:-CVR)?$/);
-  if (m) {
-    const seats = Number(m[1] || 0);
-    const layout = m[2] || '';
-    pushLifelySofaModules(out, 'AMLS', colour, seats, includeFrame, includeCover);
-    if (layout === 'LEFT' || layout === 'RIGHT' || layout === 'OTM') pushLifelySofaModules(out, 'OTM', colour, 1, includeFrame, includeCover);
-    return out;
-  }
-
-  m = s.match(/^LFSF-(\d+)S(?:-([A-Z0-9]+))?-[A-Z0-9]+(?:-CVR)?$/);
-  if (m) {
-    const seats = Number(m[1] || 0);
-    const layout = m[2] || '';
-    const ottomanMatch = layout.match(/(\d*)OTM/);
-    const ottomans = ottomanMatch ? Number(ottomanMatch[1] || 1) : 0;
-    const corners = /(^|-)U/.test(layout) ? 2 : /(^|-)L/.test(layout) ? 1 : 0;
-    pushLifelySofaModules(out, 'AMLS', colour, seats, includeFrame, includeCover);
-    pushLifelySofaModules(out, 'CRNR', colour, corners, includeFrame, includeCover);
-    pushLifelySofaModules(out, 'OTM', colour, ottomans, includeFrame, includeCover);
-    return out;
-  }
-
-  return null;
+  const resolved = resolveBomMasterLeaves(s, bomMap);
+  if (!resolved.ok) return null;
+  return Object.entries(resolved.components).map(([componentSku, qty]) => ({
+    sku: componentSku,
+    qty
+  }));
 }
 
 function lfsbSizeFromCmss(size) {
@@ -606,9 +559,13 @@ function explodeCaseGoodsBundleSku(sku, ckId) {
   return null;
 }
 
-function explodeKnownBundleSkuForCk(sku, ckId) {
+function explodeKnownBundleSkuForCk(sku, ckId, options = {}) {
   const s = String(sku || '').toUpperCase().trim();
   if (!s) return null;
+  if (options.useBomMaster !== false) {
+    const bomMasterComponents = bomMasterComponentsForPanel(ckId, s, dataCache.cin7BOMs);
+    if (bomMasterComponents !== null) return bomMasterComponents;
+  }
   const ll = explodeLittleLifelyBundleSku(s, ckId);
   if (ll) return ll;
   if (ckId === 'll-mattresses') {
@@ -2397,7 +2354,6 @@ function buildCKData(ckId) {
 
   // Velocity
   const velocity = {};
-  const llnaFrameTrend = { _7d: {}, _30d: {}, _weeklyBreakdown: {}, _firstSeen: {} };
   const mergeVelocitySource = (source, country = '') => {
     const addMappedVelocity = (mappedSku, vel) => {
       const visible = visibleDemandSku(mappedSku);
@@ -2408,18 +2364,23 @@ function buildCKData(ckId) {
     for (const [rawSku, vel] of Object.entries(source || {})) {
       if (String(rawSku || '').startsWith('_')) continue;
       const sku = canonicalDemandSku(rawSku, country);
+      const exact30DayUnits = source?._30d?.[rawSku];
+      const weeklyVelocity = exact30DayUnits !== undefined
+        ? Number(exact30DayUnits || 0) / 30 * 7
+        : Number(vel || 0);
       const exploded = explodeDemandSkuForCk(sku, ckId);
       const primaryMappings = exploded || [sku];
       if (exploded) {
-        for (const componentSku of exploded) addMappedVelocity(componentSku, vel);
+        for (const componentSku of exploded) addMappedVelocity(componentSku, weeklyVelocity);
       } else if (!(ckId === 'cocoon' && isCocoonComboSku(sku))
-        && skuMatchesDef(sku, def)
+        && (skuMatchesDef(sku, def)
+          || (ckId === 'llau' && ['DD-21915CF', 'DD-21107CF', 'DD-21137CF'].includes(sku)))
         && (!def.requireBranchMatch || cin7[sku] !== undefined)) {
-        velocity[sku] = (velocity[sku] || 0) + Number(vel || 0);
+        velocity[sku] = (velocity[sku] || 0) + weeklyVelocity;
       }
       for (const primarySku of primaryMappings) {
         for (const componentSku of supplementalDemandComponentsForCk(primarySku, ckId)) {
-          addMappedVelocity(componentSku, vel);
+          addMappedVelocity(componentSku, weeklyVelocity);
         }
       }
     }
@@ -2429,39 +2390,11 @@ function buildCKData(ckId) {
     for (const sourceStore of relatedStores) {
       const source = dataCache.shopifyVelocityByCountry?.[sourceStore]?.[salesCountry] || {};
       mergeVelocitySource(source, salesCountry);
-      if (ckId === 'llna' || ckId === 'llca') {
-        addLlnaFrameVelocity(
-          velocity,
-          source,
-          dataCache.cin7BOMs,
-          rawSku => canonicalDemandSku(rawSku, salesCountry)
-        );
-        addLlnaFrameTrend(
-          llnaFrameTrend,
-          source,
-          dataCache.cin7BOMs,
-          rawSku => canonicalDemandSku(rawSku, salesCountry)
-        );
-      }
     }
   } else {
     for (const sourceStore of relatedStores) {
       const source = dataCache.shopifyVelocity?.[sourceStore] || {};
       mergeVelocitySource(source, '');
-      if (ckId === 'llna' || ckId === 'llca') {
-        addLlnaFrameVelocity(
-          velocity,
-          source,
-          dataCache.cin7BOMs,
-          rawSku => canonicalDemandSku(rawSku, '')
-        );
-        addLlnaFrameTrend(
-          llnaFrameTrend,
-          source,
-          dataCache.cin7BOMs,
-          rawSku => canonicalDemandSku(rawSku, '')
-        );
-      }
     }
   }
 
@@ -3118,7 +3051,10 @@ function buildCKData(ckId) {
   // Final row guard: known bundle/config SKUs must not appear as CK rows.
   // Their demand/velocity was already funneled into component SKUs above.
   for (const sku of new Set([...Object.keys(cin7), ...Object.keys(shopify), ...Object.keys(velocity)])) {
-    if (!explodeDemandSkuForCk(sku, ckId)) continue;
+    // Preserve the established visible stock rows. BOM Master changes demand
+    // attribution only; row visibility/SOH remains governed by the existing
+    // panel-specific virtual-bundle rules.
+    if (!explodeKnownBundleSkuForCk(sku, ckId, { useBomMaster: false })) continue;
     delete cin7[sku];
     delete cin7Available[sku];
     delete shopify[sku];
@@ -3429,15 +3365,6 @@ function buildCKData(ckId) {
             : dataCache.shopifyVelocity?.[sourceStore] || {};
           absorbTrend(velSource, salesCountry || '');
         }
-        d7Qty += Number(llnaFrameTrend._7d[sku] || 0);
-        d30Qty += Number(llnaFrameTrend._30d[sku] || 0);
-        const mappedFirstSeen = llnaFrameTrend._firstSeen[sku] || null;
-        if (mappedFirstSeen && (!firstSeenValue || String(mappedFirstSeen) < String(firstSeenValue))) {
-          firstSeenValue = mappedFirstSeen;
-        }
-        for (const [week, qty] of Object.entries(llnaFrameTrend._weeklyBreakdown[sku] || {})) {
-          wk[week] = (wk[week] || 0) + Number(qty || 0);
-        }
         const v7 = d7Qty; // already a 7-day total, shown as weekly rate
         const v30 = d30Qty / 30 * 7;
         const weekKeys = Object.keys(wk).sort().slice(-5);
@@ -3482,7 +3409,6 @@ function buildCKData(ckId) {
           : dataCache.shopifyVelocity?.[sourceStore]?._weeklyBreakdown;
         addWeekly(weekly || {}, salesCountry || '');
       }
-      addWeekly(llnaFrameTrend._weeklyBreakdown, salesCountry || '');
       return Object.keys(result).length > 0 ? result : null;
     })(),
     lastRefresh: dataCache.lastRefresh,

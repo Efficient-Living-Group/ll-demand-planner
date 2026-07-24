@@ -7,6 +7,8 @@ const CACHE_PATH = path.join(ROOT, 'data', 'cache-snapshot.json');
 const SERVER_PATH = path.join(ROOT, 'server.js');
 const FRONTEND_PATH = path.join(ROOT, 'public', 'index.html');
 const CONTAINER_TRACKING_PATH = path.join(ROOT, 'lib', 'container-tracking.js');
+const BOM_MASTER_DEMAND_PATH = path.join(ROOT, 'lib', 'bom-master-demand.js');
+const PACKAGE_PATH = path.join(ROOT, 'package.json');
 const REFRESH_SCRIPT_PATH = path.join(ROOT, 'scripts', 'refresh_live_cin7_cache.py');
 const WARN_STALE_HOURS = 6;
 const MIN_PRODUCTS = 1000;
@@ -92,8 +94,25 @@ let cache;
 try { cache = readJson(CACHE_PATH); } catch (err) { blockers.push(err.message); cache = {}; }
 const serverSource = fs.readFileSync(SERVER_PATH, 'utf8');
 const frontendSource = fs.readFileSync(FRONTEND_PATH, 'utf8');
+const bomMasterDemandSource = fs.existsSync(BOM_MASTER_DEMAND_PATH)
+  ? fs.readFileSync(BOM_MASTER_DEMAND_PATH, 'utf8')
+  : '';
+const packageSource = fs.readFileSync(PACKAGE_PATH, 'utf8');
 if (frontendSource.includes('> No sales</span>')) {
   blockers.push('Dashboard must not show the misleading No sales trend label');
+}
+if (!bomMasterDemandSource.includes('function resolveBomMasterLeaves')
+  || !bomMasterDemandSource.includes('function bomMasterComponentsForPanel')) {
+  blockers.push('Universal BOM Master demand resolver is missing');
+}
+if (!serverSource.includes('bomMasterComponentsForPanel(ckId, s, dataCache.cin7BOMs)')) {
+  blockers.push('Demand attribution must route known parent SKUs through BOM Master');
+}
+if (serverSource.includes('function pushLifelySofaModules')) {
+  blockers.push('Lifely Sofa demand must not infer module composition from parent SKU tokens');
+}
+if (!packageSource.includes('scripts/test_all_tab_bom_reconciliation.js')) {
+  blockers.push('Universal 20-tab BOM reconciliation must run before release');
 }
 const containerTrackingSource = fs.existsSync(CONTAINER_TRACKING_PATH)
   ? fs.readFileSync(CONTAINER_TRACKING_PATH, 'utf8')
