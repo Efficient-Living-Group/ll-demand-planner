@@ -5,10 +5,13 @@ const assert = require('assert');
 const {
   normalizeContainerNumber,
   isValidContainerNumber,
+  canonicalDestination,
+  resolveTrackingDestination,
   warehouseSourceForDestination,
   selectLecangsRecords,
   lecangsSignature,
   normalizeFindTeu,
+  validateFindTeuDestination,
   normalizeLecangs,
   normalizeCirro,
   buildContainerJourney
@@ -21,26 +24,66 @@ assert.deepStrictEqual(warehouseSourceForDestination('United States'), {
   key: 'lecangs_us',
   name: 'Lecangs US',
   market: 'United States',
-  connected: true
+  connected: true,
+  recordLabel: 'ASN'
 });
 assert.deepStrictEqual(warehouseSourceForDestination('Canada'), {
   key: 'lecangs_ca',
   name: 'Lecangs Canada',
   market: 'Canada',
-  connected: true
+  connected: true,
+  recordLabel: 'ASN'
 });
 assert.deepStrictEqual(warehouseSourceForDestination('United Kingdom'), {
   key: 'cirro',
   name: 'Cirro',
   market: 'United Kingdom',
-  connected: true
+  connected: true,
+  recordLabel: 'inbound'
 });
 assert.strictEqual(warehouseSourceForDestination('Australia').key, 'capital_logistics');
 assert.strictEqual(warehouseSourceForDestination('New Zealand').key, 'pacificomm');
 assert.strictEqual(warehouseSourceForDestination('Singapore').key, 'unsupported');
+assert.strictEqual(canonicalDestination('USA'), 'United States');
+assert.deepStrictEqual(
+  resolveTrackingDestination({
+    reference: 'PO-2174-UK',
+    deliveryCountry: 'United Kingdom',
+    branchId: 62444,
+    items: { 'LLUK-CB-S-BLU': 1 }
+  }).destination,
+  'United Kingdom'
+);
+assert.strictEqual(
+  resolveTrackingDestination({ reference: 'PO-CA001', deliveryCountry: 'United States' }).status,
+  'conflict',
+  'Conflicting PO destination evidence must fail closed'
+);
+assert.deepStrictEqual(
+  resolveTrackingDestination({ reference: 'PO-CA001', port: 'Toronto', branchId: 60701 }),
+  {
+    status: 'resolved',
+    destination: 'Canada',
+    evidence: [
+      { source: 'poReference', destination: 'Canada' },
+      { source: 'branch', destination: 'United States' },
+      { source: 'port', destination: 'Canada' }
+    ],
+    conflicts: [],
+    ignoredConflicts: ['United States']
+  },
+  'Two direct destination signals must outrank a stale warehouse branch assignment'
+);
+assert.strictEqual(
+  resolveTrackingDestination({ reference: 'PO-UNKNOWN', items: { 'LLNA-CB-TW-BLU': 1 } }).status,
+  'unknown',
+  'Shared LLNA SKUs must not default tracking to US or Canada'
+);
 const currentLecangsRows = [
   { asnNo: 'ASN-ONE', poNo: 'PO-US14-4', erpNo: null, containerNo: 'HMMU4115585' },
   { asnNo: 'ASN-TWO', poNo: 'PO-US14-4-B', erpNo: null, containerNo: 'HMMU4115585' },
+  { asnNo: 'ASN-NO-CONTAINER', poNo: 'PO-US14-4', erpNo: null, containerNo: '' },
+  { asnNo: '', poNo: 'PO-US14-4', erpNo: null, containerNo: 'HMMU4115585' },
   { asnNo: 'ASN-OTHER', poNo: 'PO-US16-1', erpNo: null, containerNo: 'TLLU1234567' }
 ];
 assert.deepStrictEqual(
@@ -50,8 +93,13 @@ assert.deepStrictEqual(
 );
 assert.deepStrictEqual(
   selectLecangsRecords(currentLecangsRows, 'PO-US14-4', '').map(row => row.asnNo),
-  ['ASN-ONE'],
-  'PO matching must use poNo when erpNo is empty'
+  [],
+  'Lecangs matching must never attach a PO-only record without the selected container'
+);
+assert.deepStrictEqual(
+  selectLecangsRecords(currentLecangsRows, 'PO-MISSING', 'HMMU4115585'),
+  [],
+  'Lecangs matching must never attach another PO through a reused container'
 );
 assert.strictEqual(
   lecangsSignature(
@@ -115,6 +163,8 @@ assert.strictEqual(normalizedFindTeu.polDeparture.timestamp, '2026-06-12');
 assert.strictEqual(normalizedFindTeu.podArrival.type, 'actual');
 assert.strictEqual(normalizedFindTeu.podArrival.timestamp, '2026-07-17');
 assert.strictEqual(normalizedFindTeu.gateOut.timestamp, '2026-07-19');
+assert.strictEqual(validateFindTeuDestination(normalizedFindTeu, 'United Kingdom').status, 'verified');
+assert.strictEqual(validateFindTeuDestination(normalizedFindTeu, 'Singapore').status, 'mismatch');
 
 const sailingJourney = buildContainerJourney({
   containerNumber: 'OOCU8815295',
@@ -128,7 +178,9 @@ const sailingJourney = buildContainerJourney({
     }
   },
   lecangsPayload: {},
-  sourceState: { findteu: 'live', lecangs: 'no_data' }
+  sourceState: { findteu: 'live', lecangs: 'no_data' },
+  expectedDestination: 'United Kingdom',
+  now: '2026-07-15T00:00:00Z'
 });
 assert.strictEqual(sailingJourney.timeline[0].label, 'Port departure');
 assert.strictEqual(sailingJourney.timeline[0].state, 'complete');
@@ -174,7 +226,10 @@ const partialJourney = buildContainerJourney({
   poReference: 'PO-US-TEST',
   findTeuPayload,
   lecangsPayload: partialLecangsPayload,
-  sourceState: { findteu: 'live', lecangs: 'live' }
+  sourceState: { findteu: 'live', lecangs: 'live' },
+  warehouseSource: warehouseSourceForDestination('United States'),
+  expectedDestination: 'United Kingdom',
+  now: '2026-07-19T00:00:00Z'
 });
 assert.strictEqual(partialJourney.complete, false);
 assert.strictEqual(partialJourney.currentStatus, 'Handover and unloading');
@@ -190,7 +245,10 @@ const completeJourney = buildContainerJourney({
   poReference: 'PO-US-TEST',
   findTeuPayload,
   lecangsPayload: partialLecangsPayload,
-  sourceState: { findteu: 'live', lecangs: 'live' }
+  sourceState: { findteu: 'live', lecangs: 'live' },
+  warehouseSource: warehouseSourceForDestination('United States'),
+  expectedDestination: 'United Kingdom',
+  now: '2026-07-19T00:00:00Z'
 });
 assert.strictEqual(completeJourney.complete, true);
 assert.strictEqual(completeJourney.currentStatus, 'Unloading complete');
@@ -208,7 +266,10 @@ const reusedContainerJourney = buildContainerJourney({
     }
   },
   lecangsPayload: partialLecangsPayload,
-  sourceState: { findteu: 'live', lecangs: 'live' }
+  sourceState: { findteu: 'live', lecangs: 'live' },
+  warehouseSource: warehouseSourceForDestination('United States'),
+  expectedDestination: 'United Kingdom',
+  now: '2026-07-19T00:00:00Z'
 });
 assert.strictEqual(reusedContainerJourney.findTeuVoyageMismatch, true);
 assert.strictEqual(reusedContainerJourney.completedVoyageArchived, true);
@@ -230,7 +291,9 @@ const unavailableJourney = buildContainerJourney({
   poReference: 'PO-US-TEST',
   findTeuPayload: {},
   lecangsPayload: {},
-  sourceState: { findteu: 'not_configured', lecangs: 'not_configured' }
+  sourceState: { findteu: 'not_configured', lecangs: 'not_configured' },
+  warehouseSource: warehouseSourceForDestination('United States'),
+  expectedDestination: 'United States'
 });
 assert.strictEqual(unavailableJourney.timeline[0].state, 'unavailable');
 assert.strictEqual(unavailableJourney.timeline.at(-1).state, 'unavailable');
@@ -241,6 +304,7 @@ const cirroPayload = {
     list: [{
       receiving_code: 'IB-ONE',
       reference_no: 'PO-UK-TEST',
+      query_container: 'OOCU8815295',
       receiving_status: 7,
       warehouse_code: 'UK01',
       eta_date: '2026-07-25T09:00:00+00:00',
@@ -248,14 +312,15 @@ const cirroPayload = {
     }]
   }
 };
-const normalizedCirro = normalizeCirro(cirroPayload, 'PO-UK-TEST');
+const normalizedCirro = normalizeCirro(cirroPayload, 'PO-UK-TEST', 'OOCU8815295');
 assert.strictEqual(normalizedCirro.recordLabel, 'inbound');
 assert.strictEqual(normalizedCirro.linkedAsnCount, 1);
 assert.strictEqual(normalizedCirro.warehouseArrival.complete, true);
-assert.strictEqual(normalizedCirro.handover.complete, true);
+assert.strictEqual(normalizedCirro.handover.complete, false);
+assert.strictEqual(normalizedCirro.handover.current, true);
 assert.strictEqual(normalizedCirro.unloaded.complete, false);
 assert.strictEqual(
-  normalizeCirro(cirroPayload, 'PO-OTHER').linkedAsnCount,
+  normalizeCirro(cirroPayload, 'PO-OTHER', 'OOCU8815295').linkedAsnCount,
   0,
   'Cirro records from another PO must not attach to a reused container journey'
 );
@@ -267,10 +332,12 @@ const cirroJourney = buildContainerJourney({
   warehousePayload: cirroPayload,
   sourceState: { findteu: 'live', warehouse: 'live' },
   warehouseSource: warehouseSourceForDestination('United Kingdom'),
-  warehouseMessage: ''
+  warehouseMessage: '',
+  expectedDestination: 'United Kingdom',
+  now: '2026-07-24T00:00:00Z'
 });
 assert.strictEqual(cirroJourney.timeline[3].source, 'Cirro');
-assert.strictEqual(cirroJourney.timeline[3].state, 'complete');
+assert.strictEqual(cirroJourney.timeline[3].state, 'archived');
 assert.strictEqual(cirroJourney.timeline[4].state, 'complete');
 assert.strictEqual(cirroJourney.timeline[5].state, 'current');
 assert.strictEqual(cirroJourney.timeline[6].state, 'pending');
@@ -291,10 +358,100 @@ const cirroComplete = buildContainerJourney({
   findTeuPayload,
   warehousePayload: cirroPayload,
   sourceState: { findteu: 'live', warehouse: 'live' },
-  warehouseSource: warehouseSourceForDestination('United Kingdom')
+  warehouseSource: warehouseSourceForDestination('United Kingdom'),
+  expectedDestination: 'United Kingdom',
+  now: '2026-07-24T00:00:00Z'
 });
 assert.strictEqual(cirroComplete.complete, true);
 assert.strictEqual(cirroComplete.progressPct, 100);
-assert.strictEqual(cirroComplete.timeline.at(-1).timestamp, '2026-07-25T12:00:00+00:00');
+assert.strictEqual(cirroComplete.timeline.at(-1).timestamp, null);
+assert.match(cirroComplete.timeline.at(-1).detail, /exact unload time is not provided/i);
+
+const wrongDestinationJourney = buildContainerJourney({
+  containerNumber: 'OOCU8815295',
+  poReference: 'PO-SG001',
+  findTeuPayload,
+  warehousePayload: {},
+  sourceState: { findteu: 'live', warehouse: 'unsupported' },
+  warehouseSource: warehouseSourceForDestination('Singapore'),
+  expectedDestination: 'Singapore',
+  now: '2026-07-24T00:00:00Z'
+});
+assert.strictEqual(wrongDestinationJourney.findTeuDestinationMismatch, true);
+assert.strictEqual(wrongDestinationJourney.timeline[0].state, 'unavailable');
+assert.deepStrictEqual(wrongDestinationJourney.pod, {});
+
+const noDestinationEvidenceJourney = buildContainerJourney({
+  containerNumber: 'OOCU8815295',
+  poReference: 'PO-NZ001',
+  findTeuPayload: { data: { container: { number: 'OOCU8815295' }, pod: { eta_date: '2026-07-20' } } },
+  warehousePayload: {},
+  sourceState: { findteu: 'live', warehouse: 'not_connected' },
+  warehouseSource: warehouseSourceForDestination('New Zealand'),
+  expectedDestination: 'New Zealand',
+  now: '2026-07-24T00:00:00Z'
+});
+assert.strictEqual(noDestinationEvidenceJourney.findTeuDestinationUnverified, true);
+assert.strictEqual(noDestinationEvidenceJourney.timeline[1].state, 'unavailable');
+
+const overdueJourney = buildContainerJourney({
+  containerNumber: 'OOCU8815295',
+  poReference: 'PO-UK-TEST',
+  findTeuPayload: {
+    data: {
+      container: { number: 'OOCU8815295' },
+      pol: findTeuPayload.data.pol,
+      pod: { ...findTeuPayload.data.pod, eta_date: '2026-07-17' },
+      events: [findTeuPayload.data.events[0]]
+    }
+  },
+  warehousePayload: {},
+  sourceState: { findteu: 'live', warehouse: 'no_data' },
+  warehouseSource: warehouseSourceForDestination('United Kingdom'),
+  expectedDestination: 'United Kingdom',
+  now: '2026-07-24T00:00:00Z'
+});
+assert.strictEqual(overdueJourney.timeline[1].state, 'overdue');
+
+const completedWithoutCarrierHistory = buildContainerJourney({
+  containerNumber: 'OOCU8815295',
+  poReference: 'PO-US-TEST',
+  findTeuPayload: {},
+  warehousePayload: partialLecangsPayload,
+  sourceState: { findteu: 'archived', warehouse: 'live' },
+  warehouseSource: warehouseSourceForDestination('United States'),
+  expectedDestination: 'United States',
+  now: '2026-07-24T00:00:00Z'
+});
+assert.strictEqual(completedWithoutCarrierHistory.complete, true);
+assert.deepStrictEqual(
+  completedWithoutCarrierHistory.timeline.slice(0, 3).map(row => row.state),
+  ['archived', 'archived', 'archived'],
+  'Verified completion must never leave missing historical carrier stages pending'
+);
+
+const receivedPoWithoutProviderCompletion = buildContainerJourney({
+  containerNumber: 'OOCU8815295',
+  poReference: 'PO-UK-RECEIVED',
+  findTeuPayload: {},
+  warehousePayload: {},
+  sourceState: { findteu: 'archived', warehouse: 'no_data' },
+  warehouseSource: warehouseSourceForDestination('United Kingdom'),
+  expectedDestination: 'United Kingdom',
+  journeyClosed: true,
+  now: '2026-07-24T00:00:00Z'
+});
+assert.strictEqual(receivedPoWithoutProviderCompletion.complete, false);
+assert.strictEqual(receivedPoWithoutProviderCompletion.carrierHistoryArchived, true);
+assert.strictEqual(receivedPoWithoutProviderCompletion.journeyClosedWithoutWarehouseConfirmation, true);
+assert.strictEqual(
+  receivedPoWithoutProviderCompletion.currentStatus,
+  'PO received · warehouse completion unverified'
+);
+assert.deepStrictEqual(
+  receivedPoWithoutProviderCompletion.timeline.slice(0, 3).map(row => row.state),
+  ['archived', 'archived', 'archived'],
+  'A received PO must never query or display a newer voyage for its reusable container number'
+);
 
 console.log('Container tracking tests passed');

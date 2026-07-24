@@ -19,9 +19,14 @@ const {
 const {
   normalizeContainerNumber,
   isValidContainerNumber,
+  canonicalDestination,
+  resolveTrackingDestination,
   warehouseSourceForDestination,
   selectLecangsRecords,
   lecangsSignature,
+  normalizeFindTeu,
+  normalizeWarehousePayload,
+  validateFindTeuDestination,
   buildContainerJourney
 } = require('./lib/container-tracking');
 const { exec } = require('child_process');
@@ -53,6 +58,7 @@ const CIRRO_UK_APP_KEY = process.env.CIRRO_UK_APP_KEY || '';
 const CIRRO_UK_APP_TOKEN = process.env.CIRRO_UK_APP_TOKEN || '';
 const CIRRO_UK_BASE_URL = (process.env.CIRRO_UK_BASE_URL || 'https://oms.elogistic.com/v1').replace(/\/$/, '');
 const CONTAINER_TRACKING_CACHE_MS = 15 * 60 * 1000;
+const CONTAINER_TRACKING_SCHEMA_VERSION = '2026-07-24-fail-closed-v2';
 const CIN7_REQUEST_SPACING_MS = 1500;
 const CIN7_REFRESH_INTERVAL_MS = 4 * 60 * 60 * 1000;
 const CIN7_MIN_REFRESH_INTERVAL_MS = CIN7_REFRESH_INTERVAL_MS;
@@ -4515,10 +4521,14 @@ async function fetchCirroInbounds(poReference, containerNumber) {
     assertCirroSuccess(listPayload);
     const listRows = Array.isArray(listPayload?.data?.list) ? listPayload.data.list : [];
     const compactPo = String(poReference || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const compactContainer = String(containerNumber || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
     const exactPoRows = listRows.filter(row => String(row?.reference_no || '')
       .trim().toUpperCase().replace(/[^A-Z0-9]/g, '') === compactPo);
-    const rowsWithoutReference = listRows.filter(row => !String(row?.reference_no || '').trim());
-    const matchedRows = exactPoRows.length ? exactPoRows : rowsWithoutReference;
+    const matchedRows = exactPoRows.filter(row => {
+      const rowContainer = String(row?.container_number || row?.container_no || '').trim()
+        .toUpperCase().replace(/[^A-Z0-9]/g, '');
+      return !!row?.receiving_code && (!rowContainer || rowContainer === compactContainer);
+    });
     if (matchedRows.length > 20) throw new Error('Cirro returned too many inbound matches for one container');
     const detailedRows = await Promise.all(matchedRows.map(async row => {
       if (!row?.receiving_code) return row;
@@ -4531,16 +4541,22 @@ async function fetchCirroInbounds(poReference, containerNumber) {
       );
       assertCirroSuccess(detailPayload);
       const detail = detailPayload?.data || {};
+      const detailReference = detail.reference_no || row.reference_no || '';
+      if (String(detailReference).trim().toUpperCase().replace(/[^A-Z0-9]/g, '') !== compactPo) {
+        return null;
+      }
       return {
         receiving_code: detail.receiving_code || row.receiving_code,
-        reference_no: detail.reference_no || row.reference_no || '',
+        reference_no: detailReference,
+        query_container: containerNumber,
+        container_number: detail.container_number || row.container_number || row.container_no || '',
         receiving_status: detail.receiving_status ?? row.receiving_status,
         warehouse_code: detail.warehouse_code || row.warehouse_code || '',
         eta_date: detail.eta_date || null,
         update_at: detail.update_at || detail.udpate_at || row.update_at || null,
         create_at: detail.create_at || row.create_at || null
       };
-    }));
+    })).then(rows => rows.filter(Boolean));
     return {
       state: detailedRows.length ? 'live' : 'no_data',
       payload: { code: 0, message: 'success', data: { list: detailedRows } },
@@ -4558,12 +4574,11 @@ async function fetchCirroInbounds(poReference, containerNumber) {
 
 function findTrackingPo(poReference, containerNumber) {
   const ref = String(poReference || '').trim().toUpperCase();
+  if (!ref || !containerNumber) return null;
   return (dataCache.cin7POs || []).find(po => {
     const poContainer = extractContainerNumber(po.trackingCode);
-    if (ref && String(po.reference || '').trim().toUpperCase() === ref) {
-      return poContainer === containerNumber;
-    }
-    return containerNumber && poContainer === containerNumber;
+    return String(po.reference || '').trim().toUpperCase() === ref
+      && poContainer === containerNumber;
   }) || null;
 }
 
@@ -4820,6 +4835,13 @@ app.get('/api/shipments', requireAuth, (req, res) => {
 app.get('/api/container-tracking', requireAuth, async (req, res) => {
   reloadSnapshotIfNewer();
   res.set('Cache-Control', 'no-store');
+  if (String(req.query.schema || '') !== CONTAINER_TRACKING_SCHEMA_VERSION) {
+    return res.status(409).json({
+      error: 'The container tracker was updated. Refresh the Demand Planner before reopening tracking.',
+      code: 'tracker_version_mismatch',
+      schemaVersion: CONTAINER_TRACKING_SCHEMA_VERSION
+    });
+  }
   const requestedContainer = normalizeContainerNumber(req.query.container);
   const requestedPo = String(req.query.po || '').trim();
   if (!isValidContainerNumber(requestedContainer)) {
@@ -4828,12 +4850,22 @@ app.get('/api/container-tracking', requireAuth, async (req, res) => {
 
   const po = findTrackingPo(requestedPo, requestedContainer);
   if (!po) {
-    return res.status(404).json({ error: 'This container is not linked to a current Cin7 purchase order.' });
+    return res.status(404).json({ error: 'This exact PO and container pair is not linked to a current Cin7 purchase order.' });
   }
   const poReference = String(po?.reference || requestedPo || '').trim();
-  const destination = inferDestination(visiblePlannerPo(po));
+  const destinationResolution = resolveTrackingDestination(visiblePlannerPo(po));
+  if (destinationResolution.status !== 'resolved') {
+    return res.status(422).json({
+      error: destinationResolution.status === 'conflict'
+        ? 'Tracking is blocked because the PO destination signals conflict.'
+        : 'Tracking is blocked because the PO destination cannot be verified.',
+      code: `destination_${destinationResolution.status}`,
+      schemaVersion: CONTAINER_TRACKING_SCHEMA_VERSION
+    });
+  }
+  const destination = destinationResolution.destination;
   const warehouseSource = warehouseSourceForDestination(destination);
-  const cacheKey = `${requestedContainer}|${poReference.toUpperCase()}`;
+  const cacheKey = `${CONTAINER_TRACKING_SCHEMA_VERSION}|${requestedContainer}|${poReference.toUpperCase()}|${destination}|${warehouseSource.key}`;
   const force = String(req.query.refresh || '') === '1';
   const cached = containerTrackingCache.get(cacheKey);
   if (!force && cached && Date.now() - cached.cachedAt < CONTAINER_TRACKING_CACHE_MS) {
@@ -4855,10 +4887,25 @@ app.get('/api/container-tracking', requireAuth, async (req, res) => {
           : `${warehouseSource.name} warehouse tracking is not connected yet.`
       });
   }
-  const [findTeuResult, warehouseResult] = await Promise.all([
-    fetchFindTeuContainer(requestedContainer, poReference),
-    warehouseResultPromise
-  ]);
+  const warehouseResult = await warehouseResultPromise;
+  const normalizedWarehouse = normalizeWarehousePayload(
+    warehouseResult.payload,
+    warehouseSource,
+    requestedContainer,
+    poReference
+  );
+  const warehouseComplete = warehouseResult.state === 'live' && normalizedWarehouse.unloaded.complete;
+  const poReceived = String(po.stage || '').trim().toLowerCase() === 'received'
+    || !!po.fullyReceivedDate;
+  const findTeuResult = (warehouseComplete || poReceived)
+    ? {
+        state: 'archived',
+        payload: {},
+        message: warehouseComplete
+          ? 'Warehouse completion is verified, so the reusable container number was not queried for a newer voyage.'
+          : 'This PO is already received in Cin7, so the reusable container number was not queried for a newer voyage.'
+      }
+    : await fetchFindTeuContainer(requestedContainer, poReference);
   const journey = buildContainerJourney({
     containerNumber: requestedContainer,
     poReference,
@@ -4870,9 +4917,41 @@ app.get('/api/container-tracking', requireAuth, async (req, res) => {
       lecangs: warehouseResult.state
     },
     warehouseSource,
-    warehouseMessage: warehouseResult.message
+    warehouseMessage: warehouseResult.message,
+    expectedDestination: destination,
+    journeyClosed: poReceived
   });
+  const normalizedFindTeu = normalizeFindTeu(findTeuResult.payload);
+  const usableFindTeuMilestones = [
+    normalizedFindTeu.polDeparture?.timestamp,
+    normalizedFindTeu.pol?.etd,
+    normalizedFindTeu.podArrival?.timestamp,
+    normalizedFindTeu.pod?.eta,
+    normalizedFindTeu.discharge?.timestamp,
+    normalizedFindTeu.gateOut?.timestamp
+  ].filter(Boolean).length;
+  const findTeuState = journey.carrierHistoryArchived
+    ? 'archived'
+    : (journey.findTeuDestinationMismatch || journey.findTeuVoyageMismatch
+      ? 'mismatch'
+      : (journey.findTeuDestinationUnverified
+        ? 'unverified'
+        : (findTeuResult.state === 'live' && usableFindTeuMilestones === 0
+          ? 'live_no_milestones'
+          : findTeuResult.state)));
+  const findTeuMessage = journey.carrierHistoryArchived
+    ? (findTeuResult.message || 'Original voyage completed. This container number will not be reused as journey identity.')
+    : (journey.findTeuDestinationMismatch
+      ? journey.findTeuIdentity.reason
+      : (journey.findTeuVoyageMismatch
+        ? 'FindTEU returned a different voyage for this reused container number, so its milestones were suppressed.'
+        : (journey.findTeuDestinationUnverified
+          ? journey.findTeuIdentity.reason
+          : (findTeuState === 'live_no_milestones'
+            ? 'FindTEU recognized the container but returned no usable journey milestones.'
+            : findTeuResult.message))));
   const response = {
+    schemaVersion: CONTAINER_TRACKING_SCHEMA_VERSION,
     journey,
     po: {
       reference: poReference,
@@ -4883,12 +4962,8 @@ app.get('/api/container-tracking', requireAuth, async (req, res) => {
     },
     sources: {
       findteu: {
-        state: journey.completedVoyageArchived ? 'archived' : (journey.findTeuVoyageMismatch ? 'mismatch' : findTeuResult.state),
-        message: journey.completedVoyageArchived
-          ? 'Original voyage completed. This container number has since been reused.'
-          : (journey.findTeuVoyageMismatch
-            ? 'FindTEU returned a different voyage for this reused container number, so its milestones were suppressed.'
-            : findTeuResult.message),
+        state: findTeuState,
+        message: findTeuMessage,
         fetchedAt
       },
       warehouse: {
@@ -4912,6 +4987,10 @@ app.get('/api/container-tracking', requireAuth, async (req, res) => {
       } : {})
     },
     warehouseSource,
+    destinationResolution: {
+      status: destinationResolution.status,
+      destination
+    },
     fetchedAt,
     cached: false
   };
@@ -4953,6 +5032,109 @@ const HEALTH_ROUTE_FIXTURES = [
   { sku: 'CAT-EDT-NAL', expected: 'Caterpillar Dining' }
 ];
 
+function buildContainerTrackingSafetyChecks(pos) {
+  const trackedPos = (pos || []).filter(po => isValidContainerNumber(extractContainerNumber(po.trackingCode)));
+  const destinationResults = trackedPos.map(po => resolveTrackingDestination(visiblePlannerPo(po)));
+  const byDestination = {};
+  for (const result of destinationResults) {
+    const key = result.status === 'resolved' ? result.destination : result.status;
+    byDestination[key] = (byDestination[key] || 0) + 1;
+  }
+
+  const fixtureContainer = 'TSTU1234567';
+  const fixturePo = 'PO-UK-SAFETY';
+  const findTeuWrongDestination = normalizeFindTeu({
+    data: {
+      container: { number: fixtureContainer },
+      pod: { port: 'Rotterdam', country: 'Netherlands', iso_code: 'NLRTM', eta_date: '2026-08-01' }
+    }
+  });
+  const cirroMissingPo = normalizeWarehousePayload(
+    {
+      data: {
+        list: [{
+          receiving_code: 'IB-SAFETY',
+          reference_no: '',
+          query_container: fixtureContainer,
+          receiving_status: 7
+        }]
+      }
+    },
+    warehouseSourceForDestination('United Kingdom'),
+    fixtureContainer,
+    fixturePo
+  );
+  const completedHistory = buildContainerJourney({
+    containerNumber: fixtureContainer,
+    poReference: 'PO-US-SAFETY',
+    findTeuPayload: {},
+    warehousePayload: {
+      data: [{
+        asnNo: 'ASN-SAFETY',
+        poNo: 'PO-US-SAFETY',
+        containerNo: fixtureContainer,
+        status: 101205
+      }]
+    },
+    sourceState: { findteu: 'archived', warehouse: 'live' },
+    warehouseSource: warehouseSourceForDestination('United States'),
+    expectedDestination: 'United States',
+    now: '2026-07-24T00:00:00Z'
+  });
+  const fixtures = [
+    {
+      name: 'uk_routes_to_cirro_inbound',
+      passed: warehouseSourceForDestination('United Kingdom').key === 'cirro'
+        && warehouseSourceForDestination('United Kingdom').recordLabel === 'inbound'
+    },
+    {
+      name: 'unknown_destination_does_not_default',
+      passed: resolveTrackingDestination({ reference: 'PO-UNKNOWN', items: { 'LLNA-CB-TW-BLU': 1 } }).status === 'unknown'
+    },
+    {
+      name: 'conflicting_destination_fails_closed',
+      passed: resolveTrackingDestination({ reference: 'PO-CA-SAFETY', deliveryCountry: 'United States' }).status === 'conflict'
+    },
+    {
+      name: 'wrong_po_reused_container_does_not_attach',
+      passed: selectLecangsRecords(
+        [{ asnNo: 'ASN-SAFETY', poNo: 'PO-OTHER', containerNo: fixtureContainer }],
+        'PO-US-SAFETY',
+        fixtureContainer
+      ).length === 0
+    },
+    {
+      name: 'cirro_missing_po_reference_does_not_attach',
+      passed: cirroMissingPo.linkedAsnCount === 0
+    },
+    {
+      name: 'wrong_findteu_destination_is_rejected',
+      passed: validateFindTeuDestination(findTeuWrongDestination, 'Singapore').status === 'mismatch'
+    },
+    {
+      name: 'completed_missing_carrier_history_is_archived',
+      passed: completedHistory.complete
+        && completedHistory.timeline.slice(0, 3).every(row => row.state === 'archived')
+    },
+    {
+      name: 'country_aliases_are_canonical',
+      passed: canonicalDestination('USA') === 'United States'
+        && canonicalDestination('GB') === 'United Kingdom'
+    }
+  ];
+
+  return {
+    schemaVersion: CONTAINER_TRACKING_SCHEMA_VERSION,
+    trackedPurchaseOrders: trackedPos.length,
+    resolvedDestinations: destinationResults.filter(result => result.status === 'resolved').length,
+    unknownDestinations: destinationResults.filter(result => result.status === 'unknown').length,
+    conflictingDestinations: destinationResults.filter(result => result.status === 'conflict').length,
+    byDestination,
+    cacheEntries: containerTrackingCache.size,
+    fixtures
+  };
+}
+
 function hoursSinceIso(value) {
   if (!value) return null;
   const ts = Date.parse(value);
@@ -4978,6 +5160,7 @@ function buildHealthStatus() {
   }
 
   const fixtureRoutes = HEALTH_ROUTE_FIXTURES.map(({ sku, expected }) => ({ sku, expected, actual: ckCategoryForSku(sku) }));
+  const containerTracking = buildContainerTrackingSafetyChecks(pos);
   const ckPanelSkuCounts = {};
   for (const id of Object.keys(CK_DEFS).filter(id => id !== 'llau-cbcf')) {
     try {
@@ -5009,6 +5192,7 @@ function buildHealthStatus() {
     productsMissingOption1: Object.keys(products).length - productsWithOption1,
     missingRequiredOption1: HEALTH_REQUIRED_OPTION1.filter(option1 => !option1Counts[normalizeOption1(option1)]),
     fixtureRoutes,
+    containerTracking,
     ckPanelSkuCounts,
     staleDemandSkuAliases,
     shopifyStores: Object.fromEntries(HEALTH_EXPECTED_STORES.map(store => [store, {
@@ -5035,6 +5219,15 @@ function buildHealthStatus() {
   if (checks.purchaseOrdersWithoutLineItems > 0) warnings.push(`${checks.purchaseOrdersWithoutLineItems} purchase orders currently have no line items`);
   const badFixtures = fixtureRoutes.filter(row => row.actual !== row.expected);
   if (badFixtures.length) critical.push(`SKU route fixture mismatch: ${badFixtures.map(row => `${row.sku} expected ${row.expected}, got ${row.actual}`).join('; ')}`);
+  const badTrackingFixtures = containerTracking.fixtures.filter(row => !row.passed);
+  if (badTrackingFixtures.length) {
+    critical.push(`Container tracking safety fixture mismatch: ${badTrackingFixtures.map(row => row.name).join(', ')}`);
+  }
+  if (containerTracking.unknownDestinations > 0 || containerTracking.conflictingDestinations > 0) {
+    critical.push(
+      `Tracked PO destination identity unresolved: ${containerTracking.unknownDestinations} unknown, ${containerTracking.conflictingDestinations} conflicting`
+    );
+  }
   const zeroPanels = Object.entries(ckPanelSkuCounts).filter(([, count]) => count === 0).map(([id]) => id);
   const expectedEmptyBranchPanels = zeroPanels.filter(id => CK_DEFS[id]?.allowEmptyBranchPanel);
   const unexpectedZeroPanels = zeroPanels.filter(id => !CK_DEFS[id]?.allowEmptyBranchPanel);

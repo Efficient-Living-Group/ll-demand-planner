@@ -11,6 +11,7 @@ const BOM_MASTER_DEMAND_PATH = path.join(ROOT, 'lib', 'bom-master-demand.js');
 const PACKAGE_PATH = path.join(ROOT, 'package.json');
 const REFRESH_SCRIPT_PATH = path.join(ROOT, 'scripts', 'refresh_live_cin7_cache.py');
 const WARN_STALE_HOURS = 6;
+const TRACKING_SCHEMA_VERSION = '2026-07-24-fail-closed-v2';
 const MIN_PRODUCTS = 1000;
 const MIN_POS = 50;
 const EXPECTED_STORES = ['lifely', 'cushie', 'littlelifely'];
@@ -29,6 +30,15 @@ const REQUIRED_OPTION1 = [
   'Case goods - Active',
   'Case goods - Discontinued'
 ];
+const {
+  normalizeContainerNumber,
+  resolveTrackingDestination,
+  warehouseSourceForDestination,
+  selectLecangsRecords,
+  normalizeFindTeu,
+  validateFindTeuDestination,
+  normalizeWarehousePayload
+} = require('../lib/container-tracking');
 
 function readJson(file) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); }
@@ -214,6 +224,44 @@ if (!frontendSource.includes('id="containerTrackingModal"') || !frontendSource.i
 if (!containerTrackingSource.includes('function buildContainerJourney') || !containerTrackingSource.includes("101205: 'Unloaded'")) {
   blockers.push('Container journey normalization must preserve the Lecangs unloaded milestone');
 }
+if (!serverSource.includes(`const CONTAINER_TRACKING_SCHEMA_VERSION = '${TRACKING_SCHEMA_VERSION}'`)
+    || !frontendSource.includes(`const CONTAINER_TRACKING_SCHEMA_VERSION = '${TRACKING_SCHEMA_VERSION}'`)) {
+  blockers.push('Frontend and API must share the fail-closed container-tracking schema version');
+}
+if (frontendSource.includes("data.warehouseSource || {name:'Lecangs US'")
+    || frontendSource.includes('journey.warehouse || journey.lecangs')
+    || frontendSource.includes('sources.warehouse || sources.lecangs')) {
+  blockers.push('Frontend must not fall back to Lecangs or legacy warehouse aliases');
+}
+if (!frontendSource.includes('providerValid')
+    || !frontendSource.includes('CONTAINER_PROVIDER_BY_DESTINATION')) {
+  blockers.push('Frontend must validate the returned warehouse provider against the PO destination');
+}
+if (!containerTrackingSource.includes('function resolveTrackingDestination')
+    || !containerTrackingSource.includes('function validateFindTeuDestination')
+    || !serverSource.includes('destinationResolution.status !==')) {
+  blockers.push('Container tracking must fail closed on unresolved PO destinations and wrong FindTEU voyages');
+}
+if (serverSource.includes('const rowsWithoutReference = listRows.filter')) {
+  blockers.push('Cirro must not attach an inbound without an exact PO reference');
+}
+if (!containerTrackingSource.includes('!!compact(record?.asnNo)')
+    || !containerTrackingSource.includes('compact(record?.containerNo) === container')) {
+  blockers.push('Lecangs must require ASN, exact PO, and exact container identity');
+}
+if (!serverSource.includes("state: 'archived'")
+    || !serverSource.includes('const warehouseComplete = warehouseResult.state')
+    || !serverSource.includes('const poReceived = String(po.stage')
+    || !serverSource.includes('warehouseComplete || poReceived')) {
+  blockers.push('Completed or Cin7-received journeys must stop querying reusable container numbers');
+}
+if (!containerTrackingSource.includes("return 'overdue';")) {
+  blockers.push('Expired expected tracking dates must become overdue');
+}
+if (!serverSource.includes('buildContainerTrackingSafetyChecks')
+    || !serverSource.includes('Container tracking safety fixture mismatch')) {
+  blockers.push('Health checks must include container-tracking truth fixtures');
+}
 if (!containerTrackingSource.includes('completedVoyageArchived') || !containerTrackingSource.includes('journeyLock')) {
   blockers.push('Completed reused containers must retain a PO/container/ASN journey lock');
 }
@@ -246,6 +294,61 @@ if (!/['\"]cusb-uk['\"]:\s*\{[^\n]*poDestination:\s*['\"]United Kingdom['\"]/.te
 const products = cache.cin7Products || {};
 const stockByBranch = cache.cin7StockByBranch || {};
 const pos = cache.cin7POs || [];
+
+const trackedPos = pos.filter(po => normalizeContainerNumber(po?.trackingCode));
+const unresolvedTrackedPos = trackedPos
+  .map(po => resolveTrackingDestination(po))
+  .filter(result => result.status !== 'resolved');
+if (unresolvedTrackedPos.length) {
+  blockers.push(`${unresolvedTrackedPos.length} tracked POs have unresolved or conflicting destination identity`);
+}
+const expectedProviderRoutes = {
+  'United States': ['lecangs_us', 'ASN'],
+  Canada: ['lecangs_ca', 'ASN'],
+  'United Kingdom': ['cirro', 'inbound'],
+  Australia: ['capital_logistics', 'warehouse record'],
+  'New Zealand': ['pacificomm', 'warehouse record']
+};
+for (const [destination, [providerKey, recordLabel]] of Object.entries(expectedProviderRoutes)) {
+  const route = warehouseSourceForDestination(destination);
+  if (route.key !== providerKey || route.recordLabel !== recordLabel) {
+    blockers.push(`${destination} tracking route must use ${providerKey} / ${recordLabel}`);
+  }
+}
+if (selectLecangsRecords(
+  [{ asnNo: 'ASN-SAFETY', poNo: 'PO-OTHER', containerNo: 'TSTU1234567' }],
+  'PO-US-SAFETY',
+  'TSTU1234567'
+).length) {
+  blockers.push('Lecangs reused-container fixture attached an ASN from the wrong PO');
+}
+const wrongDestination = normalizeFindTeu({
+  data: {
+    container: { number: 'TSTU1234567' },
+    pod: { port: 'Rotterdam', country: 'Netherlands', iso_code: 'NLRTM' }
+  }
+});
+if (validateFindTeuDestination(wrongDestination, 'Singapore').status !== 'mismatch') {
+  blockers.push('FindTEU wrong-destination fixture was not rejected');
+}
+const missingCirroPo = normalizeWarehousePayload(
+  {
+    data: {
+      list: [{
+        receiving_code: 'IB-SAFETY',
+        reference_no: '',
+        query_container: 'TSTU1234567',
+        receiving_status: 7
+      }]
+    }
+  },
+  warehouseSourceForDestination('United Kingdom'),
+  'TSTU1234567',
+  'PO-UK-SAFETY'
+);
+if (missingCirroPo.linkedAsnCount !== 0) {
+  blockers.push('Cirro missing-PO fixture attached an inbound by container alone');
+}
 
 if (Object.keys(products).length < MIN_PRODUCTS) blockers.push(`Cin7 product count below floor: ${Object.keys(products).length}`);
 if (Object.keys(stockByBranch).length === 0) blockers.push('Cin7 branch stock payload missing');
