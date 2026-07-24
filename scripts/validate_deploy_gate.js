@@ -92,6 +92,9 @@ let cache;
 try { cache = readJson(CACHE_PATH); } catch (err) { blockers.push(err.message); cache = {}; }
 const serverSource = fs.readFileSync(SERVER_PATH, 'utf8');
 const frontendSource = fs.readFileSync(FRONTEND_PATH, 'utf8');
+if (frontendSource.includes('> No sales</span>')) {
+  blockers.push('Dashboard must not show the misleading No sales trend label');
+}
 const containerTrackingSource = fs.existsSync(CONTAINER_TRACKING_PATH)
   ? fs.readFileSync(CONTAINER_TRACKING_PATH, 'utf8')
   : '';

@@ -2322,11 +2322,8 @@ function trendIndicator(sku) {
   const v7 = t.v7, v30 = t.v30;
   const sparkline = t.sparkline || [];
   
-  // Both zero — if using estimated velocity, don't show "No sales" (handled by (est) tag)
-  if (v7 === 0 && v30 === 0) {
-    if (isEstVel(sku)) return '';
-    return '<span style="color:var(--text-dim);font-size:9px"> No sales</span>';
-  }
+  // Zero direct trend should stay visually quiet; mapped/component demand is shown in Units/wk.
+  if (v7 === 0 && v30 === 0) return '';
   
   // New SKU (< 30 days old)
   if (t.firstSeen) {
