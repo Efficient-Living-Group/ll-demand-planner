@@ -120,6 +120,7 @@ const partialJourney = buildContainerJourney({
 });
 assert.strictEqual(partialJourney.complete, false);
 assert.strictEqual(partialJourney.currentStatus, 'Handover and unloading');
+assert.strictEqual(partialJourney.timeline[0].label, 'Destination port arrival');
 assert.strictEqual(partialJourney.timeline.at(-1).state, 'pending');
 
 partialLecangsPayload.data[1].status = 101205;
