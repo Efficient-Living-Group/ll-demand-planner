@@ -136,6 +136,25 @@ assert.strictEqual(completeJourney.currentStatus, 'Unloading complete');
 assert.strictEqual(completeJourney.progressPct, 100);
 assert.strictEqual(completeJourney.timeline.at(-1).timestamp, '2026-07-20 12:10:00');
 
+const reusedContainerJourney = buildContainerJourney({
+  containerNumber: 'OOCU8815295',
+  poReference: 'PO-UK006',
+  findTeuPayload: {
+    data: {
+      container: { number: 'OOCU8815295', type: "40'HQ" },
+      pod: { port: 'Felixstowe', eta_date: '2026-08-29' },
+      events: []
+    }
+  },
+  lecangsPayload: partialLecangsPayload,
+  sourceState: { findteu: 'live', lecangs: 'live' }
+});
+assert.strictEqual(reusedContainerJourney.findTeuVoyageMismatch, true);
+assert.strictEqual(reusedContainerJourney.timeline[0].state, 'unavailable');
+assert.strictEqual(reusedContainerJourney.timeline[1].state, 'unavailable');
+assert.deepStrictEqual(reusedContainerJourney.pod, {});
+assert.strictEqual(reusedContainerJourney.complete, true);
+
 const unavailableJourney = buildContainerJourney({
   containerNumber: 'OOCU8815295',
   poReference: 'PO-UK006',
