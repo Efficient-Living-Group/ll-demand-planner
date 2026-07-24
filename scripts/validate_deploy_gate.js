@@ -195,6 +195,12 @@ if (!frontendSource.includes('id="containerTrackingModal"') || !frontendSource.i
 if (!containerTrackingSource.includes('function buildContainerJourney') || !containerTrackingSource.includes("101205: 'Unloaded'")) {
   blockers.push('Container journey normalization must preserve the Lecangs unloaded milestone');
 }
+if (!containerTrackingSource.includes('completedVoyageArchived') || !containerTrackingSource.includes('journeyLock')) {
+  blockers.push('Completed reused containers must retain a PO/container/ASN journey lock');
+}
+if (!frontendSource.includes("filter(step => step.state !== 'archived')") || !frontendSource.includes('Original voyage archived')) {
+  blockers.push('Completed reused-container voyages must hide superseded carrier warning rows');
+}
 if (!/['\"]cusb-us['\"]:\s*\{[^\n]*poDestination:\s*['\"]United States['\"]/.test(serverSource)) {
   blockers.push('Cushie US must filter POs to United States');
 }

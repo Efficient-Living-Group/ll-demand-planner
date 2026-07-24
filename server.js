@@ -4770,10 +4770,12 @@ app.get('/api/container-tracking', requireAuth, async (req, res) => {
     },
     sources: {
       findteu: {
-        state: journey.findTeuVoyageMismatch ? 'mismatch' : findTeuResult.state,
-        message: journey.findTeuVoyageMismatch
-          ? 'FindTEU returned a different voyage for this reused container number, so its milestones were suppressed.'
-          : findTeuResult.message,
+        state: journey.completedVoyageArchived ? 'archived' : (journey.findTeuVoyageMismatch ? 'mismatch' : findTeuResult.state),
+        message: journey.completedVoyageArchived
+          ? 'Original voyage completed. This container number has since been reused.'
+          : (journey.findTeuVoyageMismatch
+            ? 'FindTEU returned a different voyage for this reused container number, so its milestones were suppressed.'
+            : findTeuResult.message),
         fetchedAt
       },
       lecangs: {

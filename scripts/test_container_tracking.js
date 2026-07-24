@@ -22,11 +22,11 @@ const currentLecangsRows = [
 ];
 assert.deepStrictEqual(
   selectLecangsRecords(currentLecangsRows, 'PO-US14-4', 'HMMU4115585').map(row => row.asnNo),
-  ['ASN-ONE', 'ASN-TWO'],
-  'Container matching must retain every ASN linked to the same container'
+  ['ASN-ONE'],
+  'Exact PO and container matching must not pull an ASN from another reused-container journey'
 );
 assert.deepStrictEqual(
-  selectLecangsRecords(currentLecangsRows, 'PO-US14-4', 'NO-CONTAINER').map(row => row.asnNo),
+  selectLecangsRecords(currentLecangsRows, 'PO-US14-4', '').map(row => row.asnNo),
   ['ASN-ONE'],
   'PO matching must use poNo when erpNo is empty'
 );
@@ -150,10 +150,16 @@ const reusedContainerJourney = buildContainerJourney({
   sourceState: { findteu: 'live', lecangs: 'live' }
 });
 assert.strictEqual(reusedContainerJourney.findTeuVoyageMismatch, true);
-assert.strictEqual(reusedContainerJourney.timeline[0].state, 'unavailable');
-assert.strictEqual(reusedContainerJourney.timeline[1].state, 'unavailable');
+assert.strictEqual(reusedContainerJourney.completedVoyageArchived, true);
+assert.strictEqual(reusedContainerJourney.timeline[0].state, 'archived');
+assert.strictEqual(reusedContainerJourney.timeline[1].state, 'archived');
 assert.deepStrictEqual(reusedContainerJourney.pod, {});
 assert.strictEqual(reusedContainerJourney.complete, true);
+assert.deepStrictEqual(reusedContainerJourney.journeyLock, {
+  poReference: 'PO-UK006',
+  containerNumber: 'OOCU8815295',
+  asnNumbers: ['ASN-ONE', 'ASN-TWO']
+});
 
 const unavailableJourney = buildContainerJourney({
   containerNumber: 'OOCU8815295',
