@@ -3,6 +3,9 @@
 
 const assert = require('assert');
 const {
+  littleLifelyCtpComponentsForDemandSku,
+  cocoonPhysicalComponentsForDemandSku,
+  caseGoodsBundleComponentsForDemandSku,
   llnaFrameComponentsForDemandSku,
   addLlnaFrameVelocity,
   addLlnaFrameTrend
@@ -28,6 +31,33 @@ const bomMap = {
       'LLNA-CB-TWX-MSM-CV': 2,
       'LLNA-CB-TWX-FRM': 1
     }
+  },
+  'LLNA-CTP-TWX-MSM-MSM': {
+    components: {
+      'DS-TWIN-XL': 1,
+      'LLNA-CB-TWX-MSM-CV': 1,
+      'LLNA-CB-TWX-MSM': 1
+    }
+  },
+  'LLAU-CTP-D-PST-PST': {
+    components: {
+      'DD-21137CF': 1,
+      'LLAU-CB-D-PST-CV': 2,
+      'LLAU-CB-D-FRM': 1
+    }
+  },
+  'LLUK-CTP-SD-MSM-MSM': {
+    components: {
+      'DDUK-21120CF': 1,
+      'LLUK-CB-SD-MSM-CV': 2,
+      'LLUK-CB-SD-FRM': 1
+    }
+  },
+  'COCOON-QUEEN-IVR': {
+    components: {
+      'COCOON-QUEEN-FRM': 1,
+      'COCOON-QUEEN-IVR-CV': 1
+    }
   }
 };
 
@@ -43,8 +73,8 @@ assert.deepStrictEqual(
 );
 assert.deepStrictEqual(
   llnaFrameComponentsForDemandSku('LLNA-CTP-TWX-MSM-MSM', bomMap),
-  ['LLNA-CB-TWX-FRM'],
-  'transition-pack sales must credit the physical Twin XL frame'
+  [],
+  'transition packs must use the shared BOM mapper so LLNA frames are not counted twice'
 );
 assert.deepStrictEqual(
   llnaFrameComponentsForDemandSku('LLNA-CB-F-NEWCOLOUR', bomMap),
@@ -53,6 +83,32 @@ assert.deepStrictEqual(
 );
 assert.deepStrictEqual(llnaFrameComponentsForDemandSku('LLNA-CB-TW-DGY-CV', bomMap), []);
 assert.deepStrictEqual(llnaFrameComponentsForDemandSku('LLNA-CB-TW-FRM', bomMap), []);
+
+assert.deepStrictEqual(
+  littleLifelyCtpComponentsForDemandSku('LLNA-CTP-TWX-MSM-MSM', bomMap),
+  ['DS-TWIN-XL', 'LLNA-CB-TWX-MSM-CV', 'LLNA-CB-TWX-MSM-CV', 'LLNA-CB-TWX-FRM'],
+  'LLNA transition packs must resolve the -SET BOM alias and preserve component quantities'
+);
+assert.deepStrictEqual(
+  littleLifelyCtpComponentsForDemandSku('LLAU-CTP-D-PST-PST', bomMap),
+  ['DD-21137CF', 'LLAU-CB-D-PST-CV', 'LLAU-CB-D-PST-CV', 'LLAU-CB-D-FRM'],
+  'AU transition packs must resolve their exact BOM'
+);
+assert.deepStrictEqual(
+  littleLifelyCtpComponentsForDemandSku('LLUK-CTP-SD-MSM-MSM', bomMap),
+  ['DDUK-21120CF', 'LLUK-CB-SD-MSM-CV', 'LLUK-CB-SD-MSM-CV', 'LLUK-CB-SD-FRM'],
+  'UK transition packs must resolve their exact BOM'
+);
+assert.deepStrictEqual(
+  cocoonPhysicalComponentsForDemandSku('COCOON-QUEEN-IVR', bomMap),
+  ['COCOON-QUEEN-FRM', 'COCOON-QUEEN-IVR-CV'],
+  'Cocoon sellable-bed demand must credit its physical frame and cover'
+);
+assert.deepStrictEqual(
+  caseGoodsBundleComponentsForDemandSku('EMMA-NOAH-4S'),
+  ['EMMA-DT180-OAK-ECO', 'NOAH-DC-WHT-ECO', 'NOAH-DC-WHT-ECO'],
+  'the EMMA bundle must credit one table and two chairs without counting the table carton twice'
+);
 
 const velocity = {};
 addLlnaFrameVelocity(velocity, {
@@ -63,8 +119,7 @@ addLlnaFrameVelocity(velocity, {
 }, bomMap);
 assert.deepStrictEqual(velocity, {
   'LLNA-CB-TW-FRM': 2.1,
-  'LLNA-CB-F-FRM': 3.4,
-  'LLNA-CB-TWX-FRM': 0.7
+  'LLNA-CB-F-FRM': 3.4
 });
 
 const canonicalVelocity = {};
@@ -116,4 +171,4 @@ assert.deepStrictEqual(trend, {
   }
 });
 
-console.log('LLNA frame velocity tests passed');
+console.log('Component demand mapping tests passed');

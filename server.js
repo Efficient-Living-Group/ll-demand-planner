@@ -6,7 +6,13 @@ const fs = require('fs');
 const path = require('path');
 const { cartonAvailableQuantity } = require('./lib/inventory');
 const { summarizeSalesVolume } = require('./lib/executive-sales');
-const { addLlnaFrameVelocity, addLlnaFrameTrend } = require('./lib/little-lifely-demand');
+const {
+  addLlnaFrameVelocity,
+  addLlnaFrameTrend,
+  littleLifelyCtpComponentsForDemandSku,
+  cocoonPhysicalComponentsForDemandSku,
+  caseGoodsBundleComponentsForDemandSku
+} = require('./lib/little-lifely-demand');
 const {
   normalizeContainerNumber,
   isValidContainerNumber,
@@ -447,6 +453,13 @@ function explodeLittleLifelyBundleSku(sku, ckId) {
   // velocity on LLAU-CB-CS-PACK, while stock is displayed from Cin7 virtual.
   if ((ckId === 'llau' || ckId === 'llnz') && s === 'LLAU-CB-CS-PACK') return null;
 
+  // Transition-pack parents consume the exact physical frame, cover(s), and
+  // mattress listed by Cin7. Some markets store the BOM on the -SET alias.
+  if (['llau', 'llnz', 'lluk', 'llna', 'llca'].includes(ckId)) {
+    const ctpComponents = littleLifelyCtpComponentsForDemandSku(s, dataCache.cin7BOMs);
+    if (ctpComponents.length) return ctpComponents;
+  }
+
   // AU sells colour/size bed SET parent SKUs, while stock is held as one
   // size-level frame plus one colour/size cover. Funnel SET and combo sales
   // into the physical component SKUs so frame/cover velocity and deadstock are
@@ -585,6 +598,8 @@ function explodeCushieUsBundleSku(sku, ckId) {
 function explodeCaseGoodsBundleSku(sku, ckId) {
   if (ckId !== 'case-goods') return null;
   const s = String(sku || '').toUpperCase().trim();
+  const emmaNoah = caseGoodsBundleComponentsForDemandSku(s);
+  if (emmaNoah.length) return emmaNoah;
   if (s === 'RKU-SOFA-SET') return ['RKU-SOFA-2S-IVORY', 'RKU-OTM-IVORY'];
   const m = s.match(/^RAI-AMBR-(BLK|GRN|WHT)-4S(?:-SET)?$/);
   if (m) return ['RAI-DT100-OAK', ...Array.from({ length: 4 }, () => `AMBR-DC-${m[1]}`)];
@@ -597,6 +612,9 @@ function explodeKnownBundleSkuForCk(sku, ckId) {
   const ll = explodeLittleLifelyBundleSku(s, ckId);
   if (ll) return ll;
   if (ckId === 'll-mattresses') {
+    const ctpMattresses = littleLifelyCtpComponentsForDemandSku(s, dataCache.cin7BOMs)
+      .filter(componentSku => /^(?:DD-(?:21915|21107|21137)CF|DDUK-(?:2190|21120|21135)CF)$/.test(componentSku));
+    if (ctpMattresses.length) return ctpMattresses;
     const au = s.match(/^LLAU-CBCF-(S|KS|D)-/);
     if (au) return [{ S: 'DD-21915CF', KS: 'DD-21107CF', D: 'DD-21137CF' }[au[1]]];
     const uk = s.match(/^LLUK-CBCF-(S|SD|D)-/);
@@ -641,6 +659,11 @@ function explodeKnownBundleSkuForCk(sku, ckId) {
 
 function explodeDemandSkuForCk(sku, ckId) {
   return explodeKnownBundleSkuForCk(sku, ckId);
+}
+
+function supplementalDemandComponentsForCk(sku, ckId) {
+  if (ckId !== 'cocoon') return [];
+  return cocoonPhysicalComponentsForDemandSku(sku, dataCache.cin7BOMs);
 }
 
 function isCocoonComboSku(sku) {
@@ -2376,23 +2399,29 @@ function buildCKData(ckId) {
   const velocity = {};
   const llnaFrameTrend = { _7d: {}, _30d: {}, _weeklyBreakdown: {}, _firstSeen: {} };
   const mergeVelocitySource = (source, country = '') => {
+    const addMappedVelocity = (mappedSku, vel) => {
+      const visible = visibleDemandSku(mappedSku);
+      if (cin7[visible.sku] !== undefined || shopify[visible.sku] !== undefined || velocity[visible.sku] !== undefined) {
+        velocity[visible.sku] = (velocity[visible.sku] || 0) + Number(vel || 0);
+      }
+    };
     for (const [rawSku, vel] of Object.entries(source || {})) {
       if (String(rawSku || '').startsWith('_')) continue;
       const sku = canonicalDemandSku(rawSku, country);
       const exploded = explodeDemandSkuForCk(sku, ckId);
+      const primaryMappings = exploded || [sku];
       if (exploded) {
-        for (const componentSku of exploded) {
-          const visible = visibleDemandSku(componentSku);
-          if (cin7[visible.sku] !== undefined || shopify[visible.sku] !== undefined || velocity[visible.sku] !== undefined) {
-            velocity[visible.sku] = (velocity[visible.sku] || 0) + Number(vel || 0);
-          }
-        }
-        continue;
+        for (const componentSku of exploded) addMappedVelocity(componentSku, vel);
+      } else if (!(ckId === 'cocoon' && isCocoonComboSku(sku))
+        && skuMatchesDef(sku, def)
+        && (!def.requireBranchMatch || cin7[sku] !== undefined)) {
+        velocity[sku] = (velocity[sku] || 0) + Number(vel || 0);
       }
-      if (ckId === 'cocoon' && isCocoonComboSku(sku)) continue;
-      if (!skuMatchesDef(sku, def)) continue;
-      if (def.requireBranchMatch && cin7[sku] === undefined) continue;
-      velocity[sku] = (velocity[sku] || 0) + Number(vel || 0);
+      for (const primarySku of primaryMappings) {
+        for (const componentSku of supplementalDemandComponentsForCk(primarySku, ckId)) {
+          addMappedVelocity(componentSku, vel);
+        }
+      }
     }
   };
 
@@ -3386,8 +3415,11 @@ function buildCKData(ckId) {
             if (String(rawSku || '').startsWith('_')) continue;
             const demandSku = canonicalDemandSku(rawSku, country);
             const exploded = explodeDemandSkuForCk(demandSku, ckId);
-            if (!exploded) continue;
-            const multiplier = exploded.filter(componentSku => componentSku === sku).length;
+            const mappedSkus = [...(exploded || [])];
+            for (const primarySku of exploded || [demandSku]) {
+              mappedSkus.push(...supplementalDemandComponentsForCk(primarySku, ckId));
+            }
+            const multiplier = mappedSkus.filter(componentSku => visibleDemandSku(componentSku).sku === sku).length;
             if (multiplier) addTrendForKey(rawSku, multiplier);
           }
         };
@@ -3436,12 +3468,11 @@ function buildCKData(ckId) {
         for (const [sourceSku, weeks] of Object.entries(weekly || {})) {
           const demandSku = canonicalDemandSku(sourceSku, country);
           const exploded = explodeDemandSkuForCk(demandSku, ckId);
+          const primaryMappings = exploded || [demandSku];
+          const supplementalMappings = primaryMappings.flatMap(primarySku => supplementalDemandComponentsForCk(primarySku, ckId));
           for (const [week, qty] of Object.entries(weeks || {})) {
-            if (exploded) {
-              for (const componentSku of exploded) add(componentSku, week, qty);
-            } else {
-              add(demandSku, week, qty);
-            }
+            for (const mappedSku of primaryMappings) add(visibleDemandSku(mappedSku).sku, week, qty);
+            for (const componentSku of supplementalMappings) add(visibleDemandSku(componentSku).sku, week, qty);
           }
         }
       };
