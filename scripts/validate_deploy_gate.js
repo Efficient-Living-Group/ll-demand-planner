@@ -6,6 +6,7 @@ const ROOT = path.resolve(__dirname, '..');
 const CACHE_PATH = path.join(ROOT, 'data', 'cache-snapshot.json');
 const SERVER_PATH = path.join(ROOT, 'server.js');
 const FRONTEND_PATH = path.join(ROOT, 'public', 'index.html');
+const CONTAINER_TRACKING_PATH = path.join(ROOT, 'lib', 'container-tracking.js');
 const REFRESH_SCRIPT_PATH = path.join(ROOT, 'scripts', 'refresh_live_cin7_cache.py');
 const WARN_STALE_HOURS = 6;
 const MIN_PRODUCTS = 1000;
@@ -91,6 +92,9 @@ let cache;
 try { cache = readJson(CACHE_PATH); } catch (err) { blockers.push(err.message); cache = {}; }
 const serverSource = fs.readFileSync(SERVER_PATH, 'utf8');
 const frontendSource = fs.readFileSync(FRONTEND_PATH, 'utf8');
+const containerTrackingSource = fs.existsSync(CONTAINER_TRACKING_PATH)
+  ? fs.readFileSync(CONTAINER_TRACKING_PATH, 'utf8')
+  : '';
 const refreshScriptSource = fs.readFileSync(REFRESH_SCRIPT_PATH, 'utf8');
 const personalisedCoverDefLine = serverSource.split('\n').find(line => line.includes("'ll-personalised-cover':")) || '';
 const littleLifelyNzDefLine = serverSource.split('\n').find(line => line.includes("'llnz':")) || '';
@@ -175,6 +179,18 @@ if (!frontendSource.includes("fullLabel:displayDate?displayDate.toLocaleDateStri
 }
 if (!frontendSource.includes('incomingDateCellsHtml(s,incomingDateBuckets)') || !frontendSource.includes('incomingDateCellsHtml(sku,incomingDateBuckets)')) {
   blockers.push('Incoming ETA cells must render in both standard and component stock tables');
+}
+if (!serverSource.includes("app.get('/api/container-tracking', requireAuth")) {
+  blockers.push('Authenticated container-tracking API route is missing');
+}
+if (!frontendSource.includes('function openContainerTracking(index, event)') || !frontendSource.includes('class="po-track-btn"')) {
+  blockers.push('PO rows must retain the container Track action');
+}
+if (!frontendSource.includes('id="containerTrackingModal"') || !frontendSource.includes('aria-modal="true"')) {
+  blockers.push('Container journey popup must retain its accessible modal semantics');
+}
+if (!containerTrackingSource.includes('function buildContainerJourney') || !containerTrackingSource.includes("101205: 'Unloaded'")) {
+  blockers.push('Container journey normalization must preserve the Lecangs unloaded milestone');
 }
 if (!/['\"]cusb-us['\"]:\s*\{[^\n]*poDestination:\s*['\"]United States['\"]/.test(serverSource)) {
   blockers.push('Cushie US must filter POs to United States');

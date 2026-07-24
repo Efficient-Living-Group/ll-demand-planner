@@ -6,6 +6,11 @@ const fs = require('fs');
 const path = require('path');
 const { cartonAvailableQuantity } = require('./lib/inventory');
 const { summarizeSalesVolume } = require('./lib/executive-sales');
+const {
+  normalizeContainerNumber,
+  isValidContainerNumber,
+  buildContainerJourney
+} = require('./lib/container-tracking');
 const { exec } = require('child_process');
 const WebSocket = require('ws');
 
@@ -23,6 +28,12 @@ const CIN7_USER = process.env.CIN7_USER || '';
 const CIN7_KEY = process.env.CIN7_KEY || '';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const AIS_API_KEY = process.env.AIS_API_KEY || '';
+const FINDTEU_API_KEY = process.env.FINDTEU_API_KEY || '';
+const FINDTEU_BASE_URL = (process.env.FINDTEU_BASE_URL || 'https://api.findteu.com').replace(/\/$/, '');
+const LECANG_ACCESS_KEY = process.env.LECANG_ACCESS_KEY || '';
+const LECANG_SECRET_KEY = process.env.LECANG_SECRET_KEY || '';
+const LECANG_BASE_URL = (process.env.LECANG_BASE_URL || 'https://app.lecangs.com/api/oms').replace(/\/$/, '');
+const CONTAINER_TRACKING_CACHE_MS = 15 * 60 * 1000;
 const CIN7_REQUEST_SPACING_MS = 1500;
 const CIN7_REFRESH_INTERVAL_MS = 4 * 60 * 60 * 1000;
 const CIN7_MIN_REFRESH_INTERVAL_MS = CIN7_REFRESH_INTERVAL_MS;
@@ -4222,12 +4233,171 @@ let aisReconnectTimer = null;
 let aisSubscribedVessels = [];
 
 function extractContainerNumber(trackingCode) {
-  const match = String(trackingCode || '').toUpperCase().match(/\b[A-Z]{4}\d{6,7}\b/);
-  return match ? match[0] : '';
+  return normalizeContainerNumber(trackingCode);
 }
 
 function hasContainerNumber(po) {
   return !!extractContainerNumber(po?.trackingCode);
+}
+
+const containerTrackingCache = new Map();
+
+function trackingRequestJson(method, requestUrl, headers = {}, body = null, timeoutMs = 75000) {
+  return new Promise((resolve, reject) => {
+    const url = new URL(requestUrl);
+    const transport = url.protocol === 'http:' ? http : https;
+    const payload = body == null ? null : JSON.stringify(body);
+    const req = transport.request({
+      protocol: url.protocol,
+      hostname: url.hostname,
+      port: url.port || undefined,
+      path: `${url.pathname}${url.search}`,
+      method,
+      headers: {
+        Accept: 'application/json',
+        ...(payload ? {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload)
+        } : {}),
+        ...headers
+      },
+      timeout: timeoutMs
+    }, response => {
+      let raw = '';
+      response.setEncoding('utf8');
+      response.on('data', chunk => {
+        raw += chunk;
+        if (raw.length > 2_000_000) req.destroy(new Error('Tracking response exceeded the safe size limit'));
+      });
+      response.on('end', () => {
+        let parsed = {};
+        try { parsed = raw ? JSON.parse(raw) : {}; }
+        catch (error) { return reject(new Error(`Tracking source returned invalid JSON (HTTP ${response.statusCode || 0})`)); }
+        if ((response.statusCode || 500) >= 400) {
+          return reject(new Error(`Tracking source returned HTTP ${response.statusCode}`));
+        }
+        resolve(parsed);
+      });
+    });
+    req.on('timeout', () => req.destroy(new Error('Tracking source timed out')));
+    req.on('error', reject);
+    if (payload) req.write(payload);
+    req.end();
+  });
+}
+
+function lecangSignature(body, timestamp) {
+  const params = { accessKey: LECANG_ACCESS_KEY, timestamp, ...body };
+  const parts = Object.keys(params).sort().map(key => {
+    const value = params[key];
+    const encoded = Array.isArray(value) || (value && typeof value === 'object')
+      ? JSON.stringify(value)
+      : (value ?? '');
+    return `${key}${encoded}`;
+  });
+  return crypto.createHash('sha256')
+    .update(`${LECANG_SECRET_KEY}${parts.join('')}${LECANG_SECRET_KEY}`)
+    .digest('hex');
+}
+
+function lecangRows(payload) {
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.data?.records)) return payload.data.records;
+  if (Array.isArray(payload?.data?.list)) return payload.data.list;
+  return [];
+}
+
+async function fetchFindTeuContainer(containerNumber, poReference) {
+  if (!FINDTEU_API_KEY) {
+    return {
+      state: 'not_configured',
+      payload: {},
+      message: 'FindTEU is not connected to the Demand Planner yet.'
+    };
+  }
+  try {
+    const payload = await trackingRequestJson(
+      'POST',
+      `${FINDTEU_BASE_URL}/container/${encodeURIComponent(containerNumber)}`,
+      { 'X-Authorization-ApiKey': FINDTEU_API_KEY },
+      { use_webhook: false, reference: poReference || containerNumber }
+    );
+    const errorCode = Number(payload?.error?.code ?? payload?.data?.error?.code ?? 0);
+    const hasData = !!(payload?.data?.container || payload?.data?.pod || payload?.data?.events?.length);
+    return {
+      state: hasData ? 'live' : (errorCode ? 'no_data' : 'no_data'),
+      payload,
+      message: hasData ? '' : 'The carrier did not return tracking milestones for this container.'
+    };
+  } catch (error) {
+    console.warn(`[container-tracking] FindTEU lookup failed for ${containerNumber}: ${error.message}`);
+    return {
+      state: 'error',
+      payload: {},
+      message: 'FindTEU is temporarily unavailable. Try again shortly.'
+    };
+  }
+}
+
+async function fetchLecangsAsns(poReference, containerNumber) {
+  if (!LECANG_ACCESS_KEY || !LECANG_SECRET_KEY) {
+    return {
+      state: 'not_configured',
+      payload: {},
+      message: 'Lecangs warehouse milestones are awaiting a scoped read-only connection.'
+    };
+  }
+  if (!poReference) {
+    return {
+      state: 'no_data',
+      payload: {},
+      message: 'This PO has no reference available for the Lecangs lookup.'
+    };
+  }
+  try {
+    const body = { pageNum: 1, pageSize: 200, erpNoList: [poReference] };
+    const timestamp = String(Date.now());
+    const payload = await trackingRequestJson(
+      'POST',
+      `${LECANG_BASE_URL}/asnTemp/api/listByAsnCode`,
+      {
+        accessKey: LECANG_ACCESS_KEY,
+        timestamp,
+        sign: lecangSignature(body, timestamp)
+      },
+      body,
+      30000
+    );
+    const rows = lecangRows(payload);
+    const matchingRows = rows.filter(row => {
+      const rowContainer = normalizeContainerNumber(row?.containerNo);
+      return !rowContainer || rowContainer === containerNumber;
+    });
+    const scopedPayload = { ...payload, data: matchingRows.length ? matchingRows : rows };
+    return {
+      state: rows.length ? 'live' : 'no_data',
+      payload: scopedPayload,
+      message: rows.length ? '' : 'No Lecangs ASN is linked to this PO yet.'
+    };
+  } catch (error) {
+    console.warn(`[container-tracking] Lecangs lookup failed for ${poReference}: ${error.message}`);
+    return {
+      state: 'error',
+      payload: {},
+      message: 'Lecangs warehouse milestones are temporarily unavailable.'
+    };
+  }
+}
+
+function findTrackingPo(poReference, containerNumber) {
+  const ref = String(poReference || '').trim().toUpperCase();
+  return (dataCache.cin7POs || []).find(po => {
+    const poContainer = extractContainerNumber(po.trackingCode);
+    if (ref && String(po.reference || '').trim().toUpperCase() === ref) {
+      return poContainer === containerNumber;
+    }
+    return containerNumber && poContainer === containerNumber;
+  }) || null;
 }
 
 function extractVesselNames() {
@@ -4478,6 +4648,70 @@ function buildShipmentData() {
 app.get('/api/shipments', requireAuth, (req, res) => {
   reloadSnapshotIfNewer();
   res.json({ shipments: buildShipmentData(), lastRefresh: dataCache.lastRefresh });
+});
+
+app.get('/api/container-tracking', requireAuth, async (req, res) => {
+  reloadSnapshotIfNewer();
+  res.set('Cache-Control', 'no-store');
+  const requestedContainer = normalizeContainerNumber(req.query.container);
+  const requestedPo = String(req.query.po || '').trim();
+  if (!isValidContainerNumber(requestedContainer)) {
+    return res.status(400).json({ error: 'A valid container number is required.' });
+  }
+
+  const po = findTrackingPo(requestedPo, requestedContainer);
+  if (!po) {
+    return res.status(404).json({ error: 'This container is not linked to a current Cin7 purchase order.' });
+  }
+  const poReference = String(po?.reference || requestedPo || '').trim();
+  const cacheKey = `${requestedContainer}|${poReference.toUpperCase()}`;
+  const force = String(req.query.refresh || '') === '1';
+  const cached = containerTrackingCache.get(cacheKey);
+  if (!force && cached && Date.now() - cached.cachedAt < CONTAINER_TRACKING_CACHE_MS) {
+    return res.json({ ...cached.response, cached: true });
+  }
+
+  const fetchedAt = new Date().toISOString();
+  const [findTeuResult, lecangsResult] = await Promise.all([
+    fetchFindTeuContainer(requestedContainer, poReference),
+    fetchLecangsAsns(poReference, requestedContainer)
+  ]);
+  const journey = buildContainerJourney({
+    containerNumber: requestedContainer,
+    poReference,
+    findTeuPayload: findTeuResult.payload,
+    lecangsPayload: lecangsResult.payload,
+    sourceState: {
+      findteu: findTeuResult.state,
+      lecangs: lecangsResult.state
+    }
+  });
+  const response = {
+    journey,
+    po: {
+      reference: poReference,
+      supplier: po?.company || '',
+      destination: po ? inferDestination(visiblePlannerPo(po)) : null,
+      currentEta: po?.estimatedArrivalDate || po?.arrival || null,
+      originalEta: po?.customFields?.orders_1000 || null
+    },
+    sources: {
+      findteu: {
+        state: findTeuResult.state,
+        message: findTeuResult.message,
+        fetchedAt
+      },
+      lecangs: {
+        state: lecangsResult.state,
+        message: lecangsResult.message,
+        fetchedAt
+      }
+    },
+    fetchedAt,
+    cached: false
+  };
+  containerTrackingCache.set(cacheKey, { cachedAt: Date.now(), response });
+  res.json(response);
 });
 
 // Serve shipment tracker page
