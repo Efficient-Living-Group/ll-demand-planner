@@ -6,6 +6,7 @@ const ROOT = path.resolve(__dirname, '..');
 const CACHE_PATH = path.join(ROOT, 'data', 'cache-snapshot.json');
 const SERVER_PATH = path.join(ROOT, 'server.js');
 const FRONTEND_PATH = path.join(ROOT, 'public', 'index.html');
+const TRACKER_FRONTEND_PATH = path.join(ROOT, 'public', 'tracker.html');
 const CONTAINER_TRACKING_PATH = path.join(ROOT, 'lib', 'container-tracking.js');
 const BOM_MASTER_DEMAND_PATH = path.join(ROOT, 'lib', 'bom-master-demand.js');
 const PACKAGE_PATH = path.join(ROOT, 'package.json');
@@ -104,6 +105,7 @@ let cache;
 try { cache = readJson(CACHE_PATH); } catch (err) { blockers.push(err.message); cache = {}; }
 const serverSource = fs.readFileSync(SERVER_PATH, 'utf8');
 const frontendSource = fs.readFileSync(FRONTEND_PATH, 'utf8');
+const trackerFrontendSource = fs.readFileSync(TRACKER_FRONTEND_PATH, 'utf8');
 const bomMasterDemandSource = fs.existsSync(BOM_MASTER_DEMAND_PATH)
   ? fs.readFileSync(BOM_MASTER_DEMAND_PATH, 'utf8')
   : '';
@@ -241,6 +243,16 @@ if (!containerTrackingSource.includes('function resolveTrackingDestination')
     || !containerTrackingSource.includes('function validateFindTeuDestination')
     || !serverSource.includes('destinationResolution.status !==')) {
   blockers.push('Container tracking must fail closed on unresolved PO destinations and wrong FindTEU voyages');
+}
+if (!serverSource.includes('resolveTrackingDestination(visiblePlannerPo(po))')
+    || serverSource.includes("DESTINATIONS['default']")) {
+  blockers.push('Standalone shipment tracker must use the shared fail-closed destination resolver');
+}
+if (!trackerFrontendSource.includes('function hasMappedDestination(s)')
+    || !trackerFrontendSource.includes('else if (isAU)')
+    || trackerFrontendSource.includes("s.destination.city||s.destination.port||'Melbourne'")
+    || trackerFrontendSource.includes('Default: Australia route')) {
+  blockers.push('Standalone shipment tracker must withhold unresolved routes instead of defaulting to Australia');
 }
 if (serverSource.includes('const rowsWithoutReference = listRows.filter')) {
   blockers.push('Cirro must not attach an inbound without an exact PO reference');

@@ -4196,40 +4196,39 @@ const SUPPLIER_ORIGINS = {
 };
 
 const DESTINATIONS = {
-  'Australia': { city: 'Melbourne', lat: -37.81, lng: 144.96, port: 'Melbourne' },
-  'USA':       { city: 'Los Angeles', lat: 33.74, lng: -118.26, port: 'Los Angeles' },
-  'Canada':    { city: 'Vancouver', lat: 49.29, lng: -123.11, port: 'Vancouver' },
-  'UK':        { city: 'Felixstowe', lat: 51.96, lng: 1.35, port: 'Felixstowe' },
-  'NZ':        { city: 'Auckland', lat: -36.84, lng: 174.76, port: 'Auckland' },
-  'Singapore': { city: 'Singapore', lat: 1.26, lng: 103.84, port: 'Singapore' },
-  'default':   { city: 'Melbourne', lat: -37.81, lng: 144.96, port: 'Melbourne' }
+  'Australia':      { city: 'Melbourne', lat: -37.81, lng: 144.96, port: 'Melbourne' },
+  'United States':  { city: 'Los Angeles', lat: 33.74, lng: -118.26, port: 'Los Angeles' },
+  'Canada':         { city: 'Vancouver', lat: 49.29, lng: -123.11, port: 'Vancouver' },
+  'United Kingdom': { city: 'Felixstowe', lat: 51.96, lng: 1.35, port: 'Felixstowe' },
+  'New Zealand':    { city: 'Auckland', lat: -36.84, lng: 174.76, port: 'Auckland' },
+  'Singapore':      { city: 'Singapore', lat: 1.26, lng: 103.84, port: 'Singapore' }
 };
 
-// Determine destination from PO reference and SKU prefixes
+// Resolve the standalone shipment tracker from the same fail-closed destination
+// evidence used by the PO journey popup. Never turn an unknown PO into Australia.
 function getDestination(po) {
-  const ref = (po.reference || '').toUpperCase();
-  const skus = Object.keys(po.items || {});
-
-  // 1. PO reference prefix takes priority
-  if (ref.startsWith('PO-CA'))  return DESTINATIONS['Canada'];
-  if (ref.startsWith('PO-US'))  return DESTINATIONS['USA'];
-  if (ref.startsWith('PO-UK'))  return DESTINATIONS['UK'];
-  if (ref.startsWith('PO-NZ'))  return DESTINATIONS['NZ'];
-  if (ref.startsWith('PO-SG'))  return DESTINATIONS['Singapore'];
-  if (ref.startsWith('PO-AU'))  return DESTINATIONS['Australia'];
-
-  // 2. Check SKU prefixes - if majority are NA, route to US
-  const naCount = skus.filter(s => s.startsWith('LLNA')).length;
-  const ukCount = skus.filter(s => s.includes('-UK')).length;
-  const sgCount = skus.filter(s => s.startsWith('LLSG')).length;
-  const total = skus.length || 1;
-
-  if (naCount / total > 0.5) return DESTINATIONS['USA'];
-  if (ukCount / total > 0.5) return DESTINATIONS['UK'];
-  if (sgCount / total > 0.5) return DESTINATIONS['Singapore'];
-
-  // 3. Fallback: Australia
-  return DESTINATIONS['default'];
+  const resolution = resolveTrackingDestination(visiblePlannerPo(po));
+  const mapped = resolution.status === 'resolved'
+    ? DESTINATIONS[resolution.destination]
+    : null;
+  if (mapped) {
+    return {
+      ...mapped,
+      country: resolution.destination,
+      resolutionStatus: 'resolved'
+    };
+  }
+  const label = resolution.status === 'conflict'
+    ? 'Destination conflict'
+    : (resolution.status === 'resolved' ? 'Destination unsupported' : 'Destination review required');
+  return {
+    city: label,
+    port: label,
+    country: resolution.destination || '',
+    lat: null,
+    lng: null,
+    resolutionStatus: resolution.status === 'resolved' ? 'unsupported' : resolution.status
+  };
 }
 
 function getSupplierOrigin(company) {
@@ -4784,6 +4783,7 @@ function buildShipmentData() {
       stage: po.stage || '',
       origin,
       destination: dest,
+      destinationResolution: dest.resolutionStatus || 'resolved',
       etd: crd ? crd.toISOString() : null,
       crd: crd ? crd.toISOString() : null,
       eta: eta ? eta.toISOString() : null,

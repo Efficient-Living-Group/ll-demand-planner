@@ -244,6 +244,12 @@ function getFilteredShipments() {
 let routeLines=[];
 let selectedRef=null;
 
+function hasMappedDestination(s){
+  return Number.isFinite(Number(s?.destination?.lat))
+    && Number.isFinite(Number(s?.destination?.lng))
+    && s?.destination?.resolutionStatus==='resolved';
+}
+
 async function loadShipments(){
   try{
     const r=await fetch('/api/shipments',{headers:H()});
@@ -320,6 +326,7 @@ function renderMap(){
     'Singapore':'Singapore'
   };
   getFilteredShipments().forEach(s=>{
+    if(!hasMappedDestination(s)) return;
     const dk=s.destination.lat+','+s.destination.lng;
     if(!destinations[dk]) destinations[dk]=s.destination;
   });
@@ -342,9 +349,17 @@ function renderMap(){
       origins[oKey]={lat:s.origin.lat,lng:s.origin.lng,city:s.origin.city,port:s.origin.port,count:0};
     }
     origins[oKey].count++;
+
+    if(!hasMappedDestination(s)){
+      const fm=L.marker([s.origin.lat+Math.random()*0.5-0.25,s.origin.lng+Math.random()*0.5-0.25],{icon:shipIcon(s.shipmentStatus)}).addTo(map);
+      fm.bindPopup(buildPopup(s)+'<br><small>Destination unresolved; route withheld.</small>',POPUP_OPTS);
+      markers.push(fm);
+      return;
+    }
     
     // Route line
     const routePoints=getRoutePoints(s.origin,s.destination);
+    if(routePoints.length<2) return;
     // Route color by destination
     const ROUTE_COLORS={
       'Melbourne':'#5BAB31',    // 🟢 Green — Australia
@@ -354,8 +369,8 @@ function renderMap(){
       'Auckland':'#06B6D4',     // 🔵 Cyan — NZ
       'Singapore':'#EF4444'     // 🔴 Red — Singapore
     };
-    const destCity=s.destination.city||s.destination.port||'Melbourne';
-    const routeColor=ROUTE_COLORS[destCity]||'#5BAB31';
+    const destCity=s.destination.city||s.destination.port||'';
+    const routeColor=ROUTE_COLORS[destCity]||'#8A8F87';
     const isActive=s.shipmentStatus==='in_transit';
     const line=L.polyline(routePoints,{color:isActive?routeColor:'#DDE3D5',weight:isActive?2.5:1.5,opacity:isActive?0.8:0.4,dashArray:isActive?null:'8 6'}).addTo(map);
     routeLines.push(line);
@@ -400,6 +415,7 @@ function renderMap(){
 }
 
 function getRoutePoints(origin,dest){
+  if(!Number.isFinite(Number(dest?.lat))||!Number.isFinite(Number(dest?.lng))) return [];
   const waypoints = [];
   waypoints.push([origin.lat, origin.lng]);
   
@@ -408,6 +424,7 @@ function getRoutePoints(origin,dest){
   const isUK = dest.lng > -5 && dest.lng < 10 && dest.lat > 45; // UK/Europe
   const isNZ = dest.lat < -30 && dest.lng > 165; // New Zealand
   const isSG = dest.lat > 0 && dest.lat < 3 && dest.lng > 100 && dest.lng < 105; // Singapore
+  const isAU = dest.country==='Australia';
   
   // Step 1: Origin → open water (same for all routes from China/Thailand)
   if (origin.lng < 102) {
@@ -471,8 +488,8 @@ function getRoutePoints(origin,dest){
     waypoints.push([-37, 140]); waypoints.push([-38, 150]); waypoints.push([-37, 160]);
     waypoints.push([-36, 170]);
     waypoints.push([dest.lat, dest.lng]);
-  } else {
-    // Default: Australia route (China → Singapore → Sunda Strait → Indian Ocean → Melbourne)
+  } else if (isAU) {
+    // Australia route (China → Singapore → Sunda Strait → Indian Ocean → Melbourne)
     waypoints.push([5, 105]);
     waypoints.push([1.2, 104.2]);           // Singapore
     waypoints.push([-1, 106]);              // Java Sea
@@ -489,6 +506,8 @@ function getRoutePoints(origin,dest){
     waypoints.push([-39, 143]);             // Bass Strait approach
     waypoints.push([-38.3, 144.8]);         // Port Phillip entrance
     waypoints.push([dest.lat, dest.lng]);
+  } else {
+    return [];
   }
   
   // Smooth interpolation
@@ -560,7 +579,9 @@ function selectShipment(ref){
   if(s){
     showDetail(s);
     let pos;
-    if(s.vesselPosition && s.vesselPosition.lat){
+    if(!hasMappedDestination(s)){
+      pos=[s.origin.lat,s.origin.lng];
+    }else if(s.vesselPosition && s.vesselPosition.lat){
       let aisLng=s.vesselPosition.lng;
       if(s.destination&&s.destination.lng<-100&&aisLng<0) aisLng+=360;
       pos=[s.vesselPosition.lat,aisLng];
