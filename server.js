@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const { cartonAvailableQuantity } = require('./lib/inventory');
 const { summarizeSalesVolume } = require('./lib/executive-sales');
+const { addLlnaFrameVelocity } = require('./lib/little-lifely-demand');
 const {
   normalizeContainerNumber,
   isValidContainerNumber,
@@ -2394,11 +2395,29 @@ function buildCKData(ckId) {
 
   if (salesCountry) {
     for (const sourceStore of relatedStores) {
-      mergeVelocitySource(dataCache.shopifyVelocityByCountry?.[sourceStore]?.[salesCountry] || {}, salesCountry);
+      const source = dataCache.shopifyVelocityByCountry?.[sourceStore]?.[salesCountry] || {};
+      mergeVelocitySource(source, salesCountry);
+      if (ckId === 'llna' || ckId === 'llca') {
+        addLlnaFrameVelocity(
+          velocity,
+          source,
+          dataCache.cin7BOMs,
+          rawSku => canonicalDemandSku(rawSku, salesCountry)
+        );
+      }
     }
   } else {
     for (const sourceStore of relatedStores) {
-      mergeVelocitySource(dataCache.shopifyVelocity?.[sourceStore] || {}, '');
+      const source = dataCache.shopifyVelocity?.[sourceStore] || {};
+      mergeVelocitySource(source, '');
+      if (ckId === 'llna' || ckId === 'llca') {
+        addLlnaFrameVelocity(
+          velocity,
+          source,
+          dataCache.cin7BOMs,
+          rawSku => canonicalDemandSku(rawSku, '')
+        );
+      }
     }
   }
 
