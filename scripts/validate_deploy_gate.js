@@ -201,8 +201,11 @@ if (!containerTrackingSource.includes('completedVoyageArchived') || !containerTr
 if (!frontendSource.includes("filter(step => step.state !== 'archived')") || !frontendSource.includes('Original voyage archived')) {
   blockers.push('Completed reused-container voyages must hide superseded carrier warning rows');
 }
-if (!frontendSource.includes('Destination port to unloading') || !frontendSource.includes('Destination port</div>')) {
-  blockers.push('Container tracking must use unambiguous destination-port terminology');
+if (!frontendSource.includes('Port departure to unloading') || !frontendSource.includes('Port departure</div>')) {
+  blockers.push('Container tracking must start at port departure and continue through unloading');
+}
+if (!containerTrackingSource.includes("'pol-departure'") || !containerTrackingSource.includes("'Port departure'")) {
+  blockers.push('Container tracking must retain the FindTEU port-departure milestone');
 }
 if (frontendSource.includes('POD to unloading') || frontendSource.includes('>POD</div>') || frontendSource.includes('from port of discharge to unloading')) {
   blockers.push('Ambiguous POD / port-of-discharge UI wording is still present');

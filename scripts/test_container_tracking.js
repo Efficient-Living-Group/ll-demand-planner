@@ -46,6 +46,13 @@ const findTeuPayload = {
   data: {
     scac: 'OOLU',
     container: { number: 'OOCU8815295', type: "40'HQ", completed: false },
+    pol: {
+      terminal: 'Yantian International',
+      port: 'Yantian',
+      country: 'China',
+      iso_code: 'CNYTN',
+      etd_date: '2026-06-12'
+    },
     pod: {
       terminal: 'Trinity',
       port: 'Felixstowe',
@@ -54,6 +61,13 @@ const findTeuPayload = {
       eta_date: '2026-07-17'
     },
     events: [
+      {
+        event_date: '2026-06-12',
+        location: { terminal: 'Yantian International', port: 'Yantian', country: 'China', iso_code: 'CNYTN' },
+        action: { action_name: 'Departed by' },
+        mode: { transport_mode: 'Vessel', vessel: { vessel_name: 'EVER AIM' } },
+        event_type: 'actual'
+      },
       {
         event_date: '2026-07-17',
         location: { terminal: 'Trinity', port: 'Felixstowe', country: 'United Kingdom', iso_code: 'GBFXT' },
@@ -73,9 +87,30 @@ const findTeuPayload = {
 };
 
 const normalizedFindTeu = normalizeFindTeu(findTeuPayload);
+assert.strictEqual(normalizedFindTeu.polDeparture.type, 'actual');
+assert.strictEqual(normalizedFindTeu.polDeparture.timestamp, '2026-06-12');
 assert.strictEqual(normalizedFindTeu.podArrival.type, 'actual');
 assert.strictEqual(normalizedFindTeu.podArrival.timestamp, '2026-07-17');
 assert.strictEqual(normalizedFindTeu.gateOut.timestamp, '2026-07-19');
+
+const sailingJourney = buildContainerJourney({
+  containerNumber: 'OOCU8815295',
+  poReference: 'PO-UK006',
+  findTeuPayload: {
+    data: {
+      container: { number: 'OOCU8815295', type: "40'HQ" },
+      pol: findTeuPayload.data.pol,
+      pod: findTeuPayload.data.pod,
+      events: [findTeuPayload.data.events[0]]
+    }
+  },
+  lecangsPayload: {},
+  sourceState: { findteu: 'live', lecangs: 'no_data' }
+});
+assert.strictEqual(sailingJourney.timeline[0].label, 'Port departure');
+assert.strictEqual(sailingJourney.timeline[0].state, 'complete');
+assert.strictEqual(sailingJourney.timeline[1].state, 'expected');
+assert.strictEqual(sailingJourney.currentStatus, 'Destination port arrival');
 
 const partialLecangsPayload = {
   success: true,
@@ -120,7 +155,9 @@ const partialJourney = buildContainerJourney({
 });
 assert.strictEqual(partialJourney.complete, false);
 assert.strictEqual(partialJourney.currentStatus, 'Handover and unloading');
-assert.strictEqual(partialJourney.timeline[0].label, 'Destination port arrival');
+assert.strictEqual(partialJourney.timeline[0].label, 'Port departure');
+assert.strictEqual(partialJourney.timeline[0].state, 'complete');
+assert.strictEqual(partialJourney.timeline[1].label, 'Destination port arrival');
 assert.strictEqual(partialJourney.timeline.at(-1).state, 'pending');
 
 partialLecangsPayload.data[1].status = 101205;
@@ -154,6 +191,8 @@ assert.strictEqual(reusedContainerJourney.findTeuVoyageMismatch, true);
 assert.strictEqual(reusedContainerJourney.completedVoyageArchived, true);
 assert.strictEqual(reusedContainerJourney.timeline[0].state, 'archived');
 assert.strictEqual(reusedContainerJourney.timeline[1].state, 'archived');
+assert.strictEqual(reusedContainerJourney.timeline[2].state, 'archived');
+assert.deepStrictEqual(reusedContainerJourney.pol, {});
 assert.deepStrictEqual(reusedContainerJourney.pod, {});
 assert.strictEqual(reusedContainerJourney.complete, true);
 assert.deepStrictEqual(reusedContainerJourney.journeyLock, {

@@ -1787,9 +1787,9 @@ function renderContainerTracking(data) {
   const journey = data.journey || {};
   const po = data.po || {};
   const sources = data.sources || {};
-  const podLabel = journey.completedVoyageArchived
+  const polLabel = journey.completedVoyageArchived
     ? 'Original voyage archived'
-    : ([journey.pod?.terminal, journey.pod?.port, journey.pod?.country].filter(Boolean).join(' · ') || 'Awaiting carrier data');
+    : ([journey.pol?.terminal, journey.pol?.port, journey.pol?.country].filter(Boolean).join(' · ') || 'Awaiting carrier data');
   const warehouseLabel = journey.lecangs?.warehouses?.join(', ') || 'Awaiting Lecangs ASN';
   const timeline = (journey.timeline || []).filter(step => step.state !== 'archived').map(step => `
     <div class="ct-step ${escapeHtml(step.state || 'pending')}">
@@ -1815,7 +1815,7 @@ function renderContainerTracking(data) {
   const sourceMessages = sourceEntries.filter(([, source]) => source.message).map(([label, source]) =>
     `<div class="ct-source-message ${escapeHtml(source.state || 'error')}"><strong>${label}:</strong> ${escapeHtml(source.message)}</div>`
   ).join('');
-  const timelineTitle = journey.completedVoyageArchived ? 'Completed warehouse journey' : 'Destination port to unloading';
+  const timelineTitle = journey.completedVoyageArchived ? 'Completed warehouse journey' : 'Port departure to unloading';
 
   document.getElementById('containerTrackingTitle').textContent = journey.containerNumber || 'Container tracking';
   document.getElementById('containerTrackingSubtitle').textContent =
@@ -1827,7 +1827,7 @@ function renderContainerTracking(data) {
         <div class="ct-summary-value">${escapeHtml(journey.currentStatus || 'Tracking active')}</div>
         <div class="ct-progress" aria-label="${Number(journey.progressPct || 0)}% of tracked milestones complete"><span style="transform:scaleX(${Math.max(0,Math.min(100,Number(journey.progressPct||0)))/100})"></span></div>
       </div>
-      <div class="ct-summary-cell"><div class="ct-summary-label">Destination port</div><div class="ct-summary-value">${escapeHtml(podLabel)}</div></div>
+      <div class="ct-summary-cell"><div class="ct-summary-label">Port departure</div><div class="ct-summary-value">${escapeHtml(polLabel)}</div></div>
       <div class="ct-summary-cell"><div class="ct-summary-label">Warehouse</div><div class="ct-summary-value">${escapeHtml(warehouseLabel)}</div></div>
       <div class="ct-summary-cell"><div class="ct-summary-label">Linked ASNs</div><div class="ct-summary-value">${Number(journey.lecangs?.linkedAsnCount || 0)}</div></div>
     </div>
@@ -2074,7 +2074,7 @@ function renderPurchaseOrders(allPOs) {
         <span data-label="Freight" style="text-align:right;color:var(--text-dim);white-space:nowrap" title="Freight in AUD${po.isEstFreight ? ' (estimated)' : ''}${po.tariffRate ? ' + ' + (po.tariffRate*100) + '% tariff' : ''}">🚛 ${po.freight ? (po.isEstFreight ? '<span style="font-size:8px;padding:1px 3px;border-radius:3px;background:#FEF3C7;color:#92400E">est</span> ' : '') + fmtVal(cx(po.freight, po.freightCurrency || 'USD')) : '—'}</span>
         <span data-label="Tariff / Charges" style="text-align:right;color:var(--text-dim);white-space:nowrap;cursor:help" title="${po.tariffNote || 'Aggregated tariff/charges rate for this PO'}">${formatPoRate(po.tariffRate)}</span>
         <span data-label="SKUs" style="color:var(--text-dim);text-align:right;white-space:nowrap">${skuCount(po)} SKUs · ${totalItems(po)}</span>
-        <span data-label="Track" style="text-align:center">${containerNumber ? `<button class="po-track-btn" type="button" onclick="openContainerTracking(${i},event)" aria-label="Track container ${escapeHtml(containerNumber)} from destination port to unloading">Track</button>` : '<span class="po-track-empty" title="Add a valid container number in Cin7 to enable tracking">—</span>'}</span>
+        <span data-label="Track" style="text-align:center">${containerNumber ? `<button class="po-track-btn" type="button" onclick="openContainerTracking(${i},event)" aria-label="Track container ${escapeHtml(containerNumber)} from port departure to unloading">Track</button>` : '<span class="po-track-empty" title="Add a valid container number in Cin7 to enable tracking">—</span>'}</span>
         <span data-label="" style="font-size:14px;text-align:center;transition:transform 0.2s">▼</span>
       </div>
       <div class="po-items" style="max-height:0;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;transition:max-height 0.3s ease">
