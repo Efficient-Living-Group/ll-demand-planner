@@ -226,6 +226,12 @@ if (!frontendSource.includes('Port departure to unloading') || !frontendSource.i
 if (!containerTrackingSource.includes("'pol-departure'") || !containerTrackingSource.includes("'Port departure'")) {
   blockers.push('Container tracking must retain the FindTEU port-departure milestone');
 }
+if (!containerTrackingSource.includes('function warehouseSourceForDestination') || !serverSource.includes("warehouseSource.key === 'lecangs_us'")) {
+  blockers.push('Warehouse tracking must route by destination and restrict the connected Lecangs credential to US POs');
+}
+for (const provider of ['Lecangs Canada', 'Cirro', 'Capital Logistics', 'Pacificomm']) {
+  if (!containerTrackingSource.includes(provider)) blockers.push(`Warehouse routing is missing provider: ${provider}`);
+}
 if (frontendSource.includes('POD to unloading') || frontendSource.includes('>POD</div>') || frontendSource.includes('from port of discharge to unloading')) {
   blockers.push('Ambiguous POD / port-of-discharge UI wording is still present');
 }

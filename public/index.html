@@ -1779,6 +1779,8 @@ function trackingSourceLabel(source) {
   if (source.state === 'mismatch') return 'Voyage mismatch';
   if (source.state === 'no_data') return 'No matching data';
   if (source.state === 'not_configured') return 'Connection pending';
+  if (source.state === 'not_connected') return 'Not connected';
+  if (source.state === 'unsupported') return 'Not available';
   return 'Temporarily unavailable';
 }
 
@@ -1787,10 +1789,16 @@ function renderContainerTracking(data) {
   const journey = data.journey || {};
   const po = data.po || {};
   const sources = data.sources || {};
+  const warehouseSource = data.warehouseSource || {name:'Lecangs US', key:'lecangs_us'};
+  const warehouseData = journey.warehouse || journey.lecangs || {};
+  const warehouseState = sources.warehouse || sources.lecangs || {state:'error'};
   const polLabel = journey.completedVoyageArchived
     ? 'Original voyage archived'
     : ([journey.pol?.terminal, journey.pol?.port, journey.pol?.country].filter(Boolean).join(' · ') || 'Awaiting carrier data');
-  const warehouseLabel = journey.lecangs?.warehouses?.join(', ') || 'Awaiting Lecangs ASN';
+  const warehouseLabel = warehouseData.warehouses?.join(', ')
+    || (['not_connected', 'unsupported'].includes(warehouseState.state)
+      ? `${warehouseSource.name} not connected`
+      : `Awaiting ${warehouseSource.name} ASN`);
   const timeline = (journey.timeline || []).filter(step => step.state !== 'archived').map(step => `
     <div class="ct-step ${escapeHtml(step.state || 'pending')}">
       <div class="ct-step-marker" aria-hidden="true">${trackingStateIcon(step.state)}</div>
@@ -1805,7 +1813,7 @@ function renderContainerTracking(data) {
     </div>`).join('');
   const sourceEntries = [
     ['FindTEU', sources.findteu || {state:'error'}],
-    ['Lecangs', sources.lecangs || {state:'error'}]
+    [warehouseSource.name || 'Warehouse provider', warehouseState]
   ];
   const sourcePills = sourceEntries.map(([label, source]) => `
     <span class="ct-source ${escapeHtml(source.state || 'error')}" title="${escapeHtml(source.message || '')}">
@@ -1819,7 +1827,7 @@ function renderContainerTracking(data) {
 
   document.getElementById('containerTrackingTitle').textContent = journey.containerNumber || 'Container tracking';
   document.getElementById('containerTrackingSubtitle').textContent =
-    [po.reference, po.supplier, po.destination?.country || po.destination?.city].filter(Boolean).join(' · ');
+    [po.reference, po.supplier, typeof po.destination === 'string' ? po.destination : (po.destination?.country || po.destination?.city)].filter(Boolean).join(' · ');
   body.innerHTML = `
     <div class="ct-summary">
       <div class="ct-summary-cell">
@@ -1829,7 +1837,7 @@ function renderContainerTracking(data) {
       </div>
       <div class="ct-summary-cell"><div class="ct-summary-label">Port departure</div><div class="ct-summary-value">${escapeHtml(polLabel)}</div></div>
       <div class="ct-summary-cell"><div class="ct-summary-label">Warehouse</div><div class="ct-summary-value">${escapeHtml(warehouseLabel)}</div></div>
-      <div class="ct-summary-cell"><div class="ct-summary-label">Linked ASNs</div><div class="ct-summary-value">${Number(journey.lecangs?.linkedAsnCount || 0)}</div></div>
+      <div class="ct-summary-cell"><div class="ct-summary-label">Linked ASNs</div><div class="ct-summary-value">${Number(warehouseData.linkedAsnCount || 0)}</div></div>
     </div>
     <div class="ct-source-row">${sourcePills}${sourceMessages}</div>
     <div class="ct-section-title">${timelineTitle}</div>

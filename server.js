@@ -19,6 +19,7 @@ const {
 const {
   normalizeContainerNumber,
   isValidContainerNumber,
+  warehouseSourceForDestination,
   selectLecangsRecords,
   lecangsSignature,
   buildContainerJourney
@@ -4694,6 +4695,8 @@ app.get('/api/container-tracking', requireAuth, async (req, res) => {
     return res.status(404).json({ error: 'This container is not linked to a current Cin7 purchase order.' });
   }
   const poReference = String(po?.reference || requestedPo || '').trim();
+  const destination = inferDestination(visiblePlannerPo(po));
+  const warehouseSource = warehouseSourceForDestination(destination);
   const cacheKey = `${requestedContainer}|${poReference.toUpperCase()}`;
   const force = String(req.query.refresh || '') === '1';
   const cached = containerTrackingCache.get(cacheKey);
@@ -4702,26 +4705,38 @@ app.get('/api/container-tracking', requireAuth, async (req, res) => {
   }
 
   const fetchedAt = new Date().toISOString();
-  const [findTeuResult, lecangsResult] = await Promise.all([
+  const warehouseResultPromise = warehouseSource.key === 'lecangs_us'
+    ? fetchLecangsAsns(poReference, requestedContainer)
+    : Promise.resolve({
+        state: warehouseSource.key === 'unsupported' ? 'unsupported' : 'not_connected',
+        payload: {},
+        message: warehouseSource.key === 'unsupported'
+          ? 'Warehouse tracking is not available for this destination.'
+          : `${warehouseSource.name} warehouse tracking is not connected yet.`
+      });
+  const [findTeuResult, warehouseResult] = await Promise.all([
     fetchFindTeuContainer(requestedContainer, poReference),
-    fetchLecangsAsns(poReference, requestedContainer)
+    warehouseResultPromise
   ]);
   const journey = buildContainerJourney({
     containerNumber: requestedContainer,
     poReference,
     findTeuPayload: findTeuResult.payload,
-    lecangsPayload: lecangsResult.payload,
+    lecangsPayload: warehouseResult.payload,
     sourceState: {
       findteu: findTeuResult.state,
-      lecangs: lecangsResult.state
-    }
+      warehouse: warehouseResult.state,
+      lecangs: warehouseResult.state
+    },
+    warehouseSource,
+    warehouseMessage: warehouseResult.message
   });
   const response = {
     journey,
     po: {
       reference: poReference,
       supplier: po?.company || '',
-      destination: po ? inferDestination(visiblePlannerPo(po)) : null,
+      destination,
       currentEta: po?.estimatedArrivalDate || po?.arrival || null,
       originalEta: po?.customFields?.orders_1000 || null
     },
@@ -4735,12 +4750,20 @@ app.get('/api/container-tracking', requireAuth, async (req, res) => {
             : findTeuResult.message),
         fetchedAt
       },
-      lecangs: {
-        state: lecangsResult.state,
-        message: lecangsResult.message,
+      warehouse: {
+        state: warehouseResult.state,
+        message: warehouseResult.message,
         fetchedAt
-      }
+      },
+      ...(warehouseSource.key === 'lecangs_us' ? {
+        lecangs: {
+          state: warehouseResult.state,
+          message: warehouseResult.message,
+          fetchedAt
+        }
+      } : {})
     },
+    warehouseSource,
     fetchedAt,
     cached: false
   };

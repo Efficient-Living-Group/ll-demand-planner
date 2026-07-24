@@ -5,6 +5,7 @@ const assert = require('assert');
 const {
   normalizeContainerNumber,
   isValidContainerNumber,
+  warehouseSourceForDestination,
   selectLecangsRecords,
   lecangsSignature,
   normalizeFindTeu,
@@ -15,6 +16,22 @@ const {
 assert.strictEqual(normalizeContainerNumber('OOCU8815295 / EVER AIM'), 'OOCU8815295');
 assert.strictEqual(isValidContainerNumber('OOCU8815295'), true);
 assert.strictEqual(isValidContainerNumber('NO-CONTAINER'), false);
+assert.deepStrictEqual(warehouseSourceForDestination('United States'), {
+  key: 'lecangs_us',
+  name: 'Lecangs US',
+  market: 'United States',
+  connected: true
+});
+assert.deepStrictEqual(warehouseSourceForDestination('Canada'), {
+  key: 'lecangs_ca',
+  name: 'Lecangs Canada',
+  market: 'Canada',
+  connected: false
+});
+assert.strictEqual(warehouseSourceForDestination('United Kingdom').key, 'cirro');
+assert.strictEqual(warehouseSourceForDestination('Australia').key, 'capital_logistics');
+assert.strictEqual(warehouseSourceForDestination('New Zealand').key, 'pacificomm');
+assert.strictEqual(warehouseSourceForDestination('Singapore').key, 'unsupported');
 const currentLecangsRows = [
   { asnNo: 'ASN-ONE', poNo: 'PO-US14-4', erpNo: null, containerNo: 'HMMU4115585' },
   { asnNo: 'ASN-TWO', poNo: 'PO-US14-4-B', erpNo: null, containerNo: 'HMMU4115585' },
@@ -95,7 +112,7 @@ assert.strictEqual(normalizedFindTeu.gateOut.timestamp, '2026-07-19');
 
 const sailingJourney = buildContainerJourney({
   containerNumber: 'OOCU8815295',
-  poReference: 'PO-UK006',
+  poReference: 'PO-US-TEST',
   findTeuPayload: {
     data: {
       container: { number: 'OOCU8815295', type: "40'HQ" },
@@ -117,7 +134,7 @@ const partialLecangsPayload = {
   data: [
     {
       asnNo: 'ASN-ONE',
-      erpNo: 'PO-UK006',
+      erpNo: 'PO-US-TEST',
       containerNo: 'OOCU8815295',
       deliveryWarehouse: 'UK01',
       status: 101205,
@@ -130,7 +147,7 @@ const partialLecangsPayload = {
     },
     {
       asnNo: 'ASN-TWO',
-      erpNo: 'PO-UK006',
+      erpNo: 'PO-US-TEST',
       containerNo: 'OOCU8815295',
       deliveryWarehouse: 'UK01',
       status: 101204,
@@ -141,14 +158,14 @@ const partialLecangsPayload = {
   ]
 };
 
-const partial = normalizeLecangs(partialLecangsPayload, 'OOCU8815295', 'PO-UK006');
+const partial = normalizeLecangs(partialLecangsPayload, 'OOCU8815295', 'PO-US-TEST');
 assert.strictEqual(partial.linkedAsnCount, 2);
 assert.strictEqual(partial.handover.complete, true);
 assert.strictEqual(partial.unloaded.complete, false, 'Every active ASN must reach unloaded');
 
 const partialJourney = buildContainerJourney({
   containerNumber: 'OOCU8815295',
-  poReference: 'PO-UK006',
+  poReference: 'PO-US-TEST',
   findTeuPayload,
   lecangsPayload: partialLecangsPayload,
   sourceState: { findteu: 'live', lecangs: 'live' }
@@ -164,7 +181,7 @@ partialLecangsPayload.data[1].status = 101205;
 partialLecangsPayload.data[1].receives.push({ picType: '2', receivingDate: '2026-07-20 12:10:00' });
 const completeJourney = buildContainerJourney({
   containerNumber: 'OOCU8815295',
-  poReference: 'PO-UK006',
+  poReference: 'PO-US-TEST',
   findTeuPayload,
   lecangsPayload: partialLecangsPayload,
   sourceState: { findteu: 'live', lecangs: 'live' }
@@ -176,7 +193,7 @@ assert.strictEqual(completeJourney.timeline.at(-1).timestamp, '2026-07-20 12:10:
 
 const reusedContainerJourney = buildContainerJourney({
   containerNumber: 'OOCU8815295',
-  poReference: 'PO-UK006',
+  poReference: 'PO-US-TEST',
   findTeuPayload: {
     data: {
       container: { number: 'OOCU8815295', type: "40'HQ" },
@@ -196,19 +213,33 @@ assert.deepStrictEqual(reusedContainerJourney.pol, {});
 assert.deepStrictEqual(reusedContainerJourney.pod, {});
 assert.strictEqual(reusedContainerJourney.complete, true);
 assert.deepStrictEqual(reusedContainerJourney.journeyLock, {
-  poReference: 'PO-UK006',
+  poReference: 'PO-US-TEST',
   containerNumber: 'OOCU8815295',
   asnNumbers: ['ASN-ONE', 'ASN-TWO']
 });
 
 const unavailableJourney = buildContainerJourney({
   containerNumber: 'OOCU8815295',
-  poReference: 'PO-UK006',
+  poReference: 'PO-US-TEST',
   findTeuPayload: {},
   lecangsPayload: {},
   sourceState: { findteu: 'not_configured', lecangs: 'not_configured' }
 });
 assert.strictEqual(unavailableJourney.timeline[0].state, 'unavailable');
 assert.strictEqual(unavailableJourney.timeline.at(-1).state, 'unavailable');
+
+const cirroNotConnected = buildContainerJourney({
+  containerNumber: 'OOCU8815295',
+  poReference: 'PO-US-TEST',
+  findTeuPayload,
+  lecangsPayload: {},
+  sourceState: { findteu: 'live', warehouse: 'not_connected' },
+  warehouseSource: warehouseSourceForDestination('United Kingdom'),
+  warehouseMessage: 'Cirro warehouse tracking is not connected yet.'
+});
+assert.strictEqual(cirroNotConnected.timeline[3].source, 'Cirro');
+assert.strictEqual(cirroNotConnected.timeline[3].state, 'unavailable');
+assert.strictEqual(cirroNotConnected.timeline[3].detail, 'Cirro warehouse tracking is not connected yet.');
+assert.strictEqual(cirroNotConnected.warehouse.providerKey, 'cirro');
 
 console.log('Container tracking tests passed');
