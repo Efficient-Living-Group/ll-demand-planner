@@ -5,6 +5,7 @@ const assert = require('assert');
 const {
   normalizeContainerNumber,
   isValidContainerNumber,
+  selectLecangsRecords,
   lecangsSignature,
   normalizeFindTeu,
   normalizeLecangs,
@@ -14,6 +15,21 @@ const {
 assert.strictEqual(normalizeContainerNumber('OOCU8815295 / EVER AIM'), 'OOCU8815295');
 assert.strictEqual(isValidContainerNumber('OOCU8815295'), true);
 assert.strictEqual(isValidContainerNumber('NO-CONTAINER'), false);
+const currentLecangsRows = [
+  { asnNo: 'ASN-ONE', poNo: 'PO-US14-4', erpNo: null, containerNo: 'HMMU4115585' },
+  { asnNo: 'ASN-TWO', poNo: 'PO-US14-4-B', erpNo: null, containerNo: 'HMMU4115585' },
+  { asnNo: 'ASN-OTHER', poNo: 'PO-US16-1', erpNo: null, containerNo: 'TLLU1234567' }
+];
+assert.deepStrictEqual(
+  selectLecangsRecords(currentLecangsRows, 'PO-US14-4', 'HMMU4115585').map(row => row.asnNo),
+  ['ASN-ONE', 'ASN-TWO'],
+  'Container matching must retain every ASN linked to the same container'
+);
+assert.deepStrictEqual(
+  selectLecangsRecords(currentLecangsRows, 'PO-US14-4', 'NO-CONTAINER').map(row => row.asnNo),
+  ['ASN-ONE'],
+  'PO matching must use poNo when erpNo is empty'
+);
 assert.strictEqual(
   lecangsSignature(
     'test-access',

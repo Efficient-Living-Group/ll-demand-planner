@@ -10,6 +10,7 @@ const { addLlnaFrameVelocity, addLlnaFrameTrend } = require('./lib/little-lifely
 const {
   normalizeContainerNumber,
   isValidContainerNumber,
+  selectLecangsRecords,
   lecangsSignature,
   buildContainerJourney
 } = require('./lib/container-tracking');
@@ -4284,6 +4285,10 @@ function hasContainerNumber(po) {
 }
 
 const containerTrackingCache = new Map();
+const LECANG_INDEX_PAGE_SIZE = 200;
+const LECANG_INDEX_MAX_PAGES = 20;
+let lecangsIndexCache = { cachedAt: 0, rows: [] };
+let lecangsIndexPromise = null;
 
 function trackingRequestJson(method, requestUrl, headers = {}, body = null, timeoutMs = 75000) {
   return new Promise((resolve, reject) => {
@@ -4336,6 +4341,56 @@ function lecangRows(payload) {
   return [];
 }
 
+function assertLecangsSuccess(payload) {
+  const code = Number(payload?.code ?? 200);
+  if (payload?.success === false || code !== 200) {
+    throw new Error(`Lecangs API rejected the request (${payload?.message || payload?.msg || `code ${code}`})`);
+  }
+}
+
+async function fetchLecangsIndex() {
+  const now = Date.now();
+  if (lecangsIndexCache.rows.length && now - lecangsIndexCache.cachedAt < CONTAINER_TRACKING_CACHE_MS) {
+    return lecangsIndexCache.rows;
+  }
+  if (lecangsIndexPromise) return lecangsIndexPromise;
+
+  lecangsIndexPromise = (async () => {
+    const rows = [];
+    for (let pageNum = 1; pageNum <= LECANG_INDEX_MAX_PAGES; pageNum += 1) {
+      const body = { pageNum, pageSize: LECANG_INDEX_PAGE_SIZE };
+      const timestamp = String(Date.now());
+      const payload = await trackingRequestJson(
+        'POST',
+        `${LECANG_BASE_URL}/asnTemp/api/listByAsnCode`,
+        {
+          accessKey: LECANG_ACCESS_KEY,
+          timestamp,
+          sign: lecangsSignature(LECANG_ACCESS_KEY, LECANG_SECRET_KEY, body, timestamp)
+        },
+        body,
+        30000
+      );
+      assertLecangsSuccess(payload);
+      const pageRows = lecangRows(payload);
+      rows.push(...pageRows);
+      if (pageRows.length < LECANG_INDEX_PAGE_SIZE) {
+        lecangsIndexCache = { cachedAt: Date.now(), rows };
+        return rows;
+      }
+      if (pageNum === LECANG_INDEX_MAX_PAGES) {
+        throw new Error('Lecangs ASN index exceeded the safe pagination limit');
+      }
+      await sleep(250);
+    }
+    return rows;
+  })().finally(() => {
+    lecangsIndexPromise = null;
+  });
+
+  return lecangsIndexPromise;
+}
+
 async function fetchFindTeuContainer(containerNumber, poReference) {
   if (!FINDTEU_API_KEY) {
     return {
@@ -4384,29 +4439,18 @@ async function fetchLecangsAsns(poReference, containerNumber) {
     };
   }
   try {
-    const body = { pageNum: 1, pageSize: 200, erpNoList: [poReference] };
-    const timestamp = String(Date.now());
-    const payload = await trackingRequestJson(
-      'POST',
-      `${LECANG_BASE_URL}/asnTemp/api/listByAsnCode`,
-      {
-        accessKey: LECANG_ACCESS_KEY,
-        timestamp,
-        sign: lecangsSignature(LECANG_ACCESS_KEY, LECANG_SECRET_KEY, body, timestamp)
-      },
-      body,
-      30000
-    );
-    const rows = lecangRows(payload);
-    const matchingRows = rows.filter(row => {
-      const rowContainer = normalizeContainerNumber(row?.containerNo);
-      return !rowContainer || rowContainer === containerNumber;
-    });
-    const scopedPayload = { ...payload, data: matchingRows.length ? matchingRows : rows };
+    const rows = await fetchLecangsIndex();
+    const matchingRows = selectLecangsRecords(rows, poReference, containerNumber);
+    const scopedPayload = {
+      success: true,
+      code: 200,
+      message: 'Succeeded',
+      data: matchingRows
+    };
     return {
-      state: rows.length ? 'live' : 'no_data',
+      state: matchingRows.length ? 'live' : 'no_data',
       payload: scopedPayload,
-      message: rows.length ? '' : 'No Lecangs ASN is linked to this PO yet.'
+      message: matchingRows.length ? '' : 'No Lecangs ASN is linked to this PO yet.'
     };
   } catch (error) {
     console.warn(`[container-tracking] Lecangs lookup failed for ${poReference}: ${error.message}`);
