@@ -379,6 +379,7 @@ const wrongDestinationJourney = buildContainerJourney({
 });
 assert.strictEqual(wrongDestinationJourney.findTeuDestinationMismatch, true);
 assert.strictEqual(wrongDestinationJourney.timeline[0].state, 'unavailable');
+assert.strictEqual(wrongDestinationJourney.currentStatus, 'Voyage mismatch · review required');
 assert.deepStrictEqual(wrongDestinationJourney.pod, {});
 
 const noDestinationEvidenceJourney = buildContainerJourney({
@@ -412,6 +413,7 @@ const overdueJourney = buildContainerJourney({
   now: '2026-07-24T00:00:00Z'
 });
 assert.strictEqual(overdueJourney.timeline[1].state, 'overdue');
+assert.strictEqual(overdueJourney.currentStatus, 'Destination port arrival overdue');
 
 const completedWithoutCarrierHistory = buildContainerJourney({
   containerNumber: 'OOCU8815295',
