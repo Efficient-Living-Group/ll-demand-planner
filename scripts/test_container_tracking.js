@@ -5,6 +5,7 @@ const assert = require('assert');
 const {
   normalizeContainerNumber,
   isValidContainerNumber,
+  lecangsSignature,
   normalizeFindTeu,
   normalizeLecangs,
   buildContainerJourney
@@ -13,6 +14,16 @@ const {
 assert.strictEqual(normalizeContainerNumber('OOCU8815295 / EVER AIM'), 'OOCU8815295');
 assert.strictEqual(isValidContainerNumber('OOCU8815295'), true);
 assert.strictEqual(isValidContainerNumber('NO-CONTAINER'), false);
+assert.strictEqual(
+  lecangsSignature(
+    'test-access',
+    'test-secret',
+    { pageNum: 1, pageSize: 200, erpNoList: ['PO-1'] },
+    '1700000000000'
+  ),
+  '6d5fce0160eb856ac8c376d6f0ab78e70c8836cface4743fda9e78961d819b4c',
+  'Lecangs signs sorted key=value pairs joined by ampersands, then appends the secret'
+);
 
 const findTeuPayload = {
   success: true,

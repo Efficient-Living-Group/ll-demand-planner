@@ -10,6 +10,7 @@ const { addLlnaFrameVelocity, addLlnaFrameTrend } = require('./lib/little-lifely
 const {
   normalizeContainerNumber,
   isValidContainerNumber,
+  lecangsSignature,
   buildContainerJourney
 } = require('./lib/container-tracking');
 const { exec } = require('child_process');
@@ -4328,20 +4329,6 @@ function trackingRequestJson(method, requestUrl, headers = {}, body = null, time
   });
 }
 
-function lecangSignature(body, timestamp) {
-  const params = { accessKey: LECANG_ACCESS_KEY, timestamp, ...body };
-  const parts = Object.keys(params).sort().map(key => {
-    const value = params[key];
-    const encoded = Array.isArray(value) || (value && typeof value === 'object')
-      ? JSON.stringify(value)
-      : (value ?? '');
-    return `${key}${encoded}`;
-  });
-  return crypto.createHash('sha256')
-    .update(`${LECANG_SECRET_KEY}${parts.join('')}${LECANG_SECRET_KEY}`)
-    .digest('hex');
-}
-
 function lecangRows(payload) {
   if (Array.isArray(payload?.data)) return payload.data;
   if (Array.isArray(payload?.data?.records)) return payload.data.records;
@@ -4405,7 +4392,7 @@ async function fetchLecangsAsns(poReference, containerNumber) {
       {
         accessKey: LECANG_ACCESS_KEY,
         timestamp,
-        sign: lecangSignature(body, timestamp)
+        sign: lecangsSignature(LECANG_ACCESS_KEY, LECANG_SECRET_KEY, body, timestamp)
       },
       body,
       30000
