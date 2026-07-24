@@ -226,8 +226,10 @@ if (!frontendSource.includes('Port departure to unloading') || !frontendSource.i
 if (!containerTrackingSource.includes("'pol-departure'") || !containerTrackingSource.includes("'Port departure'")) {
   blockers.push('Container tracking must retain the FindTEU port-departure milestone');
 }
-if (!containerTrackingSource.includes('function warehouseSourceForDestination') || !serverSource.includes("warehouseSource.key === 'lecangs_us'")) {
-  blockers.push('Warehouse tracking must route by destination and restrict the connected Lecangs credential to US POs');
+if (!containerTrackingSource.includes('function warehouseSourceForDestination')
+    || !serverSource.includes("['lecangs_us', 'lecangs_ca'].includes(warehouseSource.key)")
+    || !serverSource.includes("warehouseSource.key === 'cirro'")) {
+  blockers.push('Warehouse tracking must route US and Canada to isolated Lecangs clients and UK to Cirro');
 }
 for (const provider of ['Lecangs Canada', 'Cirro', 'Capital Logistics', 'Pacificomm']) {
   if (!containerTrackingSource.includes(provider)) blockers.push(`Warehouse routing is missing provider: ${provider}`);

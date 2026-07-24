@@ -10,6 +10,7 @@ const {
   lecangsSignature,
   normalizeFindTeu,
   normalizeLecangs,
+  normalizeCirro,
   buildContainerJourney
 } = require('../lib/container-tracking');
 
@@ -26,9 +27,14 @@ assert.deepStrictEqual(warehouseSourceForDestination('Canada'), {
   key: 'lecangs_ca',
   name: 'Lecangs Canada',
   market: 'Canada',
-  connected: false
+  connected: true
 });
-assert.strictEqual(warehouseSourceForDestination('United Kingdom').key, 'cirro');
+assert.deepStrictEqual(warehouseSourceForDestination('United Kingdom'), {
+  key: 'cirro',
+  name: 'Cirro',
+  market: 'United Kingdom',
+  connected: true
+});
 assert.strictEqual(warehouseSourceForDestination('Australia').key, 'capital_logistics');
 assert.strictEqual(warehouseSourceForDestination('New Zealand').key, 'pacificomm');
 assert.strictEqual(warehouseSourceForDestination('Singapore').key, 'unsupported');
@@ -215,7 +221,8 @@ assert.strictEqual(reusedContainerJourney.complete, true);
 assert.deepStrictEqual(reusedContainerJourney.journeyLock, {
   poReference: 'PO-US-TEST',
   containerNumber: 'OOCU8815295',
-  asnNumbers: ['ASN-ONE', 'ASN-TWO']
+  asnNumbers: ['ASN-ONE', 'ASN-TWO'],
+  warehouseReferences: ['ASN-ONE', 'ASN-TWO']
 });
 
 const unavailableJourney = buildContainerJourney({
@@ -228,18 +235,66 @@ const unavailableJourney = buildContainerJourney({
 assert.strictEqual(unavailableJourney.timeline[0].state, 'unavailable');
 assert.strictEqual(unavailableJourney.timeline.at(-1).state, 'unavailable');
 
-const cirroNotConnected = buildContainerJourney({
+const cirroPayload = {
+  code: 0,
+  data: {
+    list: [{
+      receiving_code: 'IB-ONE',
+      reference_no: 'PO-UK-TEST',
+      receiving_status: 7,
+      warehouse_code: 'UK01',
+      eta_date: '2026-07-25T09:00:00+00:00',
+      update_at: '2026-07-25T10:00:00+00:00'
+    }]
+  }
+};
+const normalizedCirro = normalizeCirro(cirroPayload, 'PO-UK-TEST');
+assert.strictEqual(normalizedCirro.recordLabel, 'inbound');
+assert.strictEqual(normalizedCirro.linkedAsnCount, 1);
+assert.strictEqual(normalizedCirro.warehouseArrival.complete, true);
+assert.strictEqual(normalizedCirro.handover.complete, true);
+assert.strictEqual(normalizedCirro.unloaded.complete, false);
+assert.strictEqual(
+  normalizeCirro(cirroPayload, 'PO-OTHER').linkedAsnCount,
+  0,
+  'Cirro records from another PO must not attach to a reused container journey'
+);
+
+const cirroJourney = buildContainerJourney({
   containerNumber: 'OOCU8815295',
-  poReference: 'PO-US-TEST',
+  poReference: 'PO-UK-TEST',
   findTeuPayload,
-  lecangsPayload: {},
-  sourceState: { findteu: 'live', warehouse: 'not_connected' },
+  warehousePayload: cirroPayload,
+  sourceState: { findteu: 'live', warehouse: 'live' },
   warehouseSource: warehouseSourceForDestination('United Kingdom'),
-  warehouseMessage: 'Cirro warehouse tracking is not connected yet.'
+  warehouseMessage: ''
 });
-assert.strictEqual(cirroNotConnected.timeline[3].source, 'Cirro');
-assert.strictEqual(cirroNotConnected.timeline[3].state, 'unavailable');
-assert.strictEqual(cirroNotConnected.timeline[3].detail, 'Cirro warehouse tracking is not connected yet.');
-assert.strictEqual(cirroNotConnected.warehouse.providerKey, 'cirro');
+assert.strictEqual(cirroJourney.timeline[3].source, 'Cirro');
+assert.strictEqual(cirroJourney.timeline[3].state, 'complete');
+assert.strictEqual(cirroJourney.timeline[4].state, 'complete');
+assert.strictEqual(cirroJourney.timeline[5].state, 'current');
+assert.strictEqual(cirroJourney.timeline[6].state, 'pending');
+assert.strictEqual(cirroJourney.warehouse.providerKey, 'cirro');
+assert.strictEqual(cirroJourney.currentStatus, 'Handover and unloading');
+assert.deepStrictEqual(cirroJourney.journeyLock, {
+  poReference: 'PO-UK-TEST',
+  containerNumber: 'OOCU8815295',
+  asnNumbers: [],
+  warehouseReferences: ['IB-ONE']
+});
+
+cirroPayload.data.list[0].receiving_status = 8;
+cirroPayload.data.list[0].update_at = '2026-07-25T12:00:00+00:00';
+const cirroComplete = buildContainerJourney({
+  containerNumber: 'OOCU8815295',
+  poReference: 'PO-UK-TEST',
+  findTeuPayload,
+  warehousePayload: cirroPayload,
+  sourceState: { findteu: 'live', warehouse: 'live' },
+  warehouseSource: warehouseSourceForDestination('United Kingdom')
+});
+assert.strictEqual(cirroComplete.complete, true);
+assert.strictEqual(cirroComplete.progressPct, 100);
+assert.strictEqual(cirroComplete.timeline.at(-1).timestamp, '2026-07-25T12:00:00+00:00');
 
 console.log('Container tracking tests passed');

@@ -46,6 +46,12 @@ const FINDTEU_BASE_URL = (process.env.FINDTEU_BASE_URL || 'https://api.findteu.c
 const LECANG_ACCESS_KEY = process.env.LECANG_ACCESS_KEY || '';
 const LECANG_SECRET_KEY = process.env.LECANG_SECRET_KEY || '';
 const LECANG_BASE_URL = (process.env.LECANG_BASE_URL || 'https://app.lecangs.com/api/oms').replace(/\/$/, '');
+const LECANG_CA_ACCESS_KEY = process.env.LECANG_CA_ACCESS_KEY || '';
+const LECANG_CA_SECRET_KEY = process.env.LECANG_CA_SECRET_KEY || '';
+const LECANG_CA_BASE_URL = (process.env.LECANG_CA_BASE_URL || 'https://app.lecangs.com/api/oms').replace(/\/$/, '');
+const CIRRO_UK_APP_KEY = process.env.CIRRO_UK_APP_KEY || '';
+const CIRRO_UK_APP_TOKEN = process.env.CIRRO_UK_APP_TOKEN || '';
+const CIRRO_UK_BASE_URL = (process.env.CIRRO_UK_BASE_URL || 'https://oms.elogistic.com/v1').replace(/\/$/, '');
 const CONTAINER_TRACKING_CACHE_MS = 15 * 60 * 1000;
 const CIN7_REQUEST_SPACING_MS = 1500;
 const CIN7_REFRESH_INTERVAL_MS = 4 * 60 * 60 * 1000;
@@ -4245,8 +4251,24 @@ function hasContainerNumber(po) {
 const containerTrackingCache = new Map();
 const LECANG_INDEX_PAGE_SIZE = 200;
 const LECANG_INDEX_MAX_PAGES = 20;
-let lecangsIndexCache = { cachedAt: 0, rows: [] };
-let lecangsIndexPromise = null;
+const lecangsClients = {
+  lecangs_us: {
+    accessKey: LECANG_ACCESS_KEY,
+    secretKey: LECANG_SECRET_KEY,
+    baseUrl: LECANG_BASE_URL,
+    name: 'Lecangs US'
+  },
+  lecangs_ca: {
+    accessKey: LECANG_CA_ACCESS_KEY,
+    secretKey: LECANG_CA_SECRET_KEY,
+    baseUrl: LECANG_CA_BASE_URL,
+    name: 'Lecangs Canada'
+  }
+};
+const lecangsIndexCaches = new Map();
+const lecangsIndexPromises = new Map();
+let cirroUkTokenCache = { token: '', expiresAt: 0 };
+let cirroUkTokenPromise = null;
 
 function trackingRequestJson(method, requestUrl, headers = {}, body = null, timeoutMs = 75000) {
   return new Promise((resolve, reject) => {
@@ -4306,25 +4328,28 @@ function assertLecangsSuccess(payload) {
   }
 }
 
-async function fetchLecangsIndex() {
+async function fetchLecangsIndex(clientKey) {
+  const client = lecangsClients[clientKey];
+  if (!client) throw new Error('Unknown Lecangs regional client');
   const now = Date.now();
-  if (lecangsIndexCache.rows.length && now - lecangsIndexCache.cachedAt < CONTAINER_TRACKING_CACHE_MS) {
-    return lecangsIndexCache.rows;
+  const cached = lecangsIndexCaches.get(clientKey) || { cachedAt: 0, rows: [] };
+  if (cached.rows.length && now - cached.cachedAt < CONTAINER_TRACKING_CACHE_MS) {
+    return cached.rows;
   }
-  if (lecangsIndexPromise) return lecangsIndexPromise;
+  if (lecangsIndexPromises.has(clientKey)) return lecangsIndexPromises.get(clientKey);
 
-  lecangsIndexPromise = (async () => {
+  const promise = (async () => {
     const rows = [];
     for (let pageNum = 1; pageNum <= LECANG_INDEX_MAX_PAGES; pageNum += 1) {
       const body = { pageNum, pageSize: LECANG_INDEX_PAGE_SIZE };
       const timestamp = String(Date.now());
       const payload = await trackingRequestJson(
         'POST',
-        `${LECANG_BASE_URL}/asnTemp/api/listByAsnCode`,
+        `${client.baseUrl}/asnTemp/api/listByAsnCode`,
         {
-          accessKey: LECANG_ACCESS_KEY,
+          accessKey: client.accessKey,
           timestamp,
-          sign: lecangsSignature(LECANG_ACCESS_KEY, LECANG_SECRET_KEY, body, timestamp)
+          sign: lecangsSignature(client.accessKey, client.secretKey, body, timestamp)
         },
         body,
         30000
@@ -4333,7 +4358,7 @@ async function fetchLecangsIndex() {
       const pageRows = lecangRows(payload);
       rows.push(...pageRows);
       if (pageRows.length < LECANG_INDEX_PAGE_SIZE) {
-        lecangsIndexCache = { cachedAt: Date.now(), rows };
+        lecangsIndexCaches.set(clientKey, { cachedAt: Date.now(), rows });
         return rows;
       }
       if (pageNum === LECANG_INDEX_MAX_PAGES) {
@@ -4343,10 +4368,10 @@ async function fetchLecangsIndex() {
     }
     return rows;
   })().finally(() => {
-    lecangsIndexPromise = null;
+    lecangsIndexPromises.delete(clientKey);
   });
-
-  return lecangsIndexPromise;
+  lecangsIndexPromises.set(clientKey, promise);
+  return promise;
 }
 
 async function fetchFindTeuContainer(containerNumber, poReference) {
@@ -4381,12 +4406,13 @@ async function fetchFindTeuContainer(containerNumber, poReference) {
   }
 }
 
-async function fetchLecangsAsns(poReference, containerNumber) {
-  if (!LECANG_ACCESS_KEY || !LECANG_SECRET_KEY) {
+async function fetchLecangsAsns(poReference, containerNumber, clientKey) {
+  const client = lecangsClients[clientKey];
+  if (!client?.accessKey || !client?.secretKey) {
     return {
       state: 'not_configured',
       payload: {},
-      message: 'Lecangs warehouse milestones are awaiting a scoped read-only connection.'
+      message: `${client?.name || 'Lecangs'} warehouse milestones are awaiting a scoped read-only connection.`
     };
   }
   if (!poReference) {
@@ -4397,7 +4423,7 @@ async function fetchLecangsAsns(poReference, containerNumber) {
     };
   }
   try {
-    const rows = await fetchLecangsIndex();
+    const rows = await fetchLecangsIndex(clientKey);
     const matchingRows = selectLecangsRecords(rows, poReference, containerNumber);
     const scopedPayload = {
       success: true,
@@ -4408,14 +4434,124 @@ async function fetchLecangsAsns(poReference, containerNumber) {
     return {
       state: matchingRows.length ? 'live' : 'no_data',
       payload: scopedPayload,
-      message: matchingRows.length ? '' : 'No Lecangs ASN is linked to this PO yet.'
+      message: matchingRows.length ? '' : `No ${client.name} ASN is linked to this PO yet.`
     };
   } catch (error) {
-    console.warn(`[container-tracking] Lecangs lookup failed for ${poReference}: ${error.message}`);
+    console.warn(`[container-tracking] ${client.name} lookup failed for ${poReference}: ${error.message}`);
     return {
       state: 'error',
       payload: {},
-      message: 'Lecangs warehouse milestones are temporarily unavailable.'
+      message: `${client.name} warehouse milestones are temporarily unavailable.`
+    };
+  }
+}
+
+function cirroEnvelope(requestData) {
+  return {
+    request_id: crypto.randomUUID(),
+    request_time: String(Math.floor(Date.now() / 1000)),
+    request_data: requestData
+  };
+}
+
+function assertCirroSuccess(payload) {
+  if (Number(payload?.code) !== 0) {
+    throw new Error(`Cirro API rejected the request (${payload?.message || `code ${payload?.code}`})`);
+  }
+}
+
+async function getCirroUkToken() {
+  if (cirroUkTokenCache.token && Date.now() < cirroUkTokenCache.expiresAt - 300000) {
+    return cirroUkTokenCache.token;
+  }
+  if (cirroUkTokenPromise) return cirroUkTokenPromise;
+  cirroUkTokenPromise = (async () => {
+    const payload = await trackingRequestJson(
+      'POST',
+      `${CIRRO_UK_BASE_URL}/auth/get-access-token`,
+      {},
+      cirroEnvelope({ app_key: CIRRO_UK_APP_KEY, app_token: CIRRO_UK_APP_TOKEN }),
+      30000
+    );
+    assertCirroSuccess(payload);
+    const token = String(payload?.data?.access_token || '');
+    if (!token) throw new Error('Cirro did not return an access token');
+    const rawExpiry = payload?.data?.expired_at;
+    const numericExpiry = Number(rawExpiry);
+    const expiresAt = Number.isFinite(numericExpiry) && numericExpiry > 0
+      ? (numericExpiry > 1e12 ? numericExpiry : numericExpiry * 1000)
+      : (Date.parse(rawExpiry) || Date.now() + 50 * 60 * 1000);
+    cirroUkTokenCache = { token, expiresAt };
+    return token;
+  })().finally(() => {
+    cirroUkTokenPromise = null;
+  });
+  return cirroUkTokenPromise;
+}
+
+async function fetchCirroInbounds(poReference, containerNumber) {
+  if (!CIRRO_UK_APP_KEY || !CIRRO_UK_APP_TOKEN) {
+    return {
+      state: 'not_configured',
+      payload: {},
+      message: 'Cirro warehouse milestones are awaiting a scoped read-only connection.'
+    };
+  }
+  try {
+    const token = await getCirroUkToken();
+    const listPayload = await trackingRequestJson(
+      'POST',
+      `${CIRRO_UK_BASE_URL}/inbound/list`,
+      { Authorization: `Bearer ${token}` },
+      cirroEnvelope({
+        search_type: 2,
+        container_number: containerNumber,
+        receiving_shipping_type: 4,
+        page: 1,
+        page_size: 100
+      }),
+      30000
+    );
+    assertCirroSuccess(listPayload);
+    const listRows = Array.isArray(listPayload?.data?.list) ? listPayload.data.list : [];
+    const compactPo = String(poReference || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const exactPoRows = listRows.filter(row => String(row?.reference_no || '')
+      .trim().toUpperCase().replace(/[^A-Z0-9]/g, '') === compactPo);
+    const rowsWithoutReference = listRows.filter(row => !String(row?.reference_no || '').trim());
+    const matchedRows = exactPoRows.length ? exactPoRows : rowsWithoutReference;
+    if (matchedRows.length > 20) throw new Error('Cirro returned too many inbound matches for one container');
+    const detailedRows = await Promise.all(matchedRows.map(async row => {
+      if (!row?.receiving_code) return row;
+      const detailPayload = await trackingRequestJson(
+        'POST',
+        `${CIRRO_UK_BASE_URL}/inbound/detail`,
+        { Authorization: `Bearer ${token}` },
+        cirroEnvelope({ receiving_code: row.receiving_code }),
+        30000
+      );
+      assertCirroSuccess(detailPayload);
+      const detail = detailPayload?.data || {};
+      return {
+        receiving_code: detail.receiving_code || row.receiving_code,
+        reference_no: detail.reference_no || row.reference_no || '',
+        receiving_status: detail.receiving_status ?? row.receiving_status,
+        warehouse_code: detail.warehouse_code || row.warehouse_code || '',
+        eta_date: detail.eta_date || null,
+        update_at: detail.update_at || detail.udpate_at || row.update_at || null,
+        create_at: detail.create_at || row.create_at || null
+      };
+    }));
+    return {
+      state: detailedRows.length ? 'live' : 'no_data',
+      payload: { code: 0, message: 'success', data: { list: detailedRows } },
+      message: detailedRows.length ? '' : 'No Cirro inbound is linked to this container yet.'
+    };
+  } catch (error) {
+    console.warn(`[container-tracking] Cirro lookup failed for ${poReference}: ${error.message}`);
+    return {
+      state: 'error',
+      payload: {},
+      message: 'Cirro warehouse milestones are temporarily unavailable.'
     };
   }
 }
@@ -4705,15 +4841,20 @@ app.get('/api/container-tracking', requireAuth, async (req, res) => {
   }
 
   const fetchedAt = new Date().toISOString();
-  const warehouseResultPromise = warehouseSource.key === 'lecangs_us'
-    ? fetchLecangsAsns(poReference, requestedContainer)
-    : Promise.resolve({
+  let warehouseResultPromise;
+  if (['lecangs_us', 'lecangs_ca'].includes(warehouseSource.key)) {
+    warehouseResultPromise = fetchLecangsAsns(poReference, requestedContainer, warehouseSource.key);
+  } else if (warehouseSource.key === 'cirro') {
+    warehouseResultPromise = fetchCirroInbounds(poReference, requestedContainer);
+  } else {
+    warehouseResultPromise = Promise.resolve({
         state: warehouseSource.key === 'unsupported' ? 'unsupported' : 'not_connected',
         payload: {},
         message: warehouseSource.key === 'unsupported'
           ? 'Warehouse tracking is not available for this destination.'
           : `${warehouseSource.name} warehouse tracking is not connected yet.`
       });
+  }
   const [findTeuResult, warehouseResult] = await Promise.all([
     fetchFindTeuContainer(requestedContainer, poReference),
     warehouseResultPromise
@@ -4722,7 +4863,7 @@ app.get('/api/container-tracking', requireAuth, async (req, res) => {
     containerNumber: requestedContainer,
     poReference,
     findTeuPayload: findTeuResult.payload,
-    lecangsPayload: warehouseResult.payload,
+    warehousePayload: warehouseResult.payload,
     sourceState: {
       findteu: findTeuResult.state,
       warehouse: warehouseResult.state,
@@ -4755,8 +4896,15 @@ app.get('/api/container-tracking', requireAuth, async (req, res) => {
         message: warehouseResult.message,
         fetchedAt
       },
-      ...(warehouseSource.key === 'lecangs_us' ? {
+      ...(['lecangs_us', 'lecangs_ca'].includes(warehouseSource.key) ? {
         lecangs: {
+          state: warehouseResult.state,
+          message: warehouseResult.message,
+          fetchedAt
+        }
+      } : {}),
+      ...(warehouseSource.key === 'cirro' ? {
+        cirro: {
           state: warehouseResult.state,
           message: warehouseResult.message,
           fetchedAt
