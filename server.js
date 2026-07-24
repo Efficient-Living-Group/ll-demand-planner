@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const { cartonAvailableQuantity } = require('./lib/inventory');
 const { summarizeSalesVolume } = require('./lib/executive-sales');
-const { addLlnaFrameVelocity } = require('./lib/little-lifely-demand');
+const { addLlnaFrameVelocity, addLlnaFrameTrend } = require('./lib/little-lifely-demand');
 const {
   normalizeContainerNumber,
   isValidContainerNumber,
@@ -2372,6 +2372,7 @@ function buildCKData(ckId) {
 
   // Velocity
   const velocity = {};
+  const llnaFrameTrend = { _7d: {}, _30d: {}, _weeklyBreakdown: {}, _firstSeen: {} };
   const mergeVelocitySource = (source, country = '') => {
     for (const [rawSku, vel] of Object.entries(source || {})) {
       if (String(rawSku || '').startsWith('_')) continue;
@@ -2404,6 +2405,12 @@ function buildCKData(ckId) {
           dataCache.cin7BOMs,
           rawSku => canonicalDemandSku(rawSku, salesCountry)
         );
+        addLlnaFrameTrend(
+          llnaFrameTrend,
+          source,
+          dataCache.cin7BOMs,
+          rawSku => canonicalDemandSku(rawSku, salesCountry)
+        );
       }
     }
   } else {
@@ -2413,6 +2420,12 @@ function buildCKData(ckId) {
       if (ckId === 'llna' || ckId === 'llca') {
         addLlnaFrameVelocity(
           velocity,
+          source,
+          dataCache.cin7BOMs,
+          rawSku => canonicalDemandSku(rawSku, '')
+        );
+        addLlnaFrameTrend(
+          llnaFrameTrend,
           source,
           dataCache.cin7BOMs,
           rawSku => canonicalDemandSku(rawSku, '')
@@ -3382,6 +3395,15 @@ function buildCKData(ckId) {
             : dataCache.shopifyVelocity?.[sourceStore] || {};
           absorbTrend(velSource, salesCountry || '');
         }
+        d7Qty += Number(llnaFrameTrend._7d[sku] || 0);
+        d30Qty += Number(llnaFrameTrend._30d[sku] || 0);
+        const mappedFirstSeen = llnaFrameTrend._firstSeen[sku] || null;
+        if (mappedFirstSeen && (!firstSeenValue || String(mappedFirstSeen) < String(firstSeenValue))) {
+          firstSeenValue = mappedFirstSeen;
+        }
+        for (const [week, qty] of Object.entries(llnaFrameTrend._weeklyBreakdown[sku] || {})) {
+          wk[week] = (wk[week] || 0) + Number(qty || 0);
+        }
         const v7 = d7Qty; // already a 7-day total, shown as weekly rate
         const v30 = d30Qty / 30 * 7;
         const weekKeys = Object.keys(wk).sort().slice(-5);
@@ -3427,6 +3449,7 @@ function buildCKData(ckId) {
           : dataCache.shopifyVelocity?.[sourceStore]?._weeklyBreakdown;
         addWeekly(weekly || {}, salesCountry || '');
       }
+      addWeekly(llnaFrameTrend._weeklyBreakdown, salesCountry || '');
       return Object.keys(result).length > 0 ? result : null;
     })(),
     lastRefresh: dataCache.lastRefresh,

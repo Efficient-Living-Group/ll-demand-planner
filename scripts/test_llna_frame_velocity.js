@@ -4,7 +4,8 @@
 const assert = require('assert');
 const {
   llnaFrameComponentsForDemandSku,
-  addLlnaFrameVelocity
+  addLlnaFrameVelocity,
+  addLlnaFrameTrend
 } = require('../lib/little-lifely-demand');
 
 const bomMap = {
@@ -74,5 +75,45 @@ addLlnaFrameVelocity(
   () => 'LLNA-CFDS-F-MSM-SET'
 );
 assert.deepStrictEqual(canonicalVelocity, { 'LLNA-CB-F-FRM': 1.2 });
+
+const trend = {};
+addLlnaFrameTrend(trend, {
+  _7d: {
+    'LLNA-CB-TW-DGY': 8,
+    'LLNA-CFDS-F-MSM-SET': 11,
+    'LLNA-CB-TW-DGY-CV': 99
+  },
+  _30d: {
+    'LLNA-CB-TW-DGY': 31,
+    'LLNA-CFDS-F-MSM-SET': 42
+  },
+  _weeklyBreakdown: {
+    'LLNA-CB-TW-DGY': { '2026-W28': 6, '2026-W29': 8 },
+    'LLNA-CFDS-F-MSM-SET': { '2026-W28': 9, '2026-W29': 11 },
+    'LLNA-CB-TW-DGY-CV': { '2026-W28': 99 }
+  },
+  _firstSeen: {
+    'LLNA-CB-TW-DGY': '2026-02-10T00:00:00.000Z',
+    'LLNA-CFDS-F-MSM-SET': '2026-01-05T00:00:00.000Z'
+  }
+}, bomMap);
+assert.deepStrictEqual(trend, {
+  _7d: {
+    'LLNA-CB-TW-FRM': 8,
+    'LLNA-CB-F-FRM': 11
+  },
+  _30d: {
+    'LLNA-CB-TW-FRM': 31,
+    'LLNA-CB-F-FRM': 42
+  },
+  _weeklyBreakdown: {
+    'LLNA-CB-TW-FRM': { '2026-W28': 6, '2026-W29': 8 },
+    'LLNA-CB-F-FRM': { '2026-W28': 9, '2026-W29': 11 }
+  },
+  _firstSeen: {
+    'LLNA-CB-TW-FRM': '2026-02-10T00:00:00.000Z',
+    'LLNA-CB-F-FRM': '2026-01-05T00:00:00.000Z'
+  }
+});
 
 console.log('LLNA frame velocity tests passed');
