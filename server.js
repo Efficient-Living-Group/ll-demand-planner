@@ -2380,6 +2380,11 @@ function buildCKData(ckId) {
 
   // Velocity
   const velocity = {};
+  // Preserve direct sellable-SKU demand separately from BOM-expanded component
+  // demand. This signal is classification-only: it prevents stocked parent
+  // products with real sales from being labelled dead stock without changing
+  // component planning velocity, weeks cover, reorder logic, stock, or POs.
+  const sellableVelocity = {};
   const mergeVelocitySource = (source, country = '') => {
     const addMappedVelocity = (mappedSku, vel) => {
       const visible = visibleDemandSku(mappedSku);
@@ -2394,6 +2399,9 @@ function buildCKData(ckId) {
       const weeklyVelocity = exact30DayUnits !== undefined
         ? Number(exact30DayUnits || 0) / 30 * 7
         : Number(vel || 0);
+      if (cin7[sku] !== undefined) {
+        sellableVelocity[sku] = (sellableVelocity[sku] || 0) + weeklyVelocity;
+      }
       const exploded = explodeDemandSkuForCk(sku, ckId);
       const primaryMappings = exploded || [sku];
       if (exploded) {
@@ -3051,7 +3059,7 @@ function buildCKData(ckId) {
   const inactiveSet = new Set(relatedStores.flatMap(sourceStore => dataCache.shopifyInventory?.[sourceStore]?.['__inactive__'] || []));
   const keepInactiveForPanel = ckId === 'll-mattresses' || ckId === 'dd' || ckId === 'lifely-sofa' || ckId === 'airflow-pad' || ckId === 'llau' || ckId === 'llna' || ckId === 'llca';
   for (const sku of Object.keys(cin7)) {
-    if (!keepInactiveForPanel && inactiveSet.has(sku)) { delete cin7[sku]; delete velocity[sku]; delete shopify[sku]; }
+    if (!keepInactiveForPanel && inactiveSet.has(sku)) { delete cin7[sku]; delete velocity[sku]; delete sellableVelocity[sku]; delete shopify[sku]; }
   }
   for (const sku of Object.keys(velocity)) {
     if (!keepInactiveForPanel && inactiveSet.has(sku)) { delete velocity[sku]; }
@@ -3069,6 +3077,7 @@ function buildCKData(ckId) {
       delete openOrders[sku];
       delete incoming[sku];
       delete velocity[sku];
+      delete sellableVelocity[sku];
       delete costs[sku];
       delete cbmMap[sku];
     }
@@ -3085,6 +3094,7 @@ function buildCKData(ckId) {
     delete cin7Available[sku];
     delete shopify[sku];
     delete velocity[sku];
+    delete sellableVelocity[sku];
     delete costs[sku];
     delete cbmMap[sku];
   }
@@ -3340,6 +3350,7 @@ function buildCKData(ckId) {
     available: cin7Available,
     incoming,
     velocity,
+    sellableVelocity,
     pos,
     allPos,
     names,
@@ -3594,7 +3605,8 @@ function executivePanelSummary(id) {
     const velocitySurge = !newSku && v7 >= 3 && weeklyLift >= 2 && (reactivated || increasePct >= 35);
     const cost = Number(data.costs?.[sku] || 0);
     const excessUnits = velocity > 0 ? Math.max(0, soh - velocity * 25) : 0;
-    const deadUnits = !newSku && velocity <= 0 && openDemand <= 0 ? Math.max(soh, 0) : 0;
+    const sellableVelocity = Number(data.sellableVelocity?.[sku] || 0);
+    const deadUnits = !newSku && velocity <= 0 && sellableVelocity <= 0 && openDemand <= 0 ? Math.max(soh, 0) : 0;
     const severity = demandBackedStockout ? 4 : critical ? 3 : (stockout || low) ? 2 : (deadUnits > 0 || excessUnits > 0) ? 1 : 0;
     return {
       sku,

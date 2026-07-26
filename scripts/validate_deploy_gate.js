@@ -126,6 +126,9 @@ if (serverSource.includes('function pushLifelySofaModules')) {
 if (!packageSource.includes('scripts/test_all_tab_bom_reconciliation.js')) {
   blockers.push('Universal 20-tab BOM reconciliation must run before release');
 }
+if (!packageSource.includes('scripts/test_sellable_parent_deadstock.js')) {
+  blockers.push('Sellable-parent dead-stock regression must run before release');
+}
 const containerTrackingSource = fs.existsSync(CONTAINER_TRACKING_PATH)
   ? fs.readFileSync(CONTAINER_TRACKING_PATH, 'utf8')
   : '';
