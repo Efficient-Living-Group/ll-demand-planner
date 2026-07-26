@@ -42,6 +42,13 @@ SHOPIFY_STORES = {
     "littlelifely": ["little_lifely"],
 }
 SHOPIFY_SPACING_SECONDS = 0.55
+US_WEST_STATE_CODES = {"CA", "WA", "OR", "NV", "AZ", "UT", "ID", "MT", "WY", "CO", "NM", "AK", "HI"}
+US_NJ_STATE_CODES = {
+    "TX", "OK", "KS", "NE", "SD", "ND", "MN", "IA", "MO", "AR", "LA",
+    "WI", "IL", "MI", "IN", "OH", "KY", "TN", "MS", "AL",
+    "ME", "NH", "VT", "MA", "RI", "CT", "NY", "NJ", "PA", "DE", "MD",
+    "DC", "VA", "WV", "NC", "SC", "GA", "FL",
+}
 
 
 class RateLimited(RuntimeError):
@@ -206,6 +213,19 @@ def country_code(order: dict[str, Any]) -> str | None:
     return raw.upper() if len(raw) == 2 else raw
 
 
+def us_demand_branch(order: dict[str, Any]) -> str | None:
+    addr = order.get("shipping_address") or {}
+    country = str(addr.get("country_code") or addr.get("country") or "").upper().strip()
+    if country not in {"US", "UNITED STATES", "UNITED STATES OF AMERICA"}:
+        return None
+    state = str(addr.get("province_code") or addr.get("province") or "").upper().strip()
+    if state in US_WEST_STATE_CODES:
+        return "60701"
+    if state in US_NJ_STATE_CODES:
+        return "63764"
+    return ""
+
+
 def canonical_demand_sku(sku: Any, country: str | None = "") -> str:
     s = str(sku or "").upper().strip()
     c = str(country or "").upper().strip()
@@ -241,6 +261,27 @@ def ensure_country_bucket(by_country: dict[str, Any], country: str) -> dict[str,
     return by_country[country]
 
 
+def add_to_velocity_bucket(
+    bucket: dict[str, Any] | None,
+    sku: str,
+    qty: float,
+    dt: datetime,
+    wk: str,
+    now_7d: datetime,
+    now_30d: datetime,
+) -> None:
+    if bucket is None:
+        return
+    bucket["skuUnits"][sku] = bucket["skuUnits"].get(sku, 0) + qty
+    if dt >= now_7d:
+        bucket["sku7d"][sku] = bucket["sku7d"].get(sku, 0) + qty
+    if dt >= now_30d:
+        bucket["sku30d"][sku] = bucket["sku30d"].get(sku, 0) + qty
+    if sku not in bucket["skuFirstSeen"] or dt < bucket["skuFirstSeen"][sku]:
+        bucket["skuFirstSeen"][sku] = dt
+    bucket["skuWeekly"].setdefault(sku, {})[wk] = bucket["skuWeekly"].setdefault(sku, {}).get(wk, 0) + qty
+
+
 def fetch_shopify_velocity(store_key: str, store: dict[str, str], api_version: str) -> dict[str, Any]:
     sku_units: dict[str, float] = {}
     sku_weekly: dict[str, dict[str, float]] = {}
@@ -248,6 +289,8 @@ def fetch_shopify_velocity(store_key: str, store: dict[str, str], api_version: s
     sku_30d: dict[str, float] = {}
     sku_first_seen: dict[str, datetime] = {}
     by_country: dict[str, Any] = {}
+    by_warehouse: dict[str, Any] = {}
+    unmapped_us_units = 0.0
     now = datetime.now(timezone.utc)
     now_7d = now - timedelta(days=7)
     now_30d = now - timedelta(days=30)
@@ -277,6 +320,8 @@ def fetch_shopify_velocity(store_key: str, store: dict[str, str], api_version: s
             wk = week_key(dt)
             c = country_code(order)
             bucket = ensure_country_bucket(by_country, c) if c else None
+            branch_id = us_demand_branch(order)
+            warehouse_bucket = ensure_country_bucket(by_warehouse, branch_id) if branch_id else None
             for line in order.get("line_items") or []:
                 sku = canonical_demand_sku(line.get("sku"), c)
                 if not sku:
@@ -291,15 +336,10 @@ def fetch_shopify_velocity(store_key: str, store: dict[str, str], api_version: s
                     sku_first_seen[sku] = dt
                 sku_weekly.setdefault(sku, {})[wk] = sku_weekly.setdefault(sku, {}).get(wk, 0) + qty
 
-                if bucket is not None:
-                    bucket["skuUnits"][sku] = bucket["skuUnits"].get(sku, 0) + qty
-                    if dt >= now_7d:
-                        bucket["sku7d"][sku] = bucket["sku7d"].get(sku, 0) + qty
-                    if dt >= now_30d:
-                        bucket["sku30d"][sku] = bucket["sku30d"].get(sku, 0) + qty
-                    if sku not in bucket["skuFirstSeen"] or dt < bucket["skuFirstSeen"][sku]:
-                        bucket["skuFirstSeen"][sku] = dt
-                    bucket["skuWeekly"].setdefault(sku, {})[wk] = bucket["skuWeekly"].setdefault(sku, {}).get(wk, 0) + qty
+                add_to_velocity_bucket(bucket, sku, qty, dt, wk, now_7d, now_30d)
+                add_to_velocity_bucket(warehouse_bucket, sku, qty, dt, wk, now_7d, now_30d)
+                if c == "US" and branch_id == "":
+                    unmapped_us_units += qty
         next_path = next_path_from_link(headers.get("link"))
         if not next_path:
             break
@@ -315,15 +355,25 @@ def fetch_shopify_velocity(store_key: str, store: dict[str, str], api_version: s
     velocity["_30d"] = sku_30d
     velocity["_firstSeen"] = {sku: dt.isoformat().replace("+00:00", "Z") for sku, dt in sku_first_seen.items()}
     velocity["_byCountry"] = {}
-    for country, bucket in by_country.items():
-        country_velocity = {sku: round((units / weeks) * 10) / 10 for sku, units in bucket["sku30d"].items()}
+    def bucket_velocity(bucket: dict[str, Any]) -> dict[str, Any]:
+        result = {sku: round((units / weeks) * 10) / 10 for sku, units in bucket["sku30d"].items()}
         for sku in bucket["skuUnits"]:
-            country_velocity.setdefault(sku, 0)
-        country_velocity["_weeklyBreakdown"] = bucket["skuWeekly"]
-        country_velocity["_7d"] = bucket["sku7d"]
-        country_velocity["_30d"] = bucket["sku30d"]
-        country_velocity["_firstSeen"] = {sku: dt.isoformat().replace("+00:00", "Z") for sku, dt in bucket["skuFirstSeen"].items()}
-        velocity["_byCountry"][country] = country_velocity
+            result.setdefault(sku, 0)
+        result["_weeklyBreakdown"] = bucket["skuWeekly"]
+        result["_7d"] = bucket["sku7d"]
+        result["_30d"] = bucket["sku30d"]
+        result["_firstSeen"] = {sku: dt.isoformat().replace("+00:00", "Z") for sku, dt in bucket["skuFirstSeen"].items()}
+        return result
+    for country, country_bucket in by_country.items():
+        velocity["_byCountry"][country] = bucket_velocity(country_bucket)
+    velocity["_byWarehouse"] = {}
+    for branch_id in ("60701", "63764"):
+        branch_velocity = bucket_velocity(by_warehouse.get(branch_id) or {
+            "skuUnits": {}, "skuWeekly": {}, "sku7d": {}, "sku30d": {}, "skuFirstSeen": {},
+        })
+        branch_velocity["_reconciled"] = unmapped_us_units == 0
+        branch_velocity["_unmappedUsUnits"] = unmapped_us_units
+        velocity["_byWarehouse"][branch_id] = branch_velocity
     print(f"Shopify velocity {store_key}: {orders_seen} orders, {len([k for k in velocity if not k.startswith('_')])} SKUs")
     return velocity
 
@@ -408,16 +458,19 @@ def fetch_shopify_snapshot() -> dict[str, Any]:
         raise RuntimeError(f"Missing Shopify credentials for planner stores: {', '.join(missing)}")
     velocity: dict[str, Any] = {}
     velocity_by_country: dict[str, Any] = {}
+    velocity_by_warehouse: dict[str, Any] = {}
     inventory: dict[str, Any] = {}
     open_demand: dict[str, Any] = {}
     for store_key, store in stores.items():
         velocity[store_key] = fetch_shopify_velocity(store_key, store, api_version)
         velocity_by_country[store_key] = velocity[store_key].get("_byCountry") or {}
+        velocity_by_warehouse[store_key] = velocity[store_key].get("_byWarehouse") or {}
         inventory[store_key] = fetch_shopify_inventory(store_key, store, api_version)
         open_demand[store_key] = fetch_shopify_open_demand(store_key, store, api_version)
     return {
         "shopifyVelocity": velocity,
         "shopifyVelocityByCountry": velocity_by_country,
+        "shopifyVelocityByWarehouse": velocity_by_warehouse,
         "shopifyInventory": inventory,
         "shopifyOpenDemand": open_demand,
     }
@@ -620,6 +673,7 @@ def write_cache(
         "cin7POs": pos,
         "shopifyVelocity": shopify_payload.get("shopifyVelocity", existing.get("shopifyVelocity", {})),
         "shopifyVelocityByCountry": shopify_payload.get("shopifyVelocityByCountry", existing.get("shopifyVelocityByCountry", {})),
+        "shopifyVelocityByWarehouse": shopify_payload.get("shopifyVelocityByWarehouse", existing.get("shopifyVelocityByWarehouse", {})),
         "shopifyInventory": shopify_payload.get("shopifyInventory", existing.get("shopifyInventory", {})),
         "shopifyOpenDemand": shopify_payload.get("shopifyOpenDemand", existing.get("shopifyOpenDemand", {})),
         "lastShopifyRefresh": ts if shopify_updated else existing.get("lastShopifyRefresh"),
