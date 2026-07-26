@@ -30,6 +30,7 @@ const {
   buildContainerJourney
 } = require('./lib/container-tracking');
 const { exec } = require('child_process');
+const { validateCin7RefreshCandidate } = require('./lib/cin7-refresh-integrity');
 const WebSocket = require('ws');
 
 const app = express();
@@ -1876,10 +1877,14 @@ async function refreshAllData(forceCin7 = false, pushReason = null) {
       let fetchedCin7Count = 0;
       let fetchedBomCount = 0;
       let fetchedPoCount = 0;
+      let cin7RefreshError = null;
       const cin7SkipReason = getCin7SkipReason(forceCin7);
 
       if (cin7SkipReason) {
         console.log(`Skipping CIN7 refresh, ${cin7SkipReason}. Reusing cached CIN7 data.`);
+        if (forceCin7) {
+          cin7RefreshError = `Cin7 refresh unavailable; preserved last complete snapshot. ${cin7SkipReason}`;
+        }
       } else {
         const cin7Data = await fetchCin7AllProducts();
         cin7Products = cin7Data.products || {};
@@ -1889,6 +1894,21 @@ async function refreshAllData(forceCin7 = false, pushReason = null) {
         fetchedCin7Count = Object.keys(cin7Products).length;
         fetchedBomCount = Object.keys(cin7BOMs).length;
         fetchedPoCount = cin7POs.length;
+        const validation = validateCin7RefreshCandidate({
+          products: dataCache.cin7Products,
+          stockByBranch: dataCache.cin7StockByBranch,
+          boms: dataCache.cin7BOMs,
+          purchaseOrders: dataCache.cin7POs
+        }, {
+          products: cin7Products,
+          stockByBranch: cin7StockByBranch,
+          boms: cin7BOMs,
+          purchaseOrders: cin7POs
+        });
+        if (!validation.ok) {
+          cin7RefreshError = `Incomplete Cin7 refresh rejected; preserved last complete snapshot. ${validation.errors.join('; ')}`;
+          console.error(cin7RefreshError);
+        }
       }
 
       const nextCache = {
@@ -1902,28 +1922,21 @@ async function refreshAllData(forceCin7 = false, pushReason = null) {
       let cin7Updated = false;
       let shopifyUpdated = false;
 
-      if (fetchedCin7Count > 0) {
+      if (!cin7SkipReason && !cin7RefreshError) {
         nextCache.cin7Products = cin7Products;
         nextCache.cin7StockByBranch = cin7StockByBranch;
-        if (fetchedBomCount > 0) nextCache.cin7BOMs = cin7BOMs;
+        nextCache.cin7BOMs = cin7BOMs;
+        nextCache.cin7POs = cin7POs;
         nextCache.lastCin7Refresh = nowIso;
+        nextCache.lastPoRefresh = nowIso;
         cin7BackoffUntil = 0;
         if (cin7RecoveryTimer) {
           clearTimeout(cin7RecoveryTimer);
           cin7RecoveryTimer = null;
         }
         cin7Updated = true;
-      } else if (Object.keys(dataCache.cin7Products).length > 0) {
-        console.warn(`CIN7 products returned empty - preserving existing cache (${Object.keys(dataCache.cin7Products).length} SKUs)`);
-      }
-
-      if (fetchedPoCount > 0) {
-        nextCache.cin7POs = cin7POs;
-        nextCache.lastCin7Refresh = nowIso;
-        nextCache.lastPoRefresh = nowIso;
-        cin7Updated = true;
-      } else if (dataCache.cin7POs.length > 0) {
-        console.warn(`CIN7 POs returned empty - preserving existing cache (${dataCache.cin7POs.length} POs)`);
+      } else if (cin7RefreshError) {
+        console.warn(`Preserving existing complete Cin7 cache (${Object.keys(dataCache.cin7Products).length} SKUs, ${Object.keys(dataCache.cin7StockByBranch || {}).length} branch-stock SKUs, ${(dataCache.cin7POs || []).length} POs)`);
       }
 
       const shopifyResults = [
@@ -1950,7 +1963,7 @@ async function refreshAllData(forceCin7 = false, pushReason = null) {
 
       let cacheSaveResult = { ok: true, wrote: false, pushed: false, skipped: 'no-source-updates' };
       if (cin7Updated || shopifyUpdated) {
-        nextCache.error = Object.keys(nextCache.cin7Products || {}).length > 0 ? null : 'CIN7 data unavailable (likely rate limited)';
+        nextCache.error = cin7RefreshError || (Object.keys(nextCache.cin7Products || {}).length > 0 ? null : 'CIN7 data unavailable (likely rate limited)');
         dataCache = nextCache;
         const effectivePushReason = pushReason || (cin7Updated ? 'daily-cin7-refresh' : 'shopify-refresh');
         cacheSaveResult = await saveCacheSnapshot(true, effectivePushReason, { forceGitPush: effectivePushReason === 'manual-live-cin7-refresh' });
@@ -1963,7 +1976,7 @@ async function refreshAllData(forceCin7 = false, pushReason = null) {
       const livePoCount = dataCache.cin7POs.length;
       const liveBomCount = Object.keys(dataCache.cin7BOMs || {}).length;
       console.log(`Data refresh complete in ${elapsed}s. Fetched CIN7: ${fetchedCin7Count} SKUs, ${fetchedBomCount} BOMs, ${fetchedPoCount} POs. Live cache: ${liveCin7Count} SKUs, ${liveBomCount} BOMs, ${livePoCount} POs. Cache wrote=${cacheSaveResult.wrote} pushed=${cacheSaveResult.pushed} skipped=${cacheSaveResult.skipped || 'none'}.`);
-      return { ok: true, cin7Updated, shopifyUpdated, cacheSaveResult, fetchedCin7Count, fetchedPoCount, lastRefresh: dataCache.lastRefresh };
+      return { ok: !cin7RefreshError, error: cin7RefreshError, cin7Updated, shopifyUpdated, cacheSaveResult, fetchedCin7Count, fetchedPoCount, lastRefresh: dataCache.lastRefresh };
     } catch (e) {
       console.error('Data refresh failed:', e.message);
       dataCache.error = e.message;
@@ -4118,6 +4131,7 @@ app.post('/api/refresh', requireAuth, async (req, res) => {
     cachePushed: !!refreshResult?.cacheSaveResult?.pushed,
     cachePushSkipped: refreshResult?.cacheSaveResult?.skipped || null,
     cacheError: refreshResult?.cacheSaveResult?.error || null,
+    error: refreshResult?.error || null,
     lastRefresh: dataCache.lastRefresh,
     lastCin7Refresh: dataCache.lastCin7Refresh,
     lastPoRefresh: dataCache.lastPoRefresh,

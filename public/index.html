@@ -241,7 +241,7 @@ th[data-tip]{position:relative;cursor:help}th[data-tip]:after{content:' ⓘ';fon
     <div><h1 id="headerTitle"><span>Select a Category Killer</span></h1><div class="subtitle" id="headerSub">Loading data...</div></div>
   </div>
     <div style="text-align:right;flex-shrink:0"><div style="font-size:11px;color:#A8C5C8" id="headerMeta"></div>
-    <button onclick="exportCurrentViewExcel()" class="btn btn-ghost" style="padding:2px 10px;font-size:11px;margin-top:4px;color:#A8C5C8;border-color:#A8C5C8" id="exportExcelBtn">📥 Export Excel</button> <button onclick="manualRefresh()" class="btn btn-ghost" style="padding:2px 10px;font-size:11px;margin-top:4px;color:#A8C5C8;border-color:#A8C5C8" id="refreshBtn">🔄 Refresh</button></div>
+    <button onclick="exportCurrentViewExcel()" class="btn btn-ghost" style="padding:2px 10px;font-size:11px;margin-top:4px;color:#A8C5C8;border-color:#A8C5C8" id="exportExcelBtn">📥 Export Excel</button> <button onclick="manualRefresh()" class="btn btn-ghost" style="padding:2px 10px;font-size:11px;margin-top:4px;color:#A8C5C8;border-color:#A8C5C8" id="refreshBtn">🔄 Refresh</button><div id="refreshStatus" style="font-size:10px;margin-top:4px;color:#A8C5C8;min-height:13px"></div></div>
   </div>
   <div class="tabs" id="categoryTabs" style="display:none">
     <div class="tab active" data-view="dashboard">📊 Dashboard</div>
@@ -990,7 +990,7 @@ function renderFreshnessWarning(){
   const stale=checks.map(([label,ts])=>({label,ts,hours:refreshAgeHours(ts)})).filter(x=>x.hours==null||x.hours>6);
   if(!stale.length){el.style.display='none';el.innerHTML='';return;}
   el.style.display='block';
-  el.innerHTML='<b>Freshness warning:</b> '+stale.map(x=>x.label+' updated '+ageText(x.hours)).join(' · ')+' . Demand Planner refreshes every 4 hours; treat stale figures carefully until the next refresh completes.';
+  el.innerHTML='<b>Freshness warning:</b> '+stale.map(x=>x.label+' updated '+ageText(x.hours)).join(' · ')+' . Scheduled refreshes run at 02:30, 08:30, 14:30 and 20:30 UTC; treat stale figures carefully until the next refresh completes.';
 }
 
 function renderSeparateComponentPanel(){
@@ -1504,7 +1504,21 @@ async function sendChat(){const i=document.getElementById('chatInput'),m=i.value
 ms.innerHTML+=`<div class="chat-msg user">${escapeHtml(m)}</div><div class="chat-msg bot" id="typing"><span style="opacity:0.6">Thinking...</span></div>`;ms.scrollTop=ms.scrollHeight;chatHistory.push({role:'user',text:m});
 try{const r=await fetch('/api/chat',{method:'POST',headers:H(),body:JSON.stringify({message:m,history:chatHistory.slice(-10),ckId:currentCK})});const d=await r.json();document.getElementById('typing')?.remove();
 ms.innerHTML+=`<div class="chat-msg bot">${d.reply||'Error'}</div>`;chatHistory.push({role:'assistant',text:d.reply})}catch(e){document.getElementById('typing')?.remove();ms.innerHTML+=`<div class="chat-msg bot">Connection error.</div>`}ms.scrollTop=ms.scrollHeight}
-async function manualRefresh(){document.getElementById('refreshBtn').textContent='⏳...';try{await fetch('/api/refresh',{method:'POST',headers:H()});EXECUTIVE_DATA=null;executiveLoaded=false;if(currentMode==='po'){await loadAllPOs(true)}else if(currentMode==='executive'){await showExecutiveSummary(true)}else if(currentCK){await selectCK(currentCK)}loadSidebar()}catch(e){}document.getElementById('refreshBtn').textContent='🔄 Refresh'}
+async function manualRefresh(){
+  const button=document.getElementById('refreshBtn'),status=document.getElementById('refreshStatus');
+  button.disabled=true;button.textContent='⏳ Refreshing…';status.textContent='Fetching Cin7 and Shopify safely…';status.style.color='#A8C5C8';
+  try{
+    const response=await fetch(apiUrl('/api/refresh'),{method:'POST',headers:H(),cache:'no-store'});
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok||result.ok===false)throw new Error(result.error||result.cacheError||('Refresh failed (HTTP '+response.status+')'));
+    status.textContent='Updated successfully';status.style.color='#9FD356';
+    window.setTimeout(()=>window.location.reload(),500);
+  }catch(error){
+    status.textContent=error.message||'Refresh failed; previous complete data was preserved';
+    status.style.color='#FF9AAF';
+    button.disabled=false;button.textContent='🔄 Retry';
+  }
+}
 // Forecast Accuracy (WMAPE)
 async function showAllPOs() {
   closeMobileMenu();currentMode='po';
