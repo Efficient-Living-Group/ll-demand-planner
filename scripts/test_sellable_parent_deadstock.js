@@ -14,7 +14,7 @@ assert(
   'Direct sellable-SKU velocity must be kept separately from BOM-expanded planning velocity'
 );
 assert(
-  serverSource.includes('sellableVelocity[sku] = (sellableVelocity[sku] || 0) + weeklyVelocity;'),
+  serverSource.includes('targetSellableVelocity[sku] = (targetSellableVelocity[sku] || 0) + weeklyVelocity;'),
   'Direct Shopify demand must be preserved before BOM expansion'
 );
 assert(
@@ -26,8 +26,8 @@ assert(
   'Dead-stock classification must recognise either planning demand or direct sellable-SKU demand'
 );
 assert(
-  frontendSource.includes('else if(soh>0 && vel===0 && getSellableVel(s)===0)'),
-  'Dead-stock value must exclude stocked sellable parents with direct sales'
+  frontendSource.includes('getDeadstockVel(sku)===0'),
+  'Row dead-stock status must exclude stocked sellable parents with direct sales'
 );
 assert(
   serverSource.includes('velocity <= 0 && sellableVelocity <= 0 && openDemand <= 0'),

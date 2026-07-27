@@ -397,7 +397,7 @@ async function fetchJsonNoCache(path, attempts=2){
   }
   throw lastErr||new Error('Load failed');
 }
-let DATA={cin7:{},shopify:{},openOrders:{},available:{},incoming:{},velocity:{},sellableVelocity:{},exactSellableVelocity:{},exactSellableWeeklyData:{},pos:[],allPos:[],names:{},sizes:{},cbmMap:{},suppliers:{},landedCosts:{},productTypes:{},mattressRegions:null,warehouseOptions:null,warehouseViews:null,_base:null},currentCK=null,charts={},dashFilter={size:'All',region:'All',warehouse:'All',productType:'All',color:'All'},heatmapSortMode='sku';
+let DATA={cin7:{},shopify:{},openOrders:{},available:{},incoming:{},velocity:{},sellableVelocity:{},exactSellableVelocity:{},exactSellableWeeklyData:{},pos:[],allPos:[],names:{},sizes:{},cbmMap:{},suppliers:{},landedCosts:{},productTypes:{},mattressRegions:null,warehouseOptions:null,warehouseViews:null,warehouseMetrics:null,_base:null},currentCK=null,charts={},dashFilter={size:'All',region:'All',warehouse:'All',productType:'All',color:'All'},heatmapSortMode='sku';
 let EXECUTIVE_DATA=null,currentMode='executive',executiveLoaded=false,_execPanelFilter='all',_execVelocityFilter='all';
 const LOGO_VERSION='20260521b';
 function logoSrc(logo){return '/logos/'+encodeURIComponent(logo||'')+'?v='+LOGO_VERSION}
@@ -454,10 +454,11 @@ function getSkus(){return[...new Set([...Object.keys(DATA.cin7),...Object.keys(D
 function updateHeaderSub(){const el=document.getElementById('headerSub');if(el)el.textContent=`${Object.keys(DATA.cin7).length} CIN7 SKUs · ${Object.keys(DATA.velocity).filter(k=>!k.startsWith('_')).length} with velocity · ${uniquePoCount(DATA.pos)} open POs`;}
 function applyMattressRegion(){if(currentCK!=='ll-mattresses'||!DATA.mattressRegions)return;const base=DATA._base||{};const region=dashFilter.region||'All';const src=region==='All'?base:DATA.mattressRegions[region];if(!src)return;DATA.cin7=src.cin7||{};DATA.shopify=src.shopify||{};DATA.openOrders=src.openOrders||{};DATA.available=src.available||{};DATA.incoming=src.incoming||{};DATA.velocity=src.velocity||{};DATA.trendData=src.trendData||{};DATA.weeklyData=src.weeklyData||null;DATA.pos=src.pos||[];DATA.allPos=src.allPos||src.pos||[];updateHeaderSub();}
 function setMattressRegion(region){dashFilter.region=region;dashFilter.size='All';applyMattressRegion();renderDashboard()}
-function applyWarehouseFilter(){if(!DATA.warehouseViews||!DATA._base)return;const warehouse=dashFilter.warehouse||'All';const src=warehouse==='All'?DATA._base:DATA.warehouseViews[warehouse];if(!src)return;DATA.cin7=src.cin7||{};DATA.shopify=src.shopify||{};DATA.openOrders=src.openOrders||{};DATA.available=src.available||{};DATA.incoming=src.incoming||{};if(src.velocity)DATA.velocity=src.velocity||{};else DATA.velocity=DATA._base.velocity||{};if(src.pos)DATA.pos=src.pos||[];else DATA.pos=DATA._base.pos||[];if(src.allPos)DATA.allPos=src.allPos||src.pos||[];else DATA.allPos=DATA._base.allPos||DATA.pos||[];if(DATA._base.coverageAux){DATA.coverageAux={...DATA._base.coverageAux,openDemandBySku:src.coverageOpenDemandBySku||DATA._base.coverageAux.openDemandBySku,stockBySku:src.coverageStockBySku||DATA._base.coverageAux.stockBySku};}updateHeaderSub();}
+function applyWarehouseFilter(){if(!DATA.warehouseViews||!DATA._base)return;const warehouse=dashFilter.warehouse||'All';const src=warehouse==='All'?DATA._base:DATA.warehouseViews[warehouse];if(!src)return;const isAll=warehouse==='All';DATA.cin7=src.cin7||{};DATA.shopify=src.shopify||{};DATA.openOrders=src.openOrders||{};DATA.available=src.available||{};DATA.incoming=src.incoming||{};DATA.warehouseMetrics=isAll?null:(src.warehouseMetrics||{demandReconciled:false,reason:'Exact branch-specific fulfilled-sales velocity is unavailable.'});DATA.velocity=isAll?(src.velocity||{}):(Object.prototype.hasOwnProperty.call(src,'velocity')?(src.velocity||{}):{});DATA.sellableVelocity=src.sellableVelocity||{};DATA.exactSellableVelocity=src.exactSellableVelocity||{};DATA.exactSellableWeeklyData=src.exactSellableWeeklyData||{};DATA.trendData=isAll?(src.trendData||{}):(src.trendData||{});DATA.weeklyData=isAll?(src.weeklyData||null):(src.weeklyData||null);DATA.pos=Object.prototype.hasOwnProperty.call(src,'pos')?(src.pos||[]):[];DATA.allPos=Object.prototype.hasOwnProperty.call(src,'allPos')?(src.allPos||[]):(DATA.pos||[]);if(DATA._base.coverageAux){DATA.coverageAux={...DATA._base.coverageAux,openDemandBySku:src.coverageOpenDemandBySku||{},stockBySku:src.coverageStockBySku||{},poRows:Object.prototype.hasOwnProperty.call(src,'coveragePoRows')?(src.coveragePoRows||{}):{}};}updateHeaderSub();}
 function setWarehouseFilter(warehouse){dashFilter.warehouse=warehouse;dashFilter.size='All';applyWarehouseFilter();renderDashboard()}
 function getGenericOpenDemand(s){return DATA.coverageAux?.mode==='generic'?Number((DATA.coverageAux.openDemandBySku||{})[s]||0):null}
-function getPreorderUnits(s){const availableDeficit=(DATA.available&&Object.prototype.hasOwnProperty.call(DATA.available,s))?Math.max(-Number(DATA.available[s]||0),0):0;const visiblePreorderDeficit=Math.max(-Number(DATA.shopify?.[s]||0),0);if(DATA.available&&Object.prototype.hasOwnProperty.call(DATA.available,s))return Math.max(availableDeficit,visiblePreorderDeficit);return Math.max(visiblePreorderDeficit,getOpenSales(s)-Number(DATA.cin7[s]||0),0)}
+function getNetComponentDeficit(s){return Math.max(-Number(DATA.shopify?.[s]||0),0)}
+function getPreorderUnits(s){const visiblePreorderDeficit=getNetComponentDeficit(s);if(isLittleLifelyCountryPanel())return visiblePreorderDeficit;const availableDeficit=(DATA.available&&Object.prototype.hasOwnProperty.call(DATA.available,s))?Math.max(-Number(DATA.available[s]||0),0):0;if(DATA.available&&Object.prototype.hasOwnProperty.call(DATA.available,s))return Math.max(availableDeficit,visiblePreorderDeficit);return Math.max(visiblePreorderDeficit,getOpenSales(s)-Number(DATA.cin7[s]||0),0)}
 function getNet(s){if(DATA.available&&Object.prototype.hasOwnProperty.call(DATA.available,s))return Number(DATA.available[s]||0);const directOpen=DATA.openOrders&&Object.prototype.hasOwnProperty.call(DATA.openOrders,s)?Number(DATA.openOrders[s]||0):null;const genericOpen=getGenericOpenDemand(s);if(directOpen!==null)return (DATA.cin7[s]||0)-directOpen;return genericOpen!==null?(DATA.cin7[s]||0)-genericOpen:(DATA.cin7[s]||0)+Math.min(DATA.shopify[s]||0,0)}
 function getIncoming(s){if(DATA.incoming&&Object.prototype.hasOwnProperty.call(DATA.incoming,s))return Number(DATA.incoming[s]||0);return(DATA.pos||[]).reduce((t,po)=>((po.analyticsItems||po.items)?.[s]||0)+t,0)}
 window._incomingDateColumnsExpanded=false;
@@ -655,6 +656,7 @@ function isEstVel(s){return!hasExactSellableVel(s)&&(DATA.velocity[s]||0)===0&&(
 function getExactVel(s){const v=Number(DATA.velocity[s]||0);return Number.isFinite(v)?v:0}
 function getSellableVel(s){const v=Number(DATA.sellableVelocity?.[s]||0);return Number.isFinite(v)?v:0}
 function getDeadstockVel(s){return Math.max(getExactVel(s),getSellableVel(s))}
+function hasReconciledWarehouseDemand(){return DATA.warehouseMetrics?.demandReconciled!==false}
 function getAirflowPadVariant(s){const sku=String(s||'').toUpperCase();if(/^PAD-[^-]+-LL/.test(sku))return'Little Lifely';if(/^PAD-[^-]+-CC/.test(sku))return'Cocoon';if(/^PAD-[^-]+-V3/.test(sku))return'Snuggle';if(/^PAD-[^-]+-V2/.test(sku))return'Cushie V2';return'Other'}
 function getSize(s){if(currentCK==='airflow-pad')return getAirflowPadVariant(s);for(const[k,l]of Object.entries(DATA.sizes||{})){if(s.includes(k))return l}return'Other'}
 function getSizeKeys(){if(currentCK==='airflow-pad')return[];const s=new Set(getSkus().map(x=>getSize(x)));return['All',...s]}
@@ -984,8 +986,8 @@ async function selectCK(ckId){
   const activeItem=document.querySelector(`.sidebar-item[data-ck="${ckId}"]`);const groupEl=activeItem?.closest('.sidebar-brand-group');if(groupEl){groupEl.classList.remove('collapsed');brandOpenState[groupEl.dataset.brandGroup]=true;const caret=groupEl.querySelector('.sidebar-brand-caret');if(caret)caret.textContent='▾';}const subgroupEl=activeItem?.closest('.sidebar-subgroup');if(subgroupEl){subgroupEl.classList.remove('collapsed');subgroupOpenState[subgroupEl.dataset.subgroup]=true;const subCaret=subgroupEl.querySelector('.sidebar-subgroup-caret');if(subCaret)subCaret.textContent='▾';}
   document.getElementById('loadingScreen').style.display='block';document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
   try{const d=await fetchJsonNoCache(`/api/ck/${ckId}`);if(!d)return;
-  DATA={cin7:d.cin7||{},shopify:d.shopify||{},openOrders:d.openOrders||{},available:d.available||{},incoming:d.incoming||{},velocity:d.velocity||{},sellableVelocity:d.sellableVelocity||{},exactSellableVelocity:d.exactSellableVelocity||{},exactSellableWeeklyData:d.exactSellableWeeklyData||{},pos:d.pos||[],allPos:d.allPos||d.pos||[],names:d.names||{},sizes:d.sizes||{},bomData:d.bomData||null,reorderBomData:d.reorderBomData||null,costs:d.costs||{},trendData:d.trendData||{},weeklyData:d.weeklyData||null,cbmMap:d.cbmMap||{},suppliers:d.suppliers||{},landedCosts:d.landedCosts||{},productTypes:d.productTypes||{},coverageAux:d.coverageAux||null,warehouseOptions:d.warehouseOptions||null,warehouseViews:d.warehouseViews||null,mattressRegions:d.mattressRegions||null,fx:d.fx||null,lastRefresh:d.lastRefresh||null,lastCin7Refresh:d.lastCin7Refresh||null,lastPoRefresh:d.lastPoRefresh||null,lastShopifyRefresh:d.lastShopifyRefresh||null};
-  DATA._base={cin7:DATA.cin7,shopify:DATA.shopify,openOrders:DATA.openOrders,available:DATA.available,incoming:DATA.incoming,velocity:DATA.velocity,sellableVelocity:DATA.sellableVelocity,trendData:DATA.trendData,weeklyData:DATA.weeklyData,pos:DATA.pos,allPos:DATA.allPos,coverageAux:DATA.coverageAux};
+  DATA={cin7:d.cin7||{},shopify:d.shopify||{},openOrders:d.openOrders||{},available:d.available||{},incoming:d.incoming||{},velocity:d.velocity||{},sellableVelocity:d.sellableVelocity||{},exactSellableVelocity:d.exactSellableVelocity||{},exactSellableWeeklyData:d.exactSellableWeeklyData||{},pos:d.pos||[],allPos:d.allPos||d.pos||[],names:d.names||{},sizes:d.sizes||{},bomData:d.bomData||null,reorderBomData:d.reorderBomData||null,costs:d.costs||{},trendData:d.trendData||{},weeklyData:d.weeklyData||null,cbmMap:d.cbmMap||{},suppliers:d.suppliers||{},landedCosts:d.landedCosts||{},productTypes:d.productTypes||{},coverageAux:d.coverageAux||null,warehouseOptions:d.warehouseOptions||null,warehouseViews:d.warehouseViews||null,warehouseMetrics:null,mattressRegions:d.mattressRegions||null,fx:d.fx||null,lastRefresh:d.lastRefresh||null,lastCin7Refresh:d.lastCin7Refresh||null,lastPoRefresh:d.lastPoRefresh||null,lastShopifyRefresh:d.lastShopifyRefresh||null};
+  DATA._base={cin7:DATA.cin7,shopify:DATA.shopify,openOrders:DATA.openOrders,available:DATA.available,incoming:DATA.incoming,velocity:DATA.velocity,sellableVelocity:DATA.sellableVelocity,exactSellableVelocity:DATA.exactSellableVelocity,exactSellableWeeklyData:DATA.exactSellableWeeklyData,trendData:DATA.trendData,weeklyData:DATA.weeklyData,pos:DATA.pos,allPos:DATA.allPos,coverageAux:DATA.coverageAux,warehouseMetrics:null};
   document.getElementById('headerTitle').innerHTML=`${headerVisual(d.ck)} ${d.ck.name}`;
   Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}});charts={};dashFilter.size='All';dashFilter.region='All';dashFilter.warehouse='All';dashFilter.productType='All';dashFilter.color='All';dashFilter.reorderType='All';applyMattressRegion();applyWarehouseFilter();updateHeaderSub();
   document.getElementById('headerMeta').textContent=d.lastRefresh?'Last refresh: '+new Date(d.lastRefresh).toLocaleString():'';renderFreshnessWarning();
@@ -1183,43 +1185,22 @@ function renderDashboard(){
   let filtered=allSkus.filter(s=>(dashFilter.size==='All'||getSize(s)===dashFilter.size)&&matchesDashboardProductType(s)&&matchesDashboardColor(s));
   if(['llau','llnz','lluk'].includes(currentCK)) filtered=filtered.filter(s=>!(DATA.coverageAux?.mattressSkus||[]).includes(s));
   filtered=filtered.sort((a,b)=>{if(isLifelySofaPanel()){const ca=getLifelySofaColor(a),cb=getLifelySofaColor(b);const cr=lifelySofaColorRank(ca)-lifelySofaColorRank(cb)||ca.localeCompare(cb);if(cr)return cr;}return a.localeCompare(b);});
+  const demandReconciled=hasReconciledWarehouseDemand();
   const hasDashboardFilter=dashFilter.size!=='All'||(dashFilter.productType&&dashFilter.productType!=='All')||(dashFilter.warehouse&&dashFilter.warehouse!=='All')||(isLifelySofaPanel()&&dashFilter.color&&dashFilter.color!=='All');
   let tSOH=0,tInc=0,tOver=0,tVel=0,tTurnVel=0,tNet=0;
   filtered.forEach(s=>{tSOH+=(DATA.cin7[s]||0);tInc+=getIncoming(s);tOver-=getOpenSales(s);tVel+=getVel(s);tTurnVel+=getStockTurnVel(s);tNet+=getNet(s)});
   let wksT=tVel>0?Math.round((tSOH+Math.min(tOver,0))/tVel):99;
   const avgStockTurnDays=calcStockTurnDays(tNet,tTurnVel);
-  const avgStockTurnSub=hasDashboardFilter?'90-day trailing · filters applied':'90-day trailing Shopify sales';
+  const avgStockTurnSub=demandReconciled?(hasDashboardFilter?'90-day trailing · filters applied':'90-day trailing Shopify sales'):'Branch demand unavailable';
   let preorderBreakdownCard='', openOrdersCard='';
   if(littleLifelyPanels.includes(currentCK)){
-    if(DATA.coverageAux?.componentMode==='frame-cover'){
-      const componentSkus=filtered;
-      const frameDemand=componentSkus.filter(s=>/-FRM$/.test(s)).reduce((sum,s)=>sum+getOpenSales(s),0);
-      const coverDemand=componentSkus.filter(s=>/-CV$/.test(s)).reduce((sum,s)=>sum+getOpenSales(s),0);
-      const totalComponentDemand=frameDemand+coverDemand;
-      preorderBreakdownCard=`<div class="card red" title="Little Lifely UK demand is shown on physical component SKUs only. Colour SET and combo order demand is funneled into one frame plus one cover."><div class="label">Component Demand</div><div class="value">${Math.round(totalComponentDemand).toLocaleString()}</div><div class="sub">Frames ${Math.round(frameDemand).toLocaleString()} · Covers ${Math.round(coverDemand).toLocaleString()}</div></div>`;
-    } else if(hasDashboardFilter){
-      const filteredPreorders=filtered.reduce((sum,s)=>sum+getOpenSales(s),0);
-      preorderBreakdownCard=`<div class="card red" title="Filtered preorder/backorder units from the currently visible table rows. Product/size filters are applied to this card."><div class="label">Filtered Preorders</div><div class="value">${Math.round(filteredPreorders).toLocaleString()}</div><div class="sub">Current filters applied</div></div>`;
-    } else {
-      let standaloneBeds=0,comboBeds=0,covers=0,swatchPacks=0,otherLittleLifely=0;
-      const openBySku=DATA.coverageAux?.openDemandBySku||{};
-      const bedPrefix=DATA.coverageAux?.bedPrefix||'';
-      const comboPrefixes=[DATA.coverageAux?.comboPrefix, ...(DATA.coverageAux?.comboPrefixes||[])].filter(Boolean);
-      const hasPrefix=(sku,prefixes)=>prefixes.some(prefix=>sku.startsWith(prefix));
-      Object.entries(openBySku).forEach(([sku,qty])=>{
-        const q=Number(qty||0); if(!q || !sku.startsWith('LL'))return;
-        if(hasPrefix(sku,comboPrefixes))comboBeds+=q;
-        else if(bedPrefix && sku.startsWith(bedPrefix) && sku.includes('-CS-PACK'))swatchPacks+=q;
-        else if(bedPrefix && sku.startsWith(bedPrefix) && sku.includes('-CV'))covers+=q;
-        else if(bedPrefix && sku.startsWith(bedPrefix) && !sku.includes('-CS-'))standaloneBeds+=q;
-        else if(!bedPrefix && /^LL[A-Z]+-CB-/.test(sku))standaloneBeds+=q;
-        else otherLittleLifely+=q;
-      });
-      const totalPreorders=standaloneBeds+comboBeds+covers+swatchPacks;
-      const coversText=covers?` · Covers ${Math.round(covers).toLocaleString()}`:'';
-      const otherText=otherLittleLifely?` · Excluded other-market ${Math.round(otherLittleLifely).toLocaleString()}`:'';
-      preorderBreakdownCard=`<div class="card red" title="Preorder/backorder units are calculated from Cin7 Stock Available by warehouse/market. Formula: max(-stockAvailable, 0). Only SKUs matching this market's bed/combo prefixes are counted."><div class="label">Preorder Breakdown</div><div class="value">${Math.round(totalPreorders).toLocaleString()}</div><div class="sub">Beds ${Math.round(standaloneBeds).toLocaleString()} · Combos ${Math.round(comboBeds).toLocaleString()}${coversText} · Swatches ${Math.round(swatchPacks).toLocaleString()}${otherText}</div></div>`;
-    }
+    const componentDeficit=filtered.reduce((sum,s)=>sum+getNetComponentDeficit(s),0);
+    const frameDeficit=filtered.filter(s=>getLittleLifelyComponentType(s)==='Frames').reduce((sum,s)=>sum+getNetComponentDeficit(s),0);
+    const coverDeficit=filtered.filter(s=>getLittleLifelyComponentType(s)==='Covers').reduce((sum,s)=>sum+getNetComponentDeficit(s),0);
+    const otherDeficit=Math.max(0,componentDeficit-frameDeficit-coverDeficit);
+    const otherText=otherDeficit?` · Other ${Math.round(otherDeficit).toLocaleString()}`:'';
+    const filterText=hasDashboardFilter?' · filters applied':'';
+    preorderBreakdownCard=`<div class="card ${componentDeficit>0?'red':'green'}" title="Net Component Deficit = for each exact Cin7 SKU in the selected warehouse, max(-Cin7 Available, 0), then expanded through exact BOM Master to physical component SKUs. All warehouses is the sum of branch component deficits; deficits are never netted between warehouses."><div class="label">Net Component Deficit</div><div class="value">${Math.round(componentDeficit).toLocaleString()}</div><div class="sub">Frames ${Math.round(frameDeficit).toLocaleString()} · Covers ${Math.round(coverDeficit).toLocaleString()}${otherText}${filterText}</div></div>`;
   } else {
     const rawOpenOrders=DATA.coverageAux?.mode==='generic'&&DATA.coverageAux.rawOpenDemandTotal!=null?Number(DATA.coverageAux.rawOpenDemandTotal):null;
     const openOrdersValue=rawOpenOrders!=null?rawOpenOrders:Math.abs(tOver);
@@ -1227,23 +1208,49 @@ function renderDashboard(){
     openOrdersCard=`<div class="card red" title="Preorder/backorder units are calculated from Cin7 Stock Available. Formula: max(-stockAvailable, 0). Raw Cin7 open orders may be higher when existing SOH can cover part of demand."><div class="label">Preorders</div><div class="value">${Math.round(openOrdersValue).toLocaleString()}</div><div class="sub">${openOrdersSub}</div></div>`;
   }
   let overstockVal=0,deadstockVal=0;
-  filtered.forEach(s=>{let vel=getExactVel(s),soh=DATA.cin7[s]||0,cost=(DATA.costs||{})[s]||0;
-    if(vel>0){
-      let excess=Math.max(0, Math.round(soh-(vel*25)));
-      if(excess>0) overstockVal+=excess*cost;
-    }
-    else if(soh>0 && vel===0 && getSellableVel(s)===0){
-      deadstockVal+=soh*cost;
-    }
-  });
+  const additiveWarehouseViews=(dashFilter.warehouse||'All')==='All'&&DATA.warehouseViews
+    ? Object.values(DATA.warehouseViews).filter(view=>view?.warehouseMetrics?.demandReconciled===true&&view.velocity)
+    : [];
+  const useAdditiveWarehouseValues=additiveWarehouseViews.length>0
+    &&additiveWarehouseViews.length===Object.keys(DATA.warehouseViews||{}).length;
+  const accumulateStockValue=(stockMap,velocityMap,sellableMap)=>{
+    filtered.forEach(s=>{let vel=Number(velocityMap?.[s]||0),sellableVel=Number(sellableMap?.[s]||0),soh=Number(stockMap?.[s]||0),cost=(DATA.costs||{})[s]||0;
+      if(vel>0){
+        let excess=Math.max(0,Math.round(soh-(vel*25)));
+        if(excess>0)overstockVal+=excess*cost;
+      }else if(soh>0&&sellableVel<=0)deadstockVal+=soh*cost;
+    });
+  };
+  if(useAdditiveWarehouseValues){
+    additiveWarehouseViews.forEach(view=>accumulateStockValue(view.cin7,view.velocity,view.sellableVelocity));
+  }else if(demandReconciled){
+    filtered.forEach(s=>{let vel=getExactVel(s),sellableVel=getSellableVel(s),soh=DATA.cin7[s]||0,cost=(DATA.costs||{})[s]||0;
+      if(vel>0){
+        let excess=Math.max(0, Math.round(soh-(vel*25)));
+        if(excess>0) overstockVal+=excess*cost;
+      }
+      else if(soh>0 && sellableVel<=0){
+        deadstockVal+=soh*cost;
+      }
+    });
+  }
+  const stockTurnCard=demandReconciled
+    ? `<div class="card blue" data-tip tabindex="0"><span class="tip" role="tooltip">${STOCK_TURN_AVG_TOOLTIP}</span><div class="label">Avg Stock Turn Days</div><div class="value">${fmtStockTurnDays(avgStockTurnDays)}</div><div class="sub">${avgStockTurnSub}</div></div>`
+    : `<div class="card blue" title="Branch-specific fulfilled-sales velocity is unavailable, so this metric is intentionally not calculated."><div class="label">Avg Stock Turn Days</div><div class="value">—</div><div class="sub">${avgStockTurnSub}</div></div>`;
+  const overstockCard=demandReconciled
+    ? `<div class="card ${overstockVal>0?'yellow':'green'}" title="Dollar value of stock above 25 weeks of cover at current velocity, excluding dead stock. Supplier price (FOB) only, not landed cost."><div class="label">Overstock Value</div><div class="value">$${overstockVal>=1000000?(overstockVal/1000000).toFixed(1)+'M':Math.round(overstockVal).toLocaleString()}</div><div class="sub">${useAdditiveWarehouseValues?'Sum of reconciled warehouses':'Excess above 25 weeks'}, FOB only</div></div>`
+    : `<div class="card blue" title="Branch-specific fulfilled-sales velocity is unavailable, so warehouse overstock is intentionally not inferred."><div class="label">Overstock Value</div><div class="value">—</div><div class="sub">Branch demand unavailable</div></div>`;
+  const deadstockCard=demandReconciled
+    ? `<div class="card ${deadstockVal>0?'red':'green'}" title="Dollar value of SKUs with physical stock but zero sales velocity. Supplier price (FOB) only, not landed cost."><div class="label">💀 Dead Stock Value</div><div class="value">$${deadstockVal>=1000000?(deadstockVal/1000000).toFixed(1)+'M':Math.round(deadstockVal).toLocaleString()}</div><div class="sub">Zero-velocity stock, FOB only</div></div>`
+    : `<div class="card blue" title="Branch-specific fulfilled-sales velocity is unavailable, so warehouse dead stock is intentionally not inferred."><div class="label">💀 Dead Stock Value</div><div class="value">—</div><div class="sub">Branch demand unavailable</div></div>`;
   document.getElementById('summary-cards').innerHTML=`
     <div class="card green" title="Total physical units in warehouse from CIN7. This is what you can actually ship today."><div class="label">CIN7 SOH</div><div class="value">${tSOH.toLocaleString()}</div><div class="sub">Physical stock</div></div>
     <div class="card blue" style="cursor:pointer;border:2px solid var(--blue);transition:all 0.15s" title="Units on the way from open Purchase Orders. Click for PO-level breakdown." onclick="toggleInboundDrilldown()" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(44,71,75,0.15)'" onmouseout="this.style.transform='';this.style.boxShadow=''"><div class="label" style="display:flex;align-items:center;gap:4px">Incoming <span style="font-size:9px;background:var(--blue);color:#fff;padding:1px 6px;border-radius:8px">▼ Details</span></div><div class="value">${tInc.toLocaleString()}</div><div class="sub">${uniquePoCount(DATA.pos)} open POs</div></div>
     ${openOrdersCard}
     ${preorderBreakdownCard}
-    <div class="card blue" data-tip tabindex="0"><span class="tip" role="tooltip">${STOCK_TURN_AVG_TOOLTIP}</span><div class="label">Avg Stock Turn Days</div><div class="value">${fmtStockTurnDays(avgStockTurnDays)}</div><div class="sub">${avgStockTurnSub}</div></div>
-    <div class="card ${overstockVal>0?'yellow':'green'}" title="Dollar value of stock above 25 weeks of cover at current velocity, excluding dead stock. Supplier price (FOB) only, not landed cost."><div class="label">Overstock Value</div><div class="value">$${overstockVal>=1000000?(overstockVal/1000000).toFixed(1)+'M':Math.round(overstockVal).toLocaleString()}</div><div class="sub">Excess above 25 weeks, FOB only</div></div>
-    <div class="card ${deadstockVal>0?'red':'green'}" title="Dollar value of SKUs with physical stock but zero sales velocity. Supplier price (FOB) only, not landed cost."><div class="label">💀 Dead Stock Value</div><div class="value">$${deadstockVal>=1000000?(deadstockVal/1000000).toFixed(1)+'M':Math.round(deadstockVal).toLocaleString()}</div><div class="sub">Zero-velocity stock, FOB only</div></div>`;
+    ${stockTurnCard}
+    ${overstockCard}
+    ${deadstockCard}`;
   const regionFilters=currentCK==='ll-mattresses'?['All','AU','NZ','UK'].map(r=>`<button class="filter-btn ${dashFilter.region===r?'active':''}" onclick="setMattressRegion('${r}')">${r}</button>`).join(''):'';
   const warehouseFilters=DATA.warehouseOptions?DATA.warehouseOptions.map(w=>`<button class="filter-btn ${(dashFilter.warehouse||'All')===String(w.id)?'active':''}" onclick="setWarehouseFilter('${String(w.id)}')">${w.name}</button>`).join(''):'';
   const productTypeOptions=isCushieTypeFilterPanel()?['All','Slipcover','V2','V3']:(littleLifelyPanels.includes(currentCK)?['All','Frames','Covers']:null);
@@ -1309,8 +1316,12 @@ function renderDashboard(){
   }
   const colorHeader=isLifelySofaPanel()?'<th>Color</th>':'';
   const sizeColumnHeader=currentCK==='airflow-pad'?'Variant':'Size';
+  const coverageDeficitLabel=isLittleLifelyCountryPanel()?'Net Component Deficit':'Preorders';
+  const coverageDeficitTip=isLittleLifelyCountryPanel()
+    ? `For this physical component in ${coverageMeta?.label||'the selected warehouse'}: exact SKU deficit max(-Cin7 Available, 0), expanded through exact BOM Master. Warehouse deficits are never netted against another warehouse.`
+    : `Units still waiting after using current ${coverageMeta?.label||''} stock.`;
   const coverageHeader=showCoverage
-    ? `<th data-tip>Preorders<span class="tip">Units still waiting after using current ${coverageMeta.label} stock. Little Lifely bundle rows include matching combo/component demand where configured.</span></th><th data-tip>Next PO<span class="tip">First ${coverageMeta.place} PO for this SKU by ETA, shown with incoming qty</span></th><th data-tip>Next ETA<span class="tip">ETA of the next ${coverageMeta.place} PO for this SKU</span></th><th data-tip>Coverage PO<span class="tip">PO that fully clears the preorder demand, corresponding to the Preorder Date</span></th><th data-tip>Preorder Date<span class="tip">ETA of the first PO that fully clears the preorder backlog using the limiting component</span></th><th data-tip>Coverage Status<span class="tip">In stock, Covered by next shipment, Covered by later shipment, No incoming PO, ETA missing, Not covered, or Dropship</span></th>`
+    ? `<th data-tip>${coverageDeficitLabel}<span class="tip">${coverageDeficitTip}</span></th><th data-tip>Next PO<span class="tip">First ${coverageMeta.place} PO for this SKU by ETA, shown with incoming qty</span></th><th data-tip>Next ETA<span class="tip">ETA of the next ${coverageMeta.place} PO for this SKU</span></th><th data-tip>Coverage PO<span class="tip">PO that fully clears the component deficit, corresponding to the Coverage Date</span></th><th data-tip>Coverage Date<span class="tip">ETA of the first PO that fully clears the component deficit using the limiting component</span></th><th data-tip>Coverage Status<span class="tip">In stock, Covered by next shipment, Covered by later shipment, No incoming PO, ETA missing, Not covered, or Dropship</span></th>`
     : '';
   const incomingDateBuckets=buildIncomingDateBreakdown();
   document.querySelector('#stockTable thead').innerHTML='<tr><th>SKU</th>'+colorHeader+'<th>'+sizeColumnHeader+'</th><th data-tip>CIN7 SOH<span class="tip">Stock On Hand — physical units in the warehouse from CIN7</span></th><th data-tip>Open Orders<span class="tip">Cin7 open-order units waiting to be fulfilled. For Lifely coverage tabs this comes from Cin7 open sales/open orders, not Shopify inventory.</span></th><th data-tip>Net Available<span class="tip">Cin7 Stock.available: stock remaining after reservations/open demand. This is the net stock value used for weeks-left and reorder calculations.</span></th>'+incomingHeaderHtml(incomingDateBuckets)+coverageHeader+'<th data-tip>Units/wk<span class="tip">Average weekly sales velocity over the last 30 days from Shopify orders</span></th><th data-tip>Wks Left Now<span class="tip">Weeks of stock remaining before incoming POs. Net Available ÷ Units/wk.</span></th><th data-tip>Wks Left + Incoming<span class="tip">Weeks of stock after adding currently open incoming POs. This is visibility only; reorder quantity rules will be reviewed separately.</span></th><th data-tip>Stock Turn Days<span class="tip">'+STOCK_TURN_ROW_TOOLTIP+'</span></th><th data-tip>Target Days<span class="tip">Target stock turn days from YK target stockturn sheet, applied by market/category.</span></th><th data-tip>Target Status<span class="tip">Under = below minimum target days; Over = above maximum target days; On target = within target range.</span></th><th data-tip>Status<span class="tip">STOCKOUT: 0wk | CRITICAL: 1-2wk | LOW: 3-4wk | OK: 5-8wk | HEALTHY: 8+wk</span></th><th data-tip>FOB<span class="tip">Factory cost per unit (AUD). From CIN7 costAUD or costUSD×FX</span></th><th data-tip>Freight/u<span class="tip">AUD freight per unit based on CBM share of container. (SKU CBM ÷ PO total CBM) × container freight ÷ qty</span></th><th data-tip>Landed<span class="tip">Full landed cost per unit in AUD = FOB + Freight + Tariff. Landed-cost sheet values are maintained in AUD; estimates use open POs</span></th><th>Supplier</th><th data-tip>CBM<span class="tip">Cubic meters per unit from CIN7 product volume</span></th></tr>';
@@ -1329,7 +1340,13 @@ function renderDashboard(){
     const coverageCells=showCoverage
       ? `<td>${coverage.preorderUnits==null?'<span style="color:var(--text-dim)">—</span>':fmt(coverage.preorderUnits)}</td><td style="font-size:10px">${coverage.nextPO?`${coverage.nextPO} <span style="color:var(--text-dim)">(${Math.round(coverage.nextQty)})</span>`:'—'}</td><td style="font-size:10px">${fmtEtaShort(coverage.nextETA)}</td><td style="font-size:10px">${coverage.coveragePO||'—'}</td><td style="font-size:10px">${fmtEtaShort(coverage.coverageETA)}</td><td><span class="badge ${coverageBadgeClass}">${coverage.status}</span></td>`
       : '';
-    return`<tr><td style="font-family:monospace;font-size:10px">${s}${skuLabel(s)}</td>${isLifelySofaPanel()?`<td><span class="badge blue">${getLifelySofaColor(s)}</span></td>`:''}<td>${getSize(s)}</td><td>${fmt(soh)}</td><td>${fmt(sh)}</td><td>${fmt(net)}</td><td class="incoming-total-cell">${fmt(inc)}</td>${incomingDateCellsHtml(s,incomingDateBuckets)}${coverageCells}<td>${vel.toFixed(1)}${isEstVel(s)?' <span style="color:var(--yellow);font-size:9px" title="Estimated: using last in-stock velocity (avg of last active weeks). Currently OOS — no recent sales.">(est)</span>':''}${trendIndicator(s)}</td><td>${wks>=25?'⚠️ '+wks:wks}</td><td>${wksInc>=25?'⚠️ '+wksInc:wksInc}</td><td>${fmtStockTurnDays(stockTurnDays)}</td><td style="font-size:10px">${targetStockTurnCell(targetRule)}</td><td>${stockTurnTargetBadge(stockTurnDays,targetRule)}</td><td>${statusBadge(wks,s)}${wks>=25&&vel>0&&!isEstVel(s)?' <span style="color:var(--yellow);font-size:10px" title="'+Math.round(soh-(vel*25))+' extra units beyond 25 weeks of demand. Costing $'+((DATA.costs||{})[s]||0).toFixed(0)+' each (supplier price). Consider promoting or discounting.">⚠️ $'+Math.round(Math.max(0,soh-(vel*25))*((DATA.costs||{})[s]||0)).toLocaleString()+'</span>':''}</td><td style="text-align:right;font-size:10px">${fob>0?'$'+fob.toFixed(2):'<span style="color:var(--text-dim)">—</span>'}</td><td style="text-align:right;font-size:10px">${lc?'$'+lc.freightPerUnit.toFixed(2)+(isEst?' <span style="font-size:8px;padding:1px 3px;border-radius:3px;background:#FEF3C7;color:#92400E">est</span>':''):'<span style="color:var(--text-dim)">—</span>'}</td><td style="text-align:right;font-weight:600;font-size:10px">${lc?'$'+lc.landedPerUnit.toFixed(2)+(isEst?' <span style="font-size:8px;padding:1px 3px;border-radius:3px;background:#FEF3C7;color:#92400E">est</span>':''):(fob>0?'$'+fob.toFixed(2)+'<span style="color:var(--text-dim);font-weight:400;font-size:8px"> (FOB only)</span>':'<span style="color:var(--text-dim)">—</span>')}</td><td style="font-size:10px">${supplier}</td><td style="text-align:right;font-size:10px">${cbm?cbm.toFixed(3):'—'}</td></tr>`}).join('');
+    const velocityCell=demandReconciled?`${vel.toFixed(1)}${isEstVel(s)?' <span style="color:var(--yellow);font-size:9px" title="Estimated: using last in-stock velocity (avg of last active weeks). Currently OOS — no recent sales.">(est)</span>':''}${trendIndicator(s)}`:'<span style="color:var(--text-dim)" title="Exact branch-specific fulfilled-sales velocity is unavailable.">—</span>';
+    const weeksNowCell=demandReconciled?(wks>=25?'⚠️ '+wks:wks):'<span style="color:var(--text-dim)">—</span>';
+    const weeksIncomingCell=demandReconciled?(wksInc>=25?'⚠️ '+wksInc:wksInc):'<span style="color:var(--text-dim)">—</span>';
+    const stockTurnCell=demandReconciled?fmtStockTurnDays(stockTurnDays):'<span style="color:var(--text-dim)">—</span>';
+    const targetStatusCell=demandReconciled?stockTurnTargetBadge(stockTurnDays,targetRule):'<span class="badge blue" title="Exact branch-specific fulfilled-sales velocity is unavailable.">DEMAND N/A</span>';
+    const statusCell=demandReconciled?`${statusBadge(wks,s)}${wks>=25&&vel>0&&!isEstVel(s)?' <span style="color:var(--yellow);font-size:10px" title="'+Math.round(soh-(vel*25))+' extra units beyond 25 weeks of demand. Costing $'+((DATA.costs||{})[s]||0).toFixed(0)+' each (supplier price). Consider promoting or discounting.">⚠️ $'+Math.round(Math.max(0,soh-(vel*25))*((DATA.costs||{})[s]||0)).toLocaleString()+'</span>':''}`:'<span class="badge blue" title="Exact branch-specific fulfilled-sales velocity is unavailable.">DEMAND N/A</span>';
+    return`<tr><td style="font-family:monospace;font-size:10px">${s}${skuLabel(s)}</td>${isLifelySofaPanel()?`<td><span class="badge blue">${getLifelySofaColor(s)}</span></td>`:''}<td>${getSize(s)}</td><td>${fmt(soh)}</td><td>${fmt(sh)}</td><td>${fmt(net)}</td><td class="incoming-total-cell">${fmt(inc)}</td>${incomingDateCellsHtml(s,incomingDateBuckets)}${coverageCells}<td>${velocityCell}</td><td>${weeksNowCell}</td><td>${weeksIncomingCell}</td><td>${stockTurnCell}</td><td style="font-size:10px">${targetStockTurnCell(targetRule)}</td><td>${targetStatusCell}</td><td>${statusCell}</td><td style="text-align:right;font-size:10px">${fob>0?'$'+fob.toFixed(2):'<span style="color:var(--text-dim)">—</span>'}</td><td style="text-align:right;font-size:10px">${lc?'$'+lc.freightPerUnit.toFixed(2)+(isEst?' <span style="font-size:8px;padding:1px 3px;border-radius:3px;background:#FEF3C7;color:#92400E">est</span>':''):'<span style="color:var(--text-dim)">—</span>'}</td><td style="text-align:right;font-weight:600;font-size:10px">${lc?'$'+lc.landedPerUnit.toFixed(2)+(isEst?' <span style="font-size:8px;padding:1px 3px;border-radius:3px;background:#FEF3C7;color:#92400E">est</span>':''):(fob>0?'$'+fob.toFixed(2)+'<span style="color:var(--text-dim);font-weight:400;font-size:8px"> (FOB only)</span>':'<span style="color:var(--text-dim)">—</span>')}</td><td style="font-size:10px">${supplier}</td><td style="text-align:right;font-size:10px">${cbm?cbm.toFixed(3):'—'}</td></tr>`}).join('');
   applyStockColumnVisibility();
   let cs=filtered.filter(s=>(DATA.cin7[s]||0)>0||getIncoming(s)>0).slice(0,30);
   if(charts.stock)charts.stock.destroy();
@@ -1342,6 +1359,11 @@ function renderDashboard(){
 }
 
 function renderStockout(){
+  if(!hasReconciledWarehouseDemand()){
+    document.getElementById('stockoutCharts').innerHTML='<div class="card blue"><div class="label">Stockout Projection</div><div class="value">—</div><div class="sub">Exact branch sales velocity is unavailable; no pooled market velocity is substituted.</div></div>';
+    document.getElementById('heatmapContainer').innerHTML='<div class="card blue"><div class="label">Stockout Heatmap</div><div class="value">—</div><div class="sub">Branch demand unavailable</div></div>';
+    return;
+  }
   const skus=getSkus().filter(s=>getVel(s)>0),weeks=getWeeks(),sg={};
   skus.forEach(s=>{const sz=getSize(s);if(!sg[sz])sg[sz]=[];sg[sz].push(s)});
   Object.keys(charts).forEach(k=>{if(k.startsWith('risk-')){charts[k].destroy();delete charts[k]}});
@@ -1417,6 +1439,13 @@ function renderCaRestockPlan(rows){
 }
 
 function renderReorder(){
+  if(!hasReconciledWarehouseDemand()){
+    const filterEl=document.getElementById('reorderTypeFilters');if(filterEl){filterEl.style.display='none';filterEl.innerHTML='';}
+    const caPanel=document.getElementById('caRestockPlan');if(caPanel){caPanel.style.display='none';caPanel.innerHTML='';}
+    document.querySelector('#reorderTable thead').innerHTML='<tr><th>Reorder Recommendations</th></tr>';
+    document.querySelector('#reorderTable tbody').innerHTML='<tr><td style="text-align:center;color:var(--text-dim);padding:32px">Exact branch sales velocity is unavailable. Reorder quantities are intentionally not calculated from pooled market demand.</td></tr>';
+    return;
+  }
   const reorderSource=DATA.reorderBomData;
   const littleLifelyCountryPanels=['llau','llnz','llna','llca','lluk','llsg'];
   const isLittleLifelyCountry=littleLifelyCountryPanels.includes(currentCK);
@@ -2178,12 +2207,18 @@ function renderPurchaseOrders(allPOs) {
 }
 
 function renderForecast() {
+  if (!hasReconciledWarehouseDemand()) {
+    document.getElementById('forecast-cards').innerHTML = '<div class="card blue"><div class="label">Forecast Accuracy</div><div class="value">—</div><div class="sub">Exact branch sales history is unavailable; pooled market history is not substituted.</div></div>';
+    const tbody=document.querySelector('#forecastTable tbody');if(tbody)tbody.innerHTML='';
+    return;
+  }
   if (!DATA.weeklyData) {
     document.getElementById('forecast-cards').innerHTML = '<div class="card yellow"><div class="label">No Data</div><div class="value">—</div><div class="sub">Weekly sales data not available</div></div>';
     return;
   }
   
-  const skus = getSkus().filter(s => DATA.weeklyData[s]);
+  const weeklyForSku=s=>hasExactSellableVel(s)?DATA.exactSellableWeeklyData?.[s]:DATA.weeklyData?.[s];
+  const skus = getSkus().filter(s => weeklyForSku(s));
   const now = new Date();
   
   // Get sorted week keys for each SKU
@@ -2196,7 +2231,7 @@ function renderForecast() {
   }
   function getWeekKeys() {
     const allWeeks = new Set();
-    skus.forEach(s => { Object.keys(DATA.weeklyData[s]||{}).forEach(w => allWeeks.add(w)); });
+    skus.forEach(s => { Object.keys(weeklyForSku(s)||{}).forEach(w => allWeeks.add(w)); });
     const current = currentWeekKey();
     return Array.from(allWeeks).filter(w => w !== current).sort();
   }
@@ -2214,7 +2249,7 @@ function renderForecast() {
   let totalAbsError = 0, totalActual = 0;
   
   skus.forEach(sku => {
-    const weekly = DATA.weeklyData[sku] || {};
+    const weekly = weeklyForSku(sku) || {};
     let absErrorSum = 0, actualSum = 0, evalWeeks = 0;
     const weeklyDetail = [];
     

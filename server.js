@@ -73,6 +73,22 @@ const LL_AU_BRANCH_IDS = [3, 60976];
 const LL_NZ_BRANCH_IDS = [48391, 68865];
 const LL_US_BRANCH_IDS = [60701, 63764];
 const LL_PERSONALISED_COVER_BRANCH_IDS = [74276];
+const US_WEST_STATE_CODES = new Set(['CA', 'WA', 'OR', 'NV', 'AZ', 'UT', 'ID', 'MT', 'WY', 'CO', 'NM', 'AK', 'HI']);
+const US_NJ_STATE_CODES = new Set([
+  'TX', 'OK', 'KS', 'NE', 'SD', 'ND', 'MN', 'IA', 'MO', 'AR', 'LA',
+  'WI', 'IL', 'MI', 'IN', 'OH', 'KY', 'TN', 'MS', 'AL',
+  'ME', 'NH', 'VT', 'MA', 'RI', 'CT', 'NY', 'NJ', 'PA', 'DE', 'MD',
+  'DC', 'VA', 'WV', 'NC', 'SC', 'GA', 'FL'
+]);
+
+function usDemandBranchForAddress(address = {}) {
+  const country = String(address.country_code || address.country || '').toUpperCase().trim();
+  if (country !== 'US' && country !== 'UNITED STATES' && country !== 'UNITED STATES OF AMERICA') return null;
+  const state = String(address.province_code || address.province || '').toUpperCase().trim();
+  if (US_WEST_STATE_CODES.has(state)) return '60701';
+  if (US_NJ_STATE_CODES.has(state)) return '63764';
+  return '';
+}
 
 // Shopify stores
 const SHOPIFY_STORES = {
@@ -736,6 +752,7 @@ let dataCache = {
   shopifyInventory: {}, // store -> {sku -> inventory_level}
   shopifyOpenDemand: {}, // store -> { country -> { sku -> open qty } }
   shopifyVelocityByCountry: {}, // store -> { country -> { velocity/trend maps } }
+  shopifyVelocityByWarehouse: {}, // store -> { branchId -> { velocity/trend maps } }
   error: null
 };
 const CACHE_SNAPSHOT_PATH = path.join(__dirname, 'data', 'cache-snapshot.json');
@@ -1167,6 +1184,9 @@ function loadCacheSnapshot(silent = false) {
           shopifyVelocityByCountry: snap.shopifyVelocityByCountry || Object.fromEntries(
             Object.entries(snap.shopifyVelocity || {}).map(([store, velocity]) => [store, velocity?._byCountry || {}])
           ),
+          shopifyVelocityByWarehouse: snap.shopifyVelocityByWarehouse || Object.fromEntries(
+            Object.entries(snap.shopifyVelocity || {}).map(([store, velocity]) => [store, velocity?._byWarehouse || {}])
+          ),
           error: null
         };
         dataCache.cin7POs = dataCache.cin7POs || [];
@@ -1204,6 +1224,7 @@ async function saveCacheSnapshot(pushToGit = false, pushReason = 'cin7-refresh',
       cin7POs: dataCache.cin7POs || [],
       shopifyVelocity: dataCache.shopifyVelocity,
       shopifyVelocityByCountry: dataCache.shopifyVelocityByCountry,
+      shopifyVelocityByWarehouse: dataCache.shopifyVelocityByWarehouse,
       shopifyInventory: dataCache.shopifyInventory,
       shopifyOpenDemand: dataCache.shopifyOpenDemand,
       error: dataCache.error,
@@ -1659,6 +1680,11 @@ async function fetchShopifyVelocity(storeKey) {
   const sku30d = {};
   const skuFirstSeen = {};
   const byCountry = {};
+  const byWarehouse = {};
+  let unmappedUsUnits = 0;
+  let usUnits30d = 0;
+  let assignedUsUnits30d = 0;
+  let unmappedUsUnits30d = 0;
   const now7d = new Date(Date.now() - 7 * 86400000);
   const now30d = new Date(Date.now() - 30 * 86400000);
   const days = 30;
@@ -1671,6 +1697,21 @@ async function fetchShopifyVelocity(storeKey) {
       byCountry[country] = { skuUnits: {}, skuWeekly: {}, sku7d: {}, sku30d: {}, skuFirstSeen: {} };
     }
     return byCountry[country];
+  };
+  const ensureWarehouse = (branchId) => {
+    if (!byWarehouse[branchId]) {
+      byWarehouse[branchId] = { skuUnits: {}, skuWeekly: {}, sku7d: {}, sku30d: {}, skuFirstSeen: {} };
+    }
+    return byWarehouse[branchId];
+  };
+  const addToBucket = (bucket, sku, qty, dt, weekKey) => {
+    if (!bucket) return;
+    bucket.skuUnits[sku] = (bucket.skuUnits[sku] || 0) + qty;
+    if (dt >= now7d) bucket.sku7d[sku] = (bucket.sku7d[sku] || 0) + qty;
+    if (dt >= now30d) bucket.sku30d[sku] = (bucket.sku30d[sku] || 0) + qty;
+    if (!bucket.skuFirstSeen[sku] || dt < bucket.skuFirstSeen[sku]) bucket.skuFirstSeen[sku] = dt;
+    if (!bucket.skuWeekly[sku]) bucket.skuWeekly[sku] = {};
+    bucket.skuWeekly[sku][weekKey] = (bucket.skuWeekly[sku][weekKey] || 0) + qty;
   };
 
   for (let page = 1; page <= 30; page++) {
@@ -1693,6 +1734,8 @@ async function fetchShopifyVelocity(storeKey) {
         const rawCountry = (o.shipping_address?.country_code || o.shipping_address?.country || '').toString().trim();
         const country = rawCountry ? (rawCountry.length === 2 ? rawCountry.toUpperCase() : rawCountry) : null;
         const countryBucket = country ? ensureCountry(country) : null;
+        const warehouseBranchId = usDemandBranchForAddress(o.shipping_address || {});
+        const warehouseBucket = warehouseBranchId ? ensureWarehouse(warehouseBranchId) : null;
 
         for (const li of (o.line_items || [])) {
           const sku = canonicalDemandSku(li.sku, country);
@@ -1705,13 +1748,13 @@ async function fetchShopifyVelocity(storeKey) {
             if (!skuWeekly[sku]) skuWeekly[sku] = {};
             skuWeekly[sku][weekKey] = (skuWeekly[sku][weekKey] || 0) + qty;
 
-            if (countryBucket) {
-              countryBucket.skuUnits[sku] = (countryBucket.skuUnits[sku] || 0) + qty;
-              if (dt >= now7d) countryBucket.sku7d[sku] = (countryBucket.sku7d[sku] || 0) + qty;
-              if (dt >= now30d) countryBucket.sku30d[sku] = (countryBucket.sku30d[sku] || 0) + qty;
-              if (!countryBucket.skuFirstSeen[sku] || dt < countryBucket.skuFirstSeen[sku]) countryBucket.skuFirstSeen[sku] = dt;
-              if (!countryBucket.skuWeekly[sku]) countryBucket.skuWeekly[sku] = {};
-              countryBucket.skuWeekly[sku][weekKey] = (countryBucket.skuWeekly[sku][weekKey] || 0) + qty;
+            addToBucket(countryBucket, sku, qty, dt, weekKey);
+            addToBucket(warehouseBucket, sku, qty, dt, weekKey);
+            if (country === 'US' && warehouseBranchId === '') unmappedUsUnits += qty;
+            if (country === 'US' && dt >= now30d) {
+              usUnits30d += qty;
+              if (warehouseBranchId) assignedUsUnits30d += qty;
+              else unmappedUsUnits30d += qty;
             }
           }
         }
@@ -1740,22 +1783,37 @@ async function fetchShopifyVelocity(storeKey) {
     velocity._firstSeen[sku] = dt.toISOString();
   }
   velocity._byCountry = {};
-  for (const [country, bucket] of Object.entries(byCountry)) {
-    const countryVel = {};
+  const bucketVelocity = (bucket) => {
+    const bucketVel = {};
     for (const [sku, units] of Object.entries(bucket.sku30d)) {
-      countryVel[sku] = Math.round((units / weeks) * 10) / 10;
+      bucketVel[sku] = Math.round((units / weeks) * 10) / 10;
     }
     for (const sku of Object.keys(bucket.skuUnits)) {
-      if (!(sku in countryVel)) countryVel[sku] = 0;
+      if (!(sku in bucketVel)) bucketVel[sku] = 0;
     }
-    countryVel._weeklyBreakdown = bucket.skuWeekly || {};
-    countryVel._7d = bucket.sku7d;
-    countryVel._30d = bucket.sku30d;
-    countryVel._firstSeen = {};
+    bucketVel._weeklyBreakdown = bucket.skuWeekly || {};
+    bucketVel._7d = bucket.sku7d;
+    bucketVel._30d = bucket.sku30d;
+    bucketVel._firstSeen = {};
     for (const [sku, dt] of Object.entries(bucket.skuFirstSeen)) {
-      countryVel._firstSeen[sku] = dt.toISOString();
+      bucketVel._firstSeen[sku] = dt.toISOString();
     }
-    velocity._byCountry[country] = countryVel;
+    return bucketVel;
+  };
+  for (const [country, bucket] of Object.entries(byCountry)) {
+    velocity._byCountry[country] = bucketVelocity(bucket);
+  }
+  velocity._byWarehouse = {};
+  const exact30dConservation = Math.abs(usUnits30d - assignedUsUnits30d - unmappedUsUnits30d) < 1e-9;
+  for (const branchId of LL_US_BRANCH_IDS.map(String)) {
+    velocity._byWarehouse[branchId] = bucketVelocity(byWarehouse[branchId] || {
+      skuUnits: {}, skuWeekly: {}, sku7d: {}, sku30d: {}, skuFirstSeen: {}
+    });
+    velocity._byWarehouse[branchId]._reconciled = exact30dConservation && unmappedUsUnits30d === 0;
+    velocity._byWarehouse[branchId]._unmappedUsUnits = unmappedUsUnits;
+    velocity._byWarehouse[branchId]._us30dUnits = usUnits30d;
+    velocity._byWarehouse[branchId]._assignedUs30dUnits = assignedUsUnits30d;
+    velocity._byWarehouse[branchId]._unmappedUs30dUnits = unmappedUsUnits30d;
   }
 
   return { ok: true, data: velocity };
@@ -1917,6 +1975,7 @@ async function refreshAllData(forceCin7 = false, pushReason = null) {
         ...dataCache,
         shopifyVelocity: { ...(dataCache.shopifyVelocity || {}) },
         shopifyVelocityByCountry: { ...(dataCache.shopifyVelocityByCountry || {}) },
+        shopifyVelocityByWarehouse: { ...(dataCache.shopifyVelocityByWarehouse || {}) },
         shopifyInventory: { ...(dataCache.shopifyInventory || {}) },
         shopifyOpenDemand: { ...(dataCache.shopifyOpenDemand || {}) }
       };
@@ -1950,6 +2009,7 @@ async function refreshAllData(forceCin7 = false, pushReason = null) {
         if (velRes.ok) {
           nextCache.shopifyVelocity[storeKey] = velRes.data;
           nextCache.shopifyVelocityByCountry[storeKey] = velRes.data._byCountry || {};
+          nextCache.shopifyVelocityByWarehouse[storeKey] = velRes.data._byWarehouse || {};
           shopifyUpdated = true;
         }
         if (invRes.ok) {
@@ -2387,11 +2447,11 @@ function buildCKData(ckId) {
   // products with real sales from being labelled dead stock without changing
   // component planning velocity, weeks cover, reorder logic, stock, or POs.
   const sellableVelocity = {};
-  const mergeVelocitySource = (source, country = '') => {
+  const mergeVelocitySource = (source, country = '', targetVelocity = velocity, targetSellableVelocity = sellableVelocity) => {
     const addMappedVelocity = (mappedSku, vel) => {
       const visible = visibleDemandSku(mappedSku);
-      if (cin7[visible.sku] !== undefined || shopify[visible.sku] !== undefined || velocity[visible.sku] !== undefined) {
-        velocity[visible.sku] = (velocity[visible.sku] || 0) + Number(vel || 0);
+      if (cin7[visible.sku] !== undefined || shopify[visible.sku] !== undefined || targetVelocity[visible.sku] !== undefined) {
+        targetVelocity[visible.sku] = (targetVelocity[visible.sku] || 0) + Number(vel || 0);
       }
     };
     for (const [rawSku, vel] of Object.entries(source || {})) {
@@ -2403,7 +2463,7 @@ function buildCKData(ckId) {
         ? Number(exact30DayUnits || 0) / 30 * 7
         : Number(vel || 0);
       if (cin7[sku] !== undefined) {
-        sellableVelocity[sku] = (sellableVelocity[sku] || 0) + weeklyVelocity;
+        targetSellableVelocity[sku] = (targetSellableVelocity[sku] || 0) + weeklyVelocity;
       }
       const exploded = explodeDemandSkuForCk(sku, ckId);
       const primaryMappings = exploded || [sku];
@@ -2413,7 +2473,7 @@ function buildCKData(ckId) {
         && (skuMatchesDef(sku, def)
           || (ckId === 'llau' && ['DD-21915CF', 'DD-21107CF', 'DD-21137CF'].includes(sku)))
         && (!def.requireBranchMatch || cin7[sku] !== undefined)) {
-        velocity[sku] = (velocity[sku] || 0) + weeklyVelocity;
+        targetVelocity[sku] = (targetVelocity[sku] || 0) + weeklyVelocity;
       }
       for (const primarySku of primaryMappings) {
         for (const componentSku of supplementalDemandComponentsForCk(primarySku, ckId)) {
@@ -2437,6 +2497,17 @@ function buildCKData(ckId) {
 
   // LLNA/LLCA dashboards: absorb dropship combo demand into the matching stocked bed SKU.
   // This affects the visible Shopify / Net / velocity metrics, not just coverage columns.
+  const absorbDropshipComboVelocity = (targetVelocity) => {
+    if (ckId !== 'llna' && ckId !== 'llca') return;
+    for (const sku of Object.keys(cin7)) {
+      if (!sku.startsWith('LLNA-CB-')) continue;
+      const comboSku = sku.replace('LLNA-CB-', 'LLNA-CFDS-');
+      if (targetVelocity[comboSku]) {
+        targetVelocity[sku] = (targetVelocity[sku] || 0) + targetVelocity[comboSku];
+        targetVelocity[comboSku] = 0;
+      }
+    }
+  };
   if (ckId === 'llna' || ckId === 'llca') {
     for (const sku of Object.keys(cin7)) {
       if (!sku.startsWith('LLNA-CB-')) continue;
@@ -2446,11 +2517,8 @@ function buildCKData(ckId) {
         shopify[sku] = (shopify[sku] || 0) - comboDemand;
         shopify[comboSku] = 0;
       }
-      if (velocity[comboSku]) {
-        velocity[sku] = (velocity[sku] || 0) + velocity[comboSku];
-        velocity[comboSku] = 0;
-      }
     }
+    absorbDropshipComboVelocity(velocity);
   }
 
   // Swatch pack: propagate PACK velocity to individual swatches
@@ -2724,18 +2792,63 @@ function buildCKData(ckId) {
           const row = branchRows[branchId];
           if (!row) return acc;
           acc.soh += Number(row.soh || 0);
+          acc.virtual += Number(row.virtual ?? row.soh ?? 0);
           acc.available += Number(row.available || 0);
           acc.openSales += Number(row.openSales || 0);
           acc.matched += 1;
           return acc;
-        }, { soh: 0, available: 0, openSales: 0, matched: 0 });
-        branchRaw[sku] = branchData.matched > 0 ? { ...data, soh: branchData.soh, available: branchData.available } : { ...data, soh: 0, available: 0 };
+        }, { soh: 0, virtual: 0, available: 0, openSales: 0, matched: 0 });
+        branchRaw[sku] = branchData.matched > 0
+          ? { ...data, soh: branchData.soh, virtual: branchData.virtual, available: branchData.available }
+          : { ...data, soh: 0, virtual: 0, available: 0 };
       }
       let normalized = normalizeCIN7(branchRaw);
       if (ckId === 'llau') normalized = normalizeSwatchPack(normalized);
+      if (ckId === 'llau') {
+        for (const sku of ['DD-21915CF', 'DD-21107CF', 'DD-21137CF']) {
+          const data = dataCache.cin7Products?.[sku];
+          if (!data) continue;
+          const branchRows = dataCache.cin7StockByBranch?.[sku] || {};
+          const branchData = ids.reduce((acc, branchId) => {
+            const row = branchRows[branchId];
+            if (!row) return acc;
+            acc.soh += Number(row.soh || 0);
+            acc.available += Number(row.available || 0);
+            acc.matched += 1;
+            return acc;
+          }, { soh: 0, available: 0, matched: 0 });
+          normalized[sku] = branchData.matched > 0
+            ? { ...data, soh: branchData.soh, available: branchData.available }
+            : { ...data, soh: 0, available: 0 };
+        }
+      }
+      // normalizeCIN7 intentionally converts some sellable parents into their
+      // component representation. The All view still retains a small set of
+      // those exact sellable rows, so restore only those visible keys from
+      // exact branch stock. This keeps warehouse scope additive without
+      // reintroducing any hidden BOM parent.
+      for (const sku of Object.keys(cin7)) {
+        if (normalized[sku] !== undefined) continue;
+        const data = dataCache.cin7Products?.[sku];
+        if (!data) continue;
+        const branchRows = dataCache.cin7StockByBranch?.[sku] || {};
+        const branchData = ids.reduce((acc, branchId) => {
+          const row = branchRows[branchId];
+          if (!row) return acc;
+          acc.soh += Number(row.soh || 0);
+          acc.virtual += Number(row.virtual ?? row.soh ?? 0);
+          acc.available += Number(row.available || 0);
+          acc.matched += 1;
+          return acc;
+        }, { soh: 0, virtual: 0, available: 0, matched: 0 });
+        normalized[sku] = branchData.matched > 0
+          ? { ...data, soh: branchData.soh, virtual: branchData.virtual, available: branchData.available }
+          : { ...data, soh: 0, virtual: 0, available: 0 };
+      }
       return normalized;
     };
     const buildBranchView = ids => {
+      const branchIdSet = new Set(ids.map(id => Number(id)));
       const viewCin7 = {};
       const viewAvailable = {};
       const viewOpenOrders = {};
@@ -2743,10 +2856,24 @@ function buildCKData(ckId) {
       const viewIncoming = {};
       const viewCoverageOpenDemandBySku = {};
       const viewCoverageStockBySku = {};
+      const viewCoveragePoRows = {};
+      const viewVelocity = {};
+      const viewSellableVelocity = {};
+      const viewWeeklyData = {};
+      const viewSellableWeeklyData = {};
+      const viewTrend7d = {};
+      const viewTrend30d = {};
+      const viewSellableTrend7d = {};
+      const viewSellableTrend30d = {};
       const branchNormalized = buildCin7ForBranchIds(ids);
       for (const [sku, data] of Object.entries(branchNormalized)) {
-        viewCin7[sku] = typeof data === 'object' ? Number(data.soh || 0) : Number(data || 0);
-        viewAvailable[sku] = typeof data === 'object' ? Number(data.available || 0) : viewCin7[sku];
+        // Warehouse views must use the exact same canonical visible SKU set as
+        // the All view. Hidden BOM parents must not reappear only in a branch.
+        if (!Object.prototype.hasOwnProperty.call(cin7, sku)) continue;
+        const branchSoh = typeof data === 'object' ? Number(data.soh || 0) : Number(data || 0);
+        const branchAvailable = typeof data === 'object' ? Number(data.available || 0) : branchSoh;
+        viewCin7[sku] = Number(cin7[sku] || 0) === 0 ? 0 : branchSoh;
+        viewAvailable[sku] = Number(cin7Available[sku] || 0) === 0 ? 0 : branchAvailable;
         viewOpenOrders[sku] = 0;
         viewShopify[sku] = 0;
         viewIncoming[sku] = 0;
@@ -2767,20 +2894,176 @@ function buildCKData(ckId) {
       }
       const branchOpenDemand = getCin7PreordersBySku(ids, salesCountry || '');
       const branchOpenSales = getCin7OpenSalesBySku(ids, salesCountry || '');
-      const branchIncoming = getCin7StockMetricBySku(ids, salesCountry || '', 'incoming');
+      const viewPos = (pos || []).filter(po => branchIdSet.has(Number(po.branchId || 0)));
+      const viewAllPos = (allPos || []).filter(po => branchIdSet.has(Number(po.branchId || 0)));
       for (const [rawSku, qty] of Object.entries(branchOpenDemand)) {
         const sku = canonicalDemandSku(rawSku, salesCountry || '');
         viewCoverageOpenDemandBySku[sku] = (viewCoverageOpenDemandBySku[sku] || 0) + Number(qty || 0);
       }
       addCin7DemandToVisibleMap(branchOpenDemand, viewShopify, salesCountry || '');
       addCin7DemandToVisibleMap(branchOpenSales, viewOpenOrders, salesCountry || '');
-      addCin7DemandToVisibleMap(branchIncoming, viewIncoming, salesCountry || '');
+      // Incoming stock is a physical PO quantity, not sales demand. Preserve the
+      // same normalized PO-item representation used by the All view and never
+      // pass incoming through the BOM demand explosion path.
+      for (const po of viewPos) {
+        for (const [sku, qty] of Object.entries(po.analyticsItems || po.items || {})) {
+          viewIncoming[sku] = (viewIncoming[sku] || 0) + Number(qty || 0);
+          if (!viewCoveragePoRows[sku]) viewCoveragePoRows[sku] = [];
+          viewCoveragePoRows[sku].push({
+            reference: po.reference,
+            qty: Number(qty || 0),
+            eta: po.arrival || po.estimatedArrivalDate || null
+          });
+        }
+      }
       for (const sku of Object.keys(viewCin7)) {
         viewShopify[sku] = -Number(viewShopify[sku] || 0);
         viewOpenOrders[sku] = Number(viewOpenOrders[sku] || 0);
         viewIncoming[sku] = Number(viewIncoming[sku] || 0);
       }
-      return { cin7: viewCin7, available: viewAvailable, openOrders: viewOpenOrders, shopify: viewShopify, incoming: viewIncoming, coverageOpenDemandBySku: viewCoverageOpenDemandBySku, coverageStockBySku: viewCoverageStockBySku };
+      let demandReconciled = ckId === 'llna';
+      const demandSourceConservation = {
+        us30dUnits: 0,
+        assignedUs30dUnits: 0,
+        unmappedUs30dUnits: 0,
+        exactUnitMetadata: true
+      };
+      if (demandReconciled) {
+        for (const sourceStore of relatedStores) {
+          const source = dataCache.shopifyVelocityByWarehouse?.[sourceStore]?.[String(ids[0])];
+          const hasExactUnitMetadata = source
+            && [source._us30dUnits, source._assignedUs30dUnits, source._unmappedUs30dUnits].every(Number.isFinite);
+          const exactUnitsConserved = hasExactUnitMetadata
+            && Math.abs(
+              Number(source._us30dUnits || 0)
+              - Number(source._assignedUs30dUnits || 0)
+              - Number(source._unmappedUs30dUnits || 0)
+            ) < 1e-9;
+          if (!source
+            || source._reconciled !== true
+            || !hasExactUnitMetadata
+            || !exactUnitsConserved
+            || Number(source._unmappedUs30dUnits || 0) !== 0) {
+            demandReconciled = false;
+            demandSourceConservation.exactUnitMetadata = false;
+            break;
+          }
+          demandSourceConservation.us30dUnits += Number(source._us30dUnits || 0);
+          demandSourceConservation.assignedUs30dUnits += Number(source._assignedUs30dUnits || 0);
+          demandSourceConservation.unmappedUs30dUnits += Number(source._unmappedUs30dUnits || 0);
+          mergeVelocitySource(source, 'US', viewVelocity, viewSellableVelocity);
+
+          const mapped7d = {};
+          const mapped7dSellable = {};
+          mergeVelocitySource(source._7d || {}, 'US', mapped7d, mapped7dSellable);
+          for (const [sku, qty] of Object.entries(mapped7d)) {
+            viewTrend7d[sku] = (viewTrend7d[sku] || 0) + Number(qty || 0);
+          }
+          for (const [sku, qty] of Object.entries(mapped7dSellable)) {
+            viewSellableTrend7d[sku] = (viewSellableTrend7d[sku] || 0) + Number(qty || 0);
+          }
+
+          const mapped30d = {};
+          const mapped30dSellable = {};
+          mergeVelocitySource(source._30d || {}, 'US', mapped30d, mapped30dSellable);
+          for (const [sku, qty] of Object.entries(mapped30d)) {
+            viewTrend30d[sku] = (viewTrend30d[sku] || 0) + Number(qty || 0);
+          }
+          for (const [sku, qty] of Object.entries(mapped30dSellable)) {
+            viewSellableTrend30d[sku] = (viewSellableTrend30d[sku] || 0) + Number(qty || 0);
+          }
+
+          const rawByWeek = {};
+          for (const [rawSku, weeks] of Object.entries(source._weeklyBreakdown || {})) {
+            for (const [week, qty] of Object.entries(weeks || {})) {
+              if (!rawByWeek[week]) rawByWeek[week] = {};
+              rawByWeek[week][rawSku] = (rawByWeek[week][rawSku] || 0) + Number(qty || 0);
+            }
+          }
+          for (const [week, rawQuantities] of Object.entries(rawByWeek)) {
+            const mappedWeek = {};
+            const mappedSellableWeek = {};
+            mergeVelocitySource(rawQuantities, 'US', mappedWeek, mappedSellableWeek);
+            for (const [sku, qty] of Object.entries(mappedWeek)) {
+              if (!viewWeeklyData[sku]) viewWeeklyData[sku] = {};
+              viewWeeklyData[sku][week] = (viewWeeklyData[sku][week] || 0) + Number(qty || 0);
+            }
+            for (const [sku, qty] of Object.entries(mappedSellableWeek)) {
+              if (!viewSellableWeeklyData[sku]) viewSellableWeeklyData[sku] = {};
+              viewSellableWeeklyData[sku][week] =
+                (viewSellableWeeklyData[sku][week] || 0) + Number(qty || 0);
+            }
+          }
+        }
+        if (demandReconciled) absorbDropshipComboVelocity(viewVelocity);
+      }
+      const viewTrendData = {};
+      if (demandReconciled) {
+        const trendSkus = new Set([
+          ...Object.keys(viewCin7),
+          ...Object.keys(viewVelocity),
+          ...Object.keys(viewWeeklyData)
+        ]);
+        for (const sku of trendSkus) {
+          const weeks = viewWeeklyData[sku] || {};
+          const weekKeys = Object.keys(weeks).sort();
+          const activeWeeks = weekKeys.filter(week => Number(weeks[week] || 0) > 0);
+          const recentActiveWeeks = activeWeeks.slice(-4);
+          const lastInStockVel = recentActiveWeeks.length >= 2
+            ? Math.round((recentActiveWeeks.reduce((sum, week) => sum + Number(weeks[week] || 0), 0) / recentActiveWeeks.length) * 10) / 10
+            : null;
+          viewTrendData[sku] = {
+            v7: Math.round(Number(viewTrend7d[sku] || 0) * 10) / 10,
+            v30: Math.round((Number(viewTrend30d[sku] || 0) / 30 * 7) * 10) / 10,
+            sparkline: weekKeys.slice(-5).map(week => Number(weeks[week] || 0)),
+            lastInStockVel
+          };
+        }
+      }
+      const viewExactSellableVelocity = {};
+      const viewExactSellableWeeklyData = {};
+      if (demandReconciled && ckId === 'llna') {
+        for (const sku of Object.keys(viewCin7)) {
+          if (!isLlnaSellableParentSku(sku)) continue;
+          viewExactSellableVelocity[sku] = Number(viewSellableVelocity[sku] || 0);
+          viewExactSellableWeeklyData[sku] = viewSellableWeeklyData[sku] || {};
+          const weeks = viewExactSellableWeeklyData[sku];
+          const weekKeys = Object.keys(weeks).sort();
+          viewTrendData[sku] = {
+            v7: Math.round(Number(viewSellableTrend7d[sku] || 0) * 10) / 10,
+            v30: Math.round((Number(viewSellableTrend30d[sku] || 0) / 30 * 7) * 10) / 10,
+            sparkline: weekKeys.slice(-5).map(week => Number(weeks[week] || 0)),
+            lastInStockVel: null
+          };
+        }
+      }
+      return {
+        cin7: viewCin7,
+        available: viewAvailable,
+        openOrders: viewOpenOrders,
+        shopify: viewShopify,
+        incoming: viewIncoming,
+        pos: viewPos,
+        allPos: viewAllPos,
+        coverageOpenDemandBySku: viewCoverageOpenDemandBySku,
+        coverageStockBySku: viewCoverageStockBySku,
+        coveragePoRows: viewCoveragePoRows,
+        ...(demandReconciled ? {
+          velocity: viewVelocity,
+          sellableVelocity: viewSellableVelocity,
+          exactSellableVelocity: viewExactSellableVelocity,
+          exactSellableWeeklyData: viewExactSellableWeeklyData,
+          trendData: viewTrendData,
+          weeklyData: viewWeeklyData
+        } : {}),
+        warehouseMetrics: {
+          demandReconciled,
+          reason: demandReconciled
+            ? 'Mapped from aggregate Shopify delivery-state demand and reconciled on exact 30-day units before rounding.'
+            : 'Exact branch-specific fulfilled-sales velocity is unavailable.',
+          demandSourceConservation
+        }
+      };
     };
     for (const branchId of branchIds) warehouseViews[String(branchId)] = buildBranchView([branchId]);
   }
@@ -3100,6 +3383,36 @@ function buildCKData(ckId) {
     delete sellableVelocity[sku];
     delete costs[sku];
     delete cbmMap[sku];
+  }
+
+  // Warehouse objects are built before the final All-view row guards above.
+  // Remove any row that did not survive into the canonical All view so branch
+  // filters cannot resurrect an inactive or hidden parent. Incoming PO lines
+  // remain untouched because supply must retain its exact physical PO
+  // representation even when the ordered SKU is not a visible demand row.
+  if (warehouseViews) {
+    const visibleSkus = new Set(Object.keys(cin7));
+    const rowScopedFields = [
+      'cin7',
+      'available',
+      'shopify',
+      'openOrders',
+      'velocity',
+      'sellableVelocity',
+      'exactSellableVelocity',
+      'exactSellableWeeklyData',
+      'trendData',
+      'weeklyData'
+    ];
+    for (const view of Object.values(warehouseViews)) {
+      for (const field of rowScopedFields) {
+        const map = view?.[field];
+        if (!map || typeof map !== 'object') continue;
+        for (const sku of Object.keys(map)) {
+          if (!sku.startsWith('_') && !visibleSkus.has(sku)) delete map[sku];
+        }
+      }
+    }
   }
 
   // === Per-SKU landed cost calculation ===

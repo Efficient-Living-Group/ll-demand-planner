@@ -129,10 +129,54 @@ if (!packageSource.includes('scripts/test_all_tab_bom_reconciliation.js')) {
 if (!packageSource.includes('scripts/test_sellable_parent_deadstock.js')) {
   blockers.push('Sellable-parent dead-stock regression must run before release');
 }
+if (!packageSource.includes('scripts/test_warehouse_aggregation.js')) {
+  blockers.push('Warehouse PO/incoming aggregation regression must run before release');
+}
+if (!serverSource.includes("Exact branch-specific fulfilled-sales velocity is unavailable.")) {
+  blockers.push('Warehouse demand-dependent metrics must fail closed when exact branch velocity is unavailable');
+}
+if (!serverSource.includes("const viewPos = (pos || []).filter(po => branchIdSet.has(Number(po.branchId || 0)))")) {
+  blockers.push('Warehouse views must use branch-filtered open PO rows');
+}
+if (serverSource.includes('addCin7DemandToVisibleMap(branchIncoming, viewIncoming')) {
+  blockers.push('Incoming PO quantities must never pass through the sales-demand BOM mapping path');
+}
+if (!serverSource.includes('coveragePoRows: viewCoveragePoRows')) {
+  blockers.push('Warehouse coverage rows must use branch-filtered PO evidence');
+}
+if (!frontendSource.includes('function hasReconciledWarehouseDemand()')
+  || !frontendSource.includes('Branch demand unavailable')
+  || !frontendSource.includes('DEMAND N/A')) {
+  blockers.push('Warehouse demand-dependent cards and rows must display an explicit unavailable state');
+}
+if (!frontendSource.includes('useAdditiveWarehouseValues')
+  || !frontendSource.includes('Sum of reconciled warehouses')) {
+  blockers.push('All-warehouse overstock must sum reconciled warehouse calculations');
+}
+if (!frontendSource.includes('Net Component Deficit')
+  || !frontendSource.includes('getNetComponentDeficit')) {
+  blockers.push('Little Lifely warehouse deficit must use the BOM-expanded Net Component Deficit measure');
+}
+if (frontendSource.includes('else DATA.pos=DATA._base.pos||[]')) {
+  blockers.push('Warehouse PO counts must never fall back to the All-warehouse PO list');
+}
+if (!serverSource.includes('const US_WEST_STATE_CODES = new Set')
+  || !serverSource.includes('const US_NJ_STATE_CODES = new Set')
+  || !serverSource.includes('shopifyVelocityByWarehouse')) {
+  blockers.push('US branch demand must use aggregate Shopify delivery-state mapping');
+}
 const containerTrackingSource = fs.existsSync(CONTAINER_TRACKING_PATH)
   ? fs.readFileSync(CONTAINER_TRACKING_PATH, 'utf8')
   : '';
 const refreshScriptSource = fs.readFileSync(REFRESH_SCRIPT_PATH, 'utf8');
+if (!refreshScriptSource.includes('"shopifyVelocityByWarehouse"')) {
+  blockers.push('Durable cache refresh must preserve aggregate Shopify warehouse velocity');
+}
+if (!refreshScriptSource.includes('us_units_30d')
+  || !refreshScriptSource.includes('assigned_us_units_30d')
+  || !refreshScriptSource.includes('unmapped_us_units_30d')) {
+  blockers.push('Warehouse velocity reconciliation must conserve exact 30-day units before rounding');
+}
 const personalisedCoverDefLine = serverSource.split('\n').find(line => line.includes("'ll-personalised-cover':")) || '';
 const littleLifelyNzDefLine = serverSource.split('\n').find(line => line.includes("'llnz':")) || '';
 const cushieUsDefLine = serverSource.split('\n').find(line => line.includes("'cusb-us':")) || '';
