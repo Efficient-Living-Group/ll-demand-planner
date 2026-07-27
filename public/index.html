@@ -397,7 +397,7 @@ async function fetchJsonNoCache(path, attempts=2){
   }
   throw lastErr||new Error('Load failed');
 }
-let DATA={cin7:{},shopify:{},openOrders:{},available:{},incoming:{},velocity:{},sellableVelocity:{},pos:[],allPos:[],names:{},sizes:{},cbmMap:{},suppliers:{},landedCosts:{},productTypes:{},mattressRegions:null,warehouseOptions:null,warehouseViews:null,_base:null},currentCK=null,charts={},dashFilter={size:'All',region:'All',warehouse:'All',productType:'All',color:'All'},heatmapSortMode='sku';
+let DATA={cin7:{},shopify:{},openOrders:{},available:{},incoming:{},velocity:{},sellableVelocity:{},exactSellableVelocity:{},exactSellableWeeklyData:{},pos:[],allPos:[],names:{},sizes:{},cbmMap:{},suppliers:{},landedCosts:{},productTypes:{},mattressRegions:null,warehouseOptions:null,warehouseViews:null,_base:null},currentCK=null,charts={},dashFilter={size:'All',region:'All',warehouse:'All',productType:'All',color:'All'},heatmapSortMode='sku';
 let EXECUTIVE_DATA=null,currentMode='executive',executiveLoaded=false,_execPanelFilter='all',_execVelocityFilter='all';
 const LOGO_VERSION='20260521b';
 function logoSrc(logo){return '/logos/'+encodeURIComponent(logo||'')+'?v='+LOGO_VERSION}
@@ -649,8 +649,9 @@ function buildPreorderCoverage(s){
     mattressStatus: null
   };
 }
-function getVel(s){let v=DATA.velocity[s]||0;if(typeof v!=='number')v=Number(v)||0;if(v===0&&(DATA.trendData||{})[s]?.lastInStockVel){return DATA.trendData[s].lastInStockVel}return v}
-function isEstVel(s){return(DATA.velocity[s]||0)===0&&(DATA.trendData||{})[s]?.lastInStockVel>0}
+function hasExactSellableVel(s){return Object.prototype.hasOwnProperty.call(DATA.exactSellableVelocity||{},s)}
+function getVel(s){if(hasExactSellableVel(s)){const exact=Number(DATA.exactSellableVelocity[s]||0);return Number.isFinite(exact)?exact:0}let v=DATA.velocity[s]||0;if(typeof v!=='number')v=Number(v)||0;if(v===0&&(DATA.trendData||{})[s]?.lastInStockVel){return DATA.trendData[s].lastInStockVel}return v}
+function isEstVel(s){return!hasExactSellableVel(s)&&(DATA.velocity[s]||0)===0&&(DATA.trendData||{})[s]?.lastInStockVel>0}
 function getExactVel(s){const v=Number(DATA.velocity[s]||0);return Number.isFinite(v)?v:0}
 function getSellableVel(s){const v=Number(DATA.sellableVelocity?.[s]||0);return Number.isFinite(v)?v:0}
 function getDeadstockVel(s){return Math.max(getExactVel(s),getSellableVel(s))}
@@ -763,7 +764,7 @@ const STOCK_TURN_TRAILING_DAYS=90;
 const STOCK_TURN_AVG_TOOLTIP='Formula: Avg Stock Turn Days = total Cin7 Net Available units ÷ average daily mapped Shopify sales over the last 90 days. Average daily mapped sales = eligible mapped Shopify units sold in the last 90 days ÷ 90. Incoming POs are excluded. Current filters apply.';
 const STOCK_TURN_ROW_TOOLTIP='Formula: Stock Turn Days = this SKU’s Cin7 Net Available units ÷ average daily mapped Shopify sales over the last 90 days. Average daily mapped sales = this SKU’s eligible mapped Shopify units sold in the last 90 days ÷ 90. Incoming POs are excluded.';
 function getStockTurnVel(s){
-  const weekly=DATA.weeklyData?.[s];
+  const weekly=hasExactSellableVel(s)?DATA.exactSellableWeeklyData?.[s]:DATA.weeklyData?.[s];
   if(!weekly||typeof weekly!=='object')return 0;
   const trailingUnits=Object.values(weekly).reduce((sum,qty)=>sum+Number(qty||0),0);
   return trailingUnits/STOCK_TURN_TRAILING_DAYS*7;
@@ -983,7 +984,7 @@ async function selectCK(ckId){
   const activeItem=document.querySelector(`.sidebar-item[data-ck="${ckId}"]`);const groupEl=activeItem?.closest('.sidebar-brand-group');if(groupEl){groupEl.classList.remove('collapsed');brandOpenState[groupEl.dataset.brandGroup]=true;const caret=groupEl.querySelector('.sidebar-brand-caret');if(caret)caret.textContent='▾';}const subgroupEl=activeItem?.closest('.sidebar-subgroup');if(subgroupEl){subgroupEl.classList.remove('collapsed');subgroupOpenState[subgroupEl.dataset.subgroup]=true;const subCaret=subgroupEl.querySelector('.sidebar-subgroup-caret');if(subCaret)subCaret.textContent='▾';}
   document.getElementById('loadingScreen').style.display='block';document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
   try{const d=await fetchJsonNoCache(`/api/ck/${ckId}`);if(!d)return;
-  DATA={cin7:d.cin7||{},shopify:d.shopify||{},openOrders:d.openOrders||{},available:d.available||{},incoming:d.incoming||{},velocity:d.velocity||{},sellableVelocity:d.sellableVelocity||{},pos:d.pos||[],allPos:d.allPos||d.pos||[],names:d.names||{},sizes:d.sizes||{},bomData:d.bomData||null,reorderBomData:d.reorderBomData||null,costs:d.costs||{},trendData:d.trendData||{},weeklyData:d.weeklyData||null,cbmMap:d.cbmMap||{},suppliers:d.suppliers||{},landedCosts:d.landedCosts||{},productTypes:d.productTypes||{},coverageAux:d.coverageAux||null,warehouseOptions:d.warehouseOptions||null,warehouseViews:d.warehouseViews||null,mattressRegions:d.mattressRegions||null,fx:d.fx||null,lastRefresh:d.lastRefresh||null,lastCin7Refresh:d.lastCin7Refresh||null,lastPoRefresh:d.lastPoRefresh||null,lastShopifyRefresh:d.lastShopifyRefresh||null};
+  DATA={cin7:d.cin7||{},shopify:d.shopify||{},openOrders:d.openOrders||{},available:d.available||{},incoming:d.incoming||{},velocity:d.velocity||{},sellableVelocity:d.sellableVelocity||{},exactSellableVelocity:d.exactSellableVelocity||{},exactSellableWeeklyData:d.exactSellableWeeklyData||{},pos:d.pos||[],allPos:d.allPos||d.pos||[],names:d.names||{},sizes:d.sizes||{},bomData:d.bomData||null,reorderBomData:d.reorderBomData||null,costs:d.costs||{},trendData:d.trendData||{},weeklyData:d.weeklyData||null,cbmMap:d.cbmMap||{},suppliers:d.suppliers||{},landedCosts:d.landedCosts||{},productTypes:d.productTypes||{},coverageAux:d.coverageAux||null,warehouseOptions:d.warehouseOptions||null,warehouseViews:d.warehouseViews||null,mattressRegions:d.mattressRegions||null,fx:d.fx||null,lastRefresh:d.lastRefresh||null,lastCin7Refresh:d.lastCin7Refresh||null,lastPoRefresh:d.lastPoRefresh||null,lastShopifyRefresh:d.lastShopifyRefresh||null};
   DATA._base={cin7:DATA.cin7,shopify:DATA.shopify,openOrders:DATA.openOrders,available:DATA.available,incoming:DATA.incoming,velocity:DATA.velocity,sellableVelocity:DATA.sellableVelocity,trendData:DATA.trendData,weeklyData:DATA.weeklyData,pos:DATA.pos,allPos:DATA.allPos,coverageAux:DATA.coverageAux};
   document.getElementById('headerTitle').innerHTML=`${headerVisual(d.ck)} ${d.ck.name}`;
   Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}});charts={};dashFilter.size='All';dashFilter.region='All';dashFilter.warehouse='All';dashFilter.productType='All';dashFilter.color='All';dashFilter.reorderType='All';applyMattressRegion();applyWarehouseFilter();updateHeaderSub();

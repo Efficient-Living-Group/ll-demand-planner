@@ -10,6 +10,7 @@ const {
   littleLifelyCtpComponentsForDemandSku,
   cocoonPhysicalComponentsForDemandSku,
   caseGoodsBundleComponentsForDemandSku,
+  isLlnaSellableParentSku,
   isShopifyVelocitySourceEligibleForPanel
 } = require('./lib/little-lifely-demand');
 const {
@@ -3352,6 +3353,31 @@ function buildCKData(ckId) {
     }
   }
 
+  // LLNA/LLCA finished-bed rows are physical sellable stock as well as BOM
+  // parents. Their row-level sales velocity must use exact direct Shopify
+  // sales, never the historical last-in-stock estimate. Component rows keep
+  // using BOM-expanded consumption velocity.
+  const exactSellableVelocity = {};
+  const exactSellableWeeklyData = {};
+  if (ckId === 'llna' || ckId === 'llca') {
+    for (const sku of Object.keys(cin7)) {
+      if (!isLlnaSellableParentSku(sku)) continue;
+      exactSellableVelocity[sku] = Number(sellableVelocity[sku] || 0);
+      exactSellableWeeklyData[sku] = {};
+    }
+    for (const sourceStore of relatedStores) {
+      const source = dataCache.shopifyVelocityByCountry?.[sourceStore]?.[salesCountry] || {};
+      for (const [rawSku, weeks] of Object.entries(source._weeklyBreakdown || {})) {
+        const sku = canonicalDemandSku(rawSku, salesCountry || '');
+        if (!Object.prototype.hasOwnProperty.call(exactSellableWeeklyData, sku)) continue;
+        for (const [week, qty] of Object.entries(weeks || {})) {
+          exactSellableWeeklyData[sku][week] =
+            (exactSellableWeeklyData[sku][week] || 0) + Number(qty || 0);
+        }
+      }
+    }
+  }
+
   return sanitizePlannerSkuData({
     ck: def,
     cin7,
@@ -3361,6 +3387,8 @@ function buildCKData(ckId) {
     incoming,
     velocity,
     sellableVelocity,
+    exactSellableVelocity,
+    exactSellableWeeklyData,
     pos,
     allPos,
     names,
@@ -3520,6 +3548,9 @@ const HIDDEN_CK_TABS = new Set(['llau-cbcf', 'cmss']);
 let executiveSummaryCache = { key: null, value: null };
 
 function executiveVelocity(data, sku) {
+  if (Object.prototype.hasOwnProperty.call(data?.exactSellableVelocity || {}, sku)) {
+    return Number(data.exactSellableVelocity[sku] || 0);
+  }
   const direct = Number(data?.velocity?.[sku] || 0);
   if (direct > 0) return direct;
   return Number(data?.trendData?.[sku]?.lastInStockVel || 0);
