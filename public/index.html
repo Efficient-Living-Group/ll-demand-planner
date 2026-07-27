@@ -759,6 +759,13 @@ function calcStockTurnDays(net,vel){
   if(net<=0)return 0;
   return (net/vel)*7;
 }
+const STOCK_TURN_TRAILING_DAYS=90;
+function getStockTurnVel(s){
+  const weekly=DATA.weeklyData?.[s];
+  if(!weekly||typeof weekly!=='object')return 0;
+  const trailingUnits=Object.values(weekly).reduce((sum,qty)=>sum+Number(qty||0),0);
+  return trailingUnits/STOCK_TURN_TRAILING_DAYS*7;
+}
 function fmtStockTurnDays(days){
   if(days==null||!Number.isFinite(days))return '<span style="color:var(--text-dim)">—</span>';
   if(days>=100)return Math.round(days).toLocaleString()+'d';
@@ -1069,22 +1076,23 @@ function renderBOM() {
   };
   const primaryEntries = summary.primaryType ? allEntries.filter(([k,v]) => v.type === summary.primaryType) : allEntries;
 
-  let primarySOH = 0, primaryIncoming = 0, primaryOversold = 0, primaryVel = 0;
+  let primarySOH = 0, primaryIncoming = 0, primaryOversold = 0, primaryVel = 0, primaryTurnVel = 0;
   primaryEntries.forEach(([sku, c]) => {
     primarySOH += c.soh;
     primaryIncoming += c.incoming;
     primaryOversold += (c.standaloneOversold || 0) + (c.comboOversold || 0);
     primaryVel += c.totalDemand;
+    primaryTurnVel += getStockTurnVel(sku);
   });
   let primaryWks = primaryVel > 0 ? Math.max(0, Math.round(primarySOH / primaryVel)) : 99;
   const primaryNet = Math.max(0, primarySOH + Math.min(primaryOversold, 0));
-  const primaryTurnDays = calcStockTurnDays(primaryNet, primaryVel);
+  const primaryTurnDays = calcStockTurnDays(primaryNet, primaryTurnVel);
 
   document.getElementById('summary-cards').innerHTML = `
     <div class="card green"><div class="label">${summary.stockLabel}</div><div class="value">${Math.round(primarySOH).toLocaleString()}</div><div class="sub">${summary.stockSub}</div></div>
     <div class="card blue"><div class="label">Incoming</div><div class="value">${Math.round(primaryIncoming).toLocaleString()}</div><div class="sub">${summary.incomingSub}</div></div>
     <div class="card red"><div class="label">Oversold</div><div class="value">${Math.round(primaryOversold).toLocaleString()}</div><div class="sub">${summary.oversoldSub}</div></div>
-    <div class="card blue" title="Weighted average stock turn days = total net available ÷ (total weekly velocity ÷ 7)."><div class="label">Avg Stock Turn Days</div><div class="value">${fmtStockTurnDays(primaryTurnDays)}</div><div class="sub">Weighted by component velocity</div></div>
+    <div class="card blue" title="Weighted average stock turn days = total net available ÷ (90-day trailing Shopify sales ÷ 90)."><div class="label">Avg Stock Turn Days</div><div class="value">${fmtStockTurnDays(primaryTurnDays)}</div><div class="sub">90-day trailing Shopify sales</div></div>
     <div class="card yellow"><div class="label">Avg Wks Stock</div><div class="value">${primaryWks}</div><div class="sub">${summary.weeksSub}</div></div>`;
 
   const coverageStats = { next: 0, later: 0, notCovered: 0, noIncoming: 0 };
@@ -1173,11 +1181,11 @@ function renderDashboard(){
   if(['llau','llnz','lluk'].includes(currentCK)) filtered=filtered.filter(s=>!(DATA.coverageAux?.mattressSkus||[]).includes(s));
   filtered=filtered.sort((a,b)=>{if(isLifelySofaPanel()){const ca=getLifelySofaColor(a),cb=getLifelySofaColor(b);const cr=lifelySofaColorRank(ca)-lifelySofaColorRank(cb)||ca.localeCompare(cb);if(cr)return cr;}return a.localeCompare(b);});
   const hasDashboardFilter=dashFilter.size!=='All'||(dashFilter.productType&&dashFilter.productType!=='All')||(dashFilter.warehouse&&dashFilter.warehouse!=='All')||(isLifelySofaPanel()&&dashFilter.color&&dashFilter.color!=='All');
-  let tSOH=0,tInc=0,tOver=0,tVel=0,tNet=0;
-  filtered.forEach(s=>{tSOH+=(DATA.cin7[s]||0);tInc+=getIncoming(s);tOver-=getOpenSales(s);tVel+=getVel(s);tNet+=getNet(s)});
+  let tSOH=0,tInc=0,tOver=0,tVel=0,tTurnVel=0,tNet=0;
+  filtered.forEach(s=>{tSOH+=(DATA.cin7[s]||0);tInc+=getIncoming(s);tOver-=getOpenSales(s);tVel+=getVel(s);tTurnVel+=getStockTurnVel(s);tNet+=getNet(s)});
   let wksT=tVel>0?Math.round((tSOH+Math.min(tOver,0))/tVel):99;
-  const avgStockTurnDays=calcStockTurnDays(tNet,tVel);
-  const avgStockTurnSub=hasDashboardFilter?'Current filters applied':'Weighted by category velocity';
+  const avgStockTurnDays=calcStockTurnDays(tNet,tTurnVel);
+  const avgStockTurnSub=hasDashboardFilter?'90-day trailing · filters applied':'90-day trailing Shopify sales';
   let preorderBreakdownCard='', openOrdersCard='';
   if(littleLifelyPanels.includes(currentCK)){
     if(DATA.coverageAux?.componentMode==='frame-cover'){
@@ -1230,7 +1238,7 @@ function renderDashboard(){
     <div class="card blue" style="cursor:pointer;border:2px solid var(--blue);transition:all 0.15s" title="Units on the way from open Purchase Orders. Click for PO-level breakdown." onclick="toggleInboundDrilldown()" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 12px rgba(44,71,75,0.15)'" onmouseout="this.style.transform='';this.style.boxShadow=''"><div class="label" style="display:flex;align-items:center;gap:4px">Incoming <span style="font-size:9px;background:var(--blue);color:#fff;padding:1px 6px;border-radius:8px">▼ Details</span></div><div class="value">${tInc.toLocaleString()}</div><div class="sub">${uniquePoCount(DATA.pos)} open POs</div></div>
     ${openOrdersCard}
     ${preorderBreakdownCard}
-    <div class="card blue" title="Weighted average stock turn days = total net available ÷ (total weekly velocity ÷ 7). Uses visible rows and current filters."><div class="label">Avg Stock Turn Days</div><div class="value">${fmtStockTurnDays(avgStockTurnDays)}</div><div class="sub">${avgStockTurnSub}</div></div>
+    <div class="card blue" title="Weighted average stock turn days = total net available ÷ (90-day trailing Shopify sales ÷ 90). Uses visible rows and current filters."><div class="label">Avg Stock Turn Days</div><div class="value">${fmtStockTurnDays(avgStockTurnDays)}</div><div class="sub">${avgStockTurnSub}</div></div>
     <div class="card ${overstockVal>0?'yellow':'green'}" title="Dollar value of stock above 25 weeks of cover at current velocity, excluding dead stock. Supplier price (FOB) only, not landed cost."><div class="label">Overstock Value</div><div class="value">$${overstockVal>=1000000?(overstockVal/1000000).toFixed(1)+'M':Math.round(overstockVal).toLocaleString()}</div><div class="sub">Excess above 25 weeks, FOB only</div></div>
     <div class="card ${deadstockVal>0?'red':'green'}" title="Dollar value of SKUs with physical stock but zero sales velocity. Supplier price (FOB) only, not landed cost."><div class="label">💀 Dead Stock Value</div><div class="value">$${deadstockVal>=1000000?(deadstockVal/1000000).toFixed(1)+'M':Math.round(deadstockVal).toLocaleString()}</div><div class="sub">Zero-velocity stock, FOB only</div></div>`;
   const regionFilters=currentCK==='ll-mattresses'?['All','AU','NZ','UK'].map(r=>`<button class="filter-btn ${dashFilter.region===r?'active':''}" onclick="setMattressRegion('${r}')">${r}</button>`).join(''):'';
@@ -1302,10 +1310,10 @@ function renderDashboard(){
     ? `<th data-tip>Preorders<span class="tip">Units still waiting after using current ${coverageMeta.label} stock. Little Lifely bundle rows include matching combo/component demand where configured.</span></th><th data-tip>Next PO<span class="tip">First ${coverageMeta.place} PO for this SKU by ETA, shown with incoming qty</span></th><th data-tip>Next ETA<span class="tip">ETA of the next ${coverageMeta.place} PO for this SKU</span></th><th data-tip>Coverage PO<span class="tip">PO that fully clears the preorder demand, corresponding to the Preorder Date</span></th><th data-tip>Preorder Date<span class="tip">ETA of the first PO that fully clears the preorder backlog using the limiting component</span></th><th data-tip>Coverage Status<span class="tip">In stock, Covered by next shipment, Covered by later shipment, No incoming PO, ETA missing, Not covered, or Dropship</span></th>`
     : '';
   const incomingDateBuckets=buildIncomingDateBreakdown();
-  document.querySelector('#stockTable thead').innerHTML='<tr><th>SKU</th>'+colorHeader+'<th>'+sizeColumnHeader+'</th><th data-tip>CIN7 SOH<span class="tip">Stock On Hand — physical units in the warehouse from CIN7</span></th><th data-tip>Open Orders<span class="tip">Cin7 open-order units waiting to be fulfilled. For Lifely coverage tabs this comes from Cin7 open sales/open orders, not Shopify inventory.</span></th><th data-tip>Net Available<span class="tip">Cin7 Stock.available: stock remaining after reservations/open demand. This is the net stock value used for weeks-left and reorder calculations.</span></th>'+incomingHeaderHtml(incomingDateBuckets)+coverageHeader+'<th data-tip>Units/wk<span class="tip">Average weekly sales velocity over the last 30 days from Shopify orders</span></th><th data-tip>Wks Left Now<span class="tip">Weeks of stock remaining before incoming POs. Net Available ÷ Units/wk.</span></th><th data-tip>Wks Left + Incoming<span class="tip">Weeks of stock after adding currently open incoming POs. This is visibility only; reorder quantity rules will be reviewed separately.</span></th><th data-tip>Stock Turn Days<span class="tip">Current stock turn days = Net Available ÷ (Units/wk ÷ 7). Uses Cin7 net available after open demand.</span></th><th data-tip>Target Days<span class="tip">Target stock turn days from YK target stockturn sheet, applied by market/category.</span></th><th data-tip>Target Status<span class="tip">Under = below minimum target days; Over = above maximum target days; On target = within target range.</span></th><th data-tip>Status<span class="tip">STOCKOUT: 0wk | CRITICAL: 1-2wk | LOW: 3-4wk | OK: 5-8wk | HEALTHY: 8+wk</span></th><th data-tip>FOB<span class="tip">Factory cost per unit (AUD). From CIN7 costAUD or costUSD×FX</span></th><th data-tip>Freight/u<span class="tip">AUD freight per unit based on CBM share of container. (SKU CBM ÷ PO total CBM) × container freight ÷ qty</span></th><th data-tip>Landed<span class="tip">Full landed cost per unit in AUD = FOB + Freight + Tariff. Landed-cost sheet values are maintained in AUD; estimates use open POs</span></th><th>Supplier</th><th data-tip>CBM<span class="tip">Cubic meters per unit from CIN7 product volume</span></th></tr>';
+  document.querySelector('#stockTable thead').innerHTML='<tr><th>SKU</th>'+colorHeader+'<th>'+sizeColumnHeader+'</th><th data-tip>CIN7 SOH<span class="tip">Stock On Hand — physical units in the warehouse from CIN7</span></th><th data-tip>Open Orders<span class="tip">Cin7 open-order units waiting to be fulfilled. For Lifely coverage tabs this comes from Cin7 open sales/open orders, not Shopify inventory.</span></th><th data-tip>Net Available<span class="tip">Cin7 Stock.available: stock remaining after reservations/open demand. This is the net stock value used for weeks-left and reorder calculations.</span></th>'+incomingHeaderHtml(incomingDateBuckets)+coverageHeader+'<th data-tip>Units/wk<span class="tip">Average weekly sales velocity over the last 30 days from Shopify orders</span></th><th data-tip>Wks Left Now<span class="tip">Weeks of stock remaining before incoming POs. Net Available ÷ Units/wk.</span></th><th data-tip>Wks Left + Incoming<span class="tip">Weeks of stock after adding currently open incoming POs. This is visibility only; reorder quantity rules will be reviewed separately.</span></th><th data-tip>Stock Turn Days<span class="tip">Stock turn days = Net Available ÷ (90-day trailing Shopify sales ÷ 90). Uses Cin7 net available after open demand.</span></th><th data-tip>Target Days<span class="tip">Target stock turn days from YK target stockturn sheet, applied by market/category.</span></th><th data-tip>Target Status<span class="tip">Under = below minimum target days; Over = above maximum target days; On target = within target range.</span></th><th data-tip>Status<span class="tip">STOCKOUT: 0wk | CRITICAL: 1-2wk | LOW: 3-4wk | OK: 5-8wk | HEALTHY: 8+wk</span></th><th data-tip>FOB<span class="tip">Factory cost per unit (AUD). From CIN7 costAUD or costUSD×FX</span></th><th data-tip>Freight/u<span class="tip">AUD freight per unit based on CBM share of container. (SKU CBM ÷ PO total CBM) × container freight ÷ qty</span></th><th data-tip>Landed<span class="tip">Full landed cost per unit in AUD = FOB + Freight + Tariff. Landed-cost sheet values are maintained in AUD; estimates use open POs</span></th><th>Supplier</th><th data-tip>CBM<span class="tip">Cubic meters per unit from CIN7 product volume</span></th></tr>';
   document.querySelector('#stockTable tbody').innerHTML=filtered.map(s=>{
     let soh=DATA.cin7[s]||0,sh=getOpenOrdersDisplay(s),net=getNet(s),inc=getIncoming(s),vel=getVel(s),wks=net<=0?0:(vel>0?Math.max(0,Math.round(net/vel)):99),wksInc=(net+inc)<=0?0:(vel>0?Math.max(0,Math.round((net+inc)/vel)):99);
-    const stockTurnDays=calcStockTurnDays(net,vel), targetRule=getTargetStockTurnRule(s);
+    const stockTurnDays=calcStockTurnDays(net,getStockTurnVel(s)), targetRule=getTargetStockTurnRule(s);
     const lc=DATA.landedCosts[s];const fob=(DATA.costs||{})[s]||0;const isEst=lc&&lc.source==='estimated'; const supplier=(DATA.suppliers||{})[s]||'—'; const cbm=(DATA.cbmMap||{})[s]||0;
     const coverage=showCoverage?buildPreorderCoverage(s):null;
     const coverageBadgeClass=!coverage?''
