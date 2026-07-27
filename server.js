@@ -9,7 +9,8 @@ const { summarizeSalesVolume } = require('./lib/executive-sales');
 const {
   littleLifelyCtpComponentsForDemandSku,
   cocoonPhysicalComponentsForDemandSku,
-  caseGoodsBundleComponentsForDemandSku
+  caseGoodsBundleComponentsForDemandSku,
+  isShopifyVelocitySourceEligibleForPanel
 } = require('./lib/little-lifely-demand');
 const {
   resolveBomMasterLeaves,
@@ -2395,6 +2396,7 @@ function buildCKData(ckId) {
     for (const [rawSku, vel] of Object.entries(source || {})) {
       if (String(rawSku || '').startsWith('_')) continue;
       const sku = canonicalDemandSku(rawSku, country);
+      if (!isShopifyVelocitySourceEligibleForPanel(ckId, sku)) continue;
       const exact30DayUnits = source?._30d?.[rawSku];
       const weeklyVelocity = exact30DayUnits !== undefined
         ? Number(exact30DayUnits || 0) / 30 * 7
@@ -3270,20 +3272,28 @@ function buildCKData(ckId) {
         for (const [rawComboSku, vel] of Object.entries(velSource)) {
           if (rawComboSku.startsWith('_')) continue;
           const comboSku = canonicalDemandSku(rawComboSku, cfg.salesCountry);
-          const mattressSku = Object.entries(cfg.comboMap).find(([prefix]) => comboSku.startsWith(prefix))?.[1];
-          if (!mattressSku) continue;
-          regionVelocity[mattressSku] = (regionVelocity[mattressSku] || 0) + Number(vel || 0);
-          regionVelocity._7d[mattressSku] = (regionVelocity._7d[mattressSku] || 0) + Number(velSource._7d?.[rawComboSku] || velSource._7d?.[comboSku] || 0);
-          regionVelocity._30d[mattressSku] = (regionVelocity._30d[mattressSku] || 0) + Number(velSource._30d?.[rawComboSku] || velSource._30d?.[comboSku] || 0);
-          const firstSeen = velSource._firstSeen?.[rawComboSku] || velSource._firstSeen?.[comboSku] || null;
-          if (firstSeen && (!regionVelocity._firstSeen[mattressSku] || String(firstSeen) < String(regionVelocity._firstSeen[mattressSku]))) {
-            regionVelocity._firstSeen[mattressSku] = firstSeen;
-          }
-          for (const [week, qty] of Object.entries(velSource._weeklyBreakdown?.[rawComboSku] || velSource._weeklyBreakdown?.[comboSku] || {})) {
-            if (!regionVelocity._weeklyBreakdown[mattressSku]) regionVelocity._weeklyBreakdown[mattressSku] = {};
-            regionVelocity._weeklyBreakdown[mattressSku][week] = (regionVelocity._weeklyBreakdown[mattressSku][week] || 0) + Number(qty || 0);
-            if (!regionWeeklyData[mattressSku]) regionWeeklyData[mattressSku] = {};
-            regionWeeklyData[mattressSku][week] = (regionWeeklyData[mattressSku][week] || 0) + Number(qty || 0);
+          if (!isShopifyVelocitySourceEligibleForPanel('ll-mattresses', comboSku)) continue;
+          const mappedMattresses = explodeDemandSkuForCk(comboSku, 'll-mattresses') || [];
+          for (const mattressSku of cfg.skus) {
+            const multiplier = mappedMattresses.filter(mappedSku => mappedSku === mattressSku).length;
+            if (!multiplier) continue;
+            regionVelocity[mattressSku] = (regionVelocity[mattressSku] || 0) + Number(vel || 0) * multiplier;
+            regionVelocity._7d[mattressSku] = (regionVelocity._7d[mattressSku] || 0)
+              + Number(velSource._7d?.[rawComboSku] || velSource._7d?.[comboSku] || 0) * multiplier;
+            regionVelocity._30d[mattressSku] = (regionVelocity._30d[mattressSku] || 0)
+              + Number(velSource._30d?.[rawComboSku] || velSource._30d?.[comboSku] || 0) * multiplier;
+            const firstSeen = velSource._firstSeen?.[rawComboSku] || velSource._firstSeen?.[comboSku] || null;
+            if (firstSeen && (!regionVelocity._firstSeen[mattressSku] || String(firstSeen) < String(regionVelocity._firstSeen[mattressSku]))) {
+              regionVelocity._firstSeen[mattressSku] = firstSeen;
+            }
+            for (const [week, qty] of Object.entries(velSource._weeklyBreakdown?.[rawComboSku] || velSource._weeklyBreakdown?.[comboSku] || {})) {
+              if (!regionVelocity._weeklyBreakdown[mattressSku]) regionVelocity._weeklyBreakdown[mattressSku] = {};
+              regionVelocity._weeklyBreakdown[mattressSku][week] = (regionVelocity._weeklyBreakdown[mattressSku][week] || 0)
+                + Number(qty || 0) * multiplier;
+              if (!regionWeeklyData[mattressSku]) regionWeeklyData[mattressSku] = {};
+              regionWeeklyData[mattressSku][week] = (regionWeeklyData[mattressSku][week] || 0)
+                + Number(qty || 0) * multiplier;
+            }
           }
         }
       }
@@ -3383,10 +3393,11 @@ function buildCKData(ckId) {
               wk[week] = (wk[week] || 0) + Number(qty || 0) * multiplier;
             }
           };
-          addTrendForKey(sku, 1);
+          if (isShopifyVelocitySourceEligibleForPanel(ckId, sku)) addTrendForKey(sku, 1);
           for (const rawSku of Object.keys(velSource || {})) {
             if (String(rawSku || '').startsWith('_')) continue;
             const demandSku = canonicalDemandSku(rawSku, country);
+            if (!isShopifyVelocitySourceEligibleForPanel(ckId, demandSku)) continue;
             const exploded = explodeDemandSkuForCk(demandSku, ckId);
             const mappedSkus = [...(exploded || [])];
             for (const primarySku of exploded || [demandSku]) {
@@ -3431,6 +3442,7 @@ function buildCKData(ckId) {
         };
         for (const [sourceSku, weeks] of Object.entries(weekly || {})) {
           const demandSku = canonicalDemandSku(sourceSku, country);
+          if (!isShopifyVelocitySourceEligibleForPanel(ckId, demandSku)) continue;
           const exploded = explodeDemandSkuForCk(demandSku, ckId);
           const primaryMappings = exploded || [demandSku];
           const supplementalMappings = primaryMappings.flatMap(primarySku => supplementalDemandComponentsForCk(primarySku, ckId));
@@ -3521,6 +3533,7 @@ function executiveSourceSkuBelongsToPanel(sourceSku, panel) {
     canonicalDemandSku(sourceSku, def.salesCountry || '')
   ]);
   for (const candidate of candidates) {
+    if (!isShopifyVelocitySourceEligibleForPanel(panel.id, candidate)) continue;
     if (panel._skuSet.has(candidate)) return true;
     const exploded = explodeDemandSkuForCk(candidate, panel.id);
     if (exploded?.some(componentSku => panel._skuSet.has(componentSku))) return true;

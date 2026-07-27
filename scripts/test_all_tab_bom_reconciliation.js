@@ -11,6 +11,9 @@ const {
   resolveBomMasterLeaves,
   isBomMasterDemandParentForPanel
 } = require('../lib/bom-master-demand');
+const {
+  isShopifyVelocitySourceEligibleForPanel
+} = require('../lib/little-lifely-demand');
 
 const ROOT = path.resolve(__dirname, '..');
 const SNAPSHOT = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'cache-snapshot.json'), 'utf8'));
@@ -92,6 +95,7 @@ function rawVelocityForPanel(ckId, ck) {
     for (const [rawSku, rawVelocity] of Object.entries(source)) {
       if (String(rawSku || '').startsWith('_')) continue;
       const sku = normalizeSku(rawSku);
+      if (!isShopifyVelocitySourceEligibleForPanel(ckId, sku)) continue;
       const exact30DayUnits = source?._30d?.[rawSku];
       const velocity = exact30DayUnits !== undefined
         ? Number(exact30DayUnits || 0) / 30 * 7
