@@ -175,6 +175,10 @@ if (!refreshScriptSource.includes('"shopifyVelocityByWarehouse"')) {
 if (!serverSource.includes('git -c user.name="Lifely Demand Planner" -c user.email="lifely.abundance@gmail.com" commit')) {
   blockers.push('Render cache refresh commits must set a local Git author identity');
 }
+if (!serverSource.includes('CACHE_PUSH_SKIPPED_NO_REMOTE')
+  || !serverSource.includes("skipped: 'git-remote-unavailable'")) {
+  blockers.push('Render manual refresh must remain usable when the ephemeral checkout has no Git remote');
+}
 if (!refreshScriptSource.includes('us_units_30d')
   || !refreshScriptSource.includes('assigned_us_units_30d')
   || !refreshScriptSource.includes('unmapped_us_units_30d')) {

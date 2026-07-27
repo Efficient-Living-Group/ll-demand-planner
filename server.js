@@ -1149,6 +1149,7 @@ function maybePushCacheSnapshotToGit(reason = 'cin7-refresh', options = {}) {
   }
   cacheSnapshotPushInFlight = true;
   const command = [
+    'if ! git remote get-url origin >/dev/null 2>&1; then echo "CACHE_PUSH_SKIPPED_NO_REMOTE"; exit 0; fi',
     'git add data/cache-snapshot.json data/po-eta-history.json data/po-eta-history.last-good.json',
     'if git diff --cached --quiet; then echo "No cache snapshot changes to commit"; exit 0; fi',
     `git -c user.name="Lifely Demand Planner" -c user.email="lifely.abundance@gmail.com" commit -m "Update cache snapshot (${reason})"`,
@@ -1162,6 +1163,11 @@ function maybePushCacheSnapshotToGit(reason = 'cin7-refresh', options = {}) {
       if (error) {
         if (error.code !== 0) console.error('Cache snapshot git push failed:', error.message);
         resolve({ ok: false, pushed: false, error: error.message });
+        return;
+      }
+      if ((stdout || '').includes('CACHE_PUSH_SKIPPED_NO_REMOTE')) {
+        console.log('Cache snapshot saved to the running service; Git remote unavailable, so the durable external refresh remains authoritative');
+        resolve({ ok: true, pushed: false, skipped: 'git-remote-unavailable' });
         return;
       }
       saveSnapshotPushState({ ...state, cacheLastSuccessAtMs: Date.now(), cacheLastReason: reason, cachePushedAt: new Date().toISOString() });
