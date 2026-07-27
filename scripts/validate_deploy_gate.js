@@ -172,6 +172,9 @@ const refreshScriptSource = fs.readFileSync(REFRESH_SCRIPT_PATH, 'utf8');
 if (!refreshScriptSource.includes('"shopifyVelocityByWarehouse"')) {
   blockers.push('Durable cache refresh must preserve aggregate Shopify warehouse velocity');
 }
+if (!serverSource.includes('git -c user.name="Lifely Demand Planner" -c user.email="lifely.abundance@gmail.com" commit')) {
+  blockers.push('Render cache refresh commits must set a local Git author identity');
+}
 if (!refreshScriptSource.includes('us_units_30d')
   || !refreshScriptSource.includes('assigned_us_units_30d')
   || !refreshScriptSource.includes('unmapped_us_units_30d')) {

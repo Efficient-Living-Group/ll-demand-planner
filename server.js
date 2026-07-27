@@ -1151,7 +1151,7 @@ function maybePushCacheSnapshotToGit(reason = 'cin7-refresh', options = {}) {
   const command = [
     'git add data/cache-snapshot.json data/po-eta-history.json data/po-eta-history.last-good.json',
     'if git diff --cached --quiet; then echo "No cache snapshot changes to commit"; exit 0; fi',
-    `git commit -m "Update cache snapshot (${reason})"`,
+    `git -c user.name="Lifely Demand Planner" -c user.email="lifely.abundance@gmail.com" commit -m "Update cache snapshot (${reason})"`,
     'git push'
   ].join(' && ');
   return new Promise(resolve => {
