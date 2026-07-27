@@ -20,7 +20,11 @@ assert(source.includes('calcStockTurnDays(tNet,tTurnVel)'), 'Average stock turn 
 assert(source.includes('calcStockTurnDays(net,getStockTurnVel(s))'), 'Row stock turn and target status must use the 90-day rate');
 assert(source.includes('primaryTurnVel += getStockTurnVel(sku);'), 'Component summary stock turn must use the 90-day rate');
 assert(source.includes('primaryVel += c.totalDemand;'), 'The existing 30-day Avg Wks Stock calculation must remain unchanged');
-assert(source.includes('90-day trailing Shopify sales ÷ 90'), 'Stock-turn formula must be explained in the UI');
+assert(source.includes('Avg Stock Turn Days = total Cin7 Net Available units ÷ average daily mapped Shopify sales over the last 90 days.'), 'Average stock-turn tooltip must name the exact numerator and denominator');
+assert(source.includes('Average daily mapped sales = eligible mapped Shopify units sold in the last 90 days ÷ 90.'), 'Average stock-turn tooltip must explain the daily sales rate');
+assert(source.includes('Incoming POs are excluded. Current filters apply.'), 'Average stock-turn tooltip must state its exclusions and filter scope');
+assert(source.includes('Stock Turn Days = this SKU’s Cin7 Net Available units ÷ average daily mapped Shopify sales over the last 90 days.'), 'Row stock-turn tooltip must explain the SKU-level formula');
+assert((source.match(/class="card blue" data-tip tabindex="0"/g)||[]).length >= 2, 'Both stock-turn cards must expose the formula with an accessible tooltip');
 
 const ninetyDayUnits = 900;
 const weeklyRate = ninetyDayUnits / 90 * 7;
