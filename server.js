@@ -2707,6 +2707,9 @@ function buildCKData(ckId) {
       const viewIncoming = {};
       const viewVelocity = {};
       const viewPos = [];
+      const viewCoverageOpenDemandBySku = {};
+      const viewCoverageStockBySku = {};
+      const viewCoveragePoRows = {};
       const panelSkus = new Set(Object.keys(cin7 || {}).filter(sku => sku.startsWith('PAD-')));
       const branchSet = new Set(cfg.branchIds.map(String));
       for (const sku of panelSkus) {
@@ -2723,6 +2726,10 @@ function buildCKData(ckId) {
           viewCin7[sku] = branchData.soh;
           viewAvailable[sku] = branchData.available;
         }
+        viewCoverageStockBySku[sku] = {
+          soh: branchData.matched > 0 ? branchData.soh : 0,
+          available: branchData.matched > 0 ? branchData.available : 0
+        };
       }
       for (const [sku, qty] of Object.entries(getCin7OpenSalesBySku(cfg.branchIds, cfg.salesCountry))) {
         if (!panelSkus.has(sku)) continue;
@@ -2730,7 +2737,9 @@ function buildCKData(ckId) {
       }
       for (const [sku, qty] of Object.entries(getCin7PreordersBySku(cfg.branchIds, cfg.salesCountry))) {
         if (!panelSkus.has(sku)) continue;
-        viewShopify[sku] = (viewShopify[sku] || 0) - Number(qty || 0);
+        const q = Number(qty || 0);
+        viewShopify[sku] = (viewShopify[sku] || 0) - q;
+        viewCoverageOpenDemandBySku[sku] = (viewCoverageOpenDemandBySku[sku] || 0) + q;
       }
       for (const po of dataCache.cin7POs || []) {
         if (!isOpenPO(po)) continue;
@@ -2743,6 +2752,12 @@ function buildCKData(ckId) {
           if (!q) continue;
           viewIncoming[sku] = (viewIncoming[sku] || 0) + q;
           relevantItems[sku] = q;
+          if (!viewCoveragePoRows[sku]) viewCoveragePoRows[sku] = [];
+          viewCoveragePoRows[sku].push({
+            reference: po.reference,
+            qty: q,
+            eta: po.arrival || po.estimatedArrivalDate || null
+          });
         }
         if (Object.keys(relevantItems).length) viewPos.push({ ...po, analyticsItems: relevantItems });
       }
@@ -2766,7 +2781,21 @@ function buildCKData(ckId) {
         if (viewIncoming[sku] === undefined) viewIncoming[sku] = 0;
         if (viewVelocity[sku] === undefined) viewVelocity[sku] = 0;
       }
-      return { cin7: viewCin7, available: viewAvailable, openOrders: viewOpenOrders, shopify: viewShopify, incoming: viewIncoming, velocity: viewVelocity, pos: viewPos, allPos: viewPos };
+      return {
+        cin7: viewCin7,
+        available: viewAvailable,
+        openOrders: viewOpenOrders,
+        shopify: viewShopify,
+        incoming: viewIncoming,
+        velocity: viewVelocity,
+        pos: viewPos,
+        allPos: viewPos,
+        coverageOpenDemandBySku: viewCoverageOpenDemandBySku,
+        coverageRawOpenDemandBySku: { ...viewCoverageOpenDemandBySku },
+        coverageRawOpenDemandTotal: Object.values(viewCoverageOpenDemandBySku).reduce((sum, qty) => sum + Number(qty || 0), 0),
+        coverageStockBySku: viewCoverageStockBySku,
+        coveragePoRows: viewCoveragePoRows
+      };
     };
     for (const cfg of airflowCountryConfigs) warehouseViews[cfg.id] = buildAirflowCountryView(cfg);
   }
@@ -3553,6 +3582,7 @@ function buildCKData(ckId) {
       const regionShopify = {};
       const regionOpenOrders = {};
       const regionAvailable = {};
+      const regionIncoming = {};
       const regionVelocity = { _7d: {}, _30d: {}, _weeklyBreakdown: {}, _firstSeen: {} };
       const regionTrendData = {};
       const regionWeeklyData = {};
@@ -3650,9 +3680,14 @@ function buildCKData(ckId) {
         if (!Object.keys(relevantItems).length) continue;
         const row = { ...po, items: relevantItems, analyticsItems: relevantItems };
         regionAllPos.push(row);
-        if (isOpenPO(po)) regionPos.push(row);
+        if (isOpenPO(po)) {
+          regionPos.push(row);
+          for (const [sku, qty] of Object.entries(relevantItems)) {
+            regionIncoming[sku] = (regionIncoming[sku] || 0) + Number(qty || 0);
+          }
+        }
       }
-      return [region, { cin7: regionCin7, shopify: regionShopify, openOrders: regionOpenOrders, available: regionAvailable, velocity: regionVelocity, trendData: regionTrendData, weeklyData: regionWeeklyData, pos: regionPos, allPos: regionAllPos }];
+      return [region, { cin7: regionCin7, shopify: regionShopify, openOrders: regionOpenOrders, available: regionAvailable, incoming: regionIncoming, velocity: regionVelocity, trendData: regionTrendData, weeklyData: regionWeeklyData, pos: regionPos, allPos: regionAllPos }];
     }));
 
     // The default "All" mattress view should use Cin7 open sales by SKU
