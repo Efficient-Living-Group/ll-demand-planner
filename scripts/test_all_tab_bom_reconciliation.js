@@ -214,7 +214,7 @@ async function reconcilePanel(row) {
 
     const missingBom = panels.flatMap(panel => panel.missingBom.map(issue => ({ panel: panel.id, ...issue })));
     const demandGaps = panels.flatMap(panel => panel.demandGaps.map(issue => ({ panel: panel.id, ...issue })));
-    assert.strictEqual((list.list || []).length, 20, 'universal reconciliation must cover all 20 planner tabs');
+    assert.strictEqual((list.list || []).length, 24, 'universal reconciliation must cover all 24 planner tabs');
     const exclusionKeys = new Set(missingBom.map(issue => `${issue.panel}:${issue.parentSku}:${issue.reason}`));
     assert.deepStrictEqual(
       [...exclusionKeys].sort(),

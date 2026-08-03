@@ -83,7 +83,7 @@ function cartonGroups() {
   try {
     await waitForServer(child);
     const list = await getJson('/api/ck-list');
-    assert.strictEqual((list.list || []).length, 20, 'carton conservation must audit all 20 CK tabs');
+    assert.strictEqual((list.list || []).length, 24, 'carton conservation must audit all 24 planner tabs');
     const groups = cartonGroups();
     const checked = [];
 

@@ -936,21 +936,25 @@ function getTargetStockTurnRule(sku){
     if(t==='V2')return makeStockTurnRule('Cushie V2','<15d',null,15,'below');
     if(t==='V3')return makeStockTurnRule('Snuggle','<15d',null,15,'below');
   }
+  if(currentCK==='cusb-au-snuggle')return makeStockTurnRule('Snuggle','<15d',null,15,'below');
   if(currentCK==='cusb-us'){
     const t=getCushieProductType(sku);
     if(t==='V2')return makeStockTurnRule('Cushie V2','10-15d',10,15);
     if(t==='V3')return makeStockTurnRule('Snuggle','15-20d',15,20);
   }
+  if(currentCK==='cusb-us-snuggle')return makeStockTurnRule('Snuggle','15-20d',15,20);
   if(currentCK==='cusb-ca'){
     const t=getCushieProductType(sku);
     if(t==='V2')return makeStockTurnRule('Cushie V2','<10d',null,10,'below','Discontinued');
     if(t==='V3')return makeStockTurnRule('Snuggle','<10d',null,10,'below','Discontinued');
   }
+  if(currentCK==='cusb-ca-snuggle')return makeStockTurnRule('Snuggle','<10d',null,10,'below','Discontinued');
   if(currentCK==='cusb-uk'){
     const t=getCushieProductType(sku);
     if(t==='V2')return makeStockTurnRule('Cushie V2','0d',0,0,'point','Discontinued');
     if(t==='V3')return makeStockTurnRule('Snuggle','0d',0,0,'point','Discontinued');
   }
+  if(currentCK==='cusb-uk-snuggle')return makeStockTurnRule('Snuggle','0d',0,0,'point','Discontinued');
   if(currentCK==='lifely-sofa')return makeStockTurnRule('Lifely Sofa','0d',0,0,'point','Discontinued');
   if(currentCK==='rdnt')return makeStockTurnRule('Radiant','<10d',null,10,'below');
   if(currentCK==='cocoon')return makeStockTurnRule('Cocoon Bed','<15d',null,15,'below');
@@ -1160,7 +1164,7 @@ async function loadSidebar(){
   try{const d=await fetchJsonNoCache('/api/ck-list');if(!d)return;
   const groups=[];const byBrand={};
   d.list.forEach(ck=>{const b=ck.brand||{id:'other',name:'Other',logo:ck.logo};if(!byBrand[b.id]){byBrand[b.id]={brand:b,items:[],subgroups:{},subgroupOrder:[]};groups.push(byBrand[b.id]);if(!(b.id in brandOpenState)) brandOpenState[b.id]=false;}const group=byBrand[b.id];if(ck.subgroup){if(!group.subgroups[ck.subgroup.id]){group.subgroups[ck.subgroup.id]={meta:ck.subgroup,items:[]};group.subgroupOrder.push(ck.subgroup.id);if(!(ck.subgroup.id in subgroupOpenState)) subgroupOpenState[ck.subgroup.id]=false;}group.subgroups[ck.subgroup.id].items.push(ck);}else{group.items.push(ck);}});
-  const brandOrder={'little-lifely':0,'cushie':1,'lifely-home':2,'case-goods':3};
+  const brandOrder={'little-lifely':0,'cushie':1,'snuggle':2,'lifely-home':3,'case-goods':4};
   const littleLifelyOrder={llau:0,llna:1,llca:2,lluk:3,llnz:4,llsg:5,'ll-personalised-cover':6,'ll-mattresses':7};
   groups.forEach(group=>{if(group.brand.id==='little-lifely')group.items.sort((a,b)=>(littleLifelyOrder[a.id]??99)-(littleLifelyOrder[b.id]??99)||String(a.name||'').localeCompare(String(b.name||'')));});
   groups.sort((a,b)=>(brandOrder[a.brand.id]??99)-(brandOrder[b.brand.id]??99)||String(a.brand.name||'').localeCompare(String(b.brand.name||'')));
@@ -1478,6 +1482,10 @@ function renderDashboard(){
     'cusb-us':{label:'US', place:'United States'},
     'cusb-ca':{label:'CA', place:'Canada'},
     'cusb-uk':{label:'UK', place:'United Kingdom'},
+    'cusb-au-snuggle':{label:'AU', place:'Australia'},
+    'cusb-us-snuggle':{label:'US', place:'United States'},
+    'cusb-ca-snuggle':{label:'CA', place:'Canada'},
+    'cusb-uk-snuggle':{label:'UK', place:'United Kingdom'},
     dd:{label:'Lifely', place:'Lifely'},
     cocoon:{label:'Lifely', place:'Lifely'},
     rdnt:{label:'Lifely', place:'Lifely'},

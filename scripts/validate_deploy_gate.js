@@ -71,10 +71,14 @@ const CK_DEFS = {
   rdnt: { name:'Radiant', prefix:'RDNT', option1:'Category Killer - Radiant' },
   wfhcr: { name:'WFH Chair', prefix:'WFHCR', option1:'Category Killer - WFH Chair' },
   caterpillar: { name:'Caterpillar Dining', prefix:'MULTI', option1:'Category Killer - Caterpillar' },
-  'cusb-au-snuggle': { name:'Cushie Snuggle Bed', prefix:'MULTI', option1:'Category Killer - Cushie V3 Snuggle', filter:s=>s.startsWith('CUSB')&&!s.includes('-UK')&&!s.includes('SGE'), excludeCV:true },
-  'cusb-au-lifely': { name:'Lifely Sofabed', prefix:'MULTI', option1:['Category Killer - Cushie V2','Category Killer - Lifely Sofa'], filter:s=>s.startsWith('LFSB')&&!s.includes('-UK'), excludeCV:true },
-  'cusb-us': { name:'Cushie US', prefix:'MULTI', option1:['Category Killer - Cushie V2','Category Killer - Cushie V3 Snuggle'], filter:s=>s.startsWith('V2-')||s.startsWith('V3-'), excludeCV:true },
-  'cusb-uk': { name:'Cushie UK', prefix:'MULTI', option1:['Category Killer - Cushie V2','Category Killer - Cushie V3 Snuggle'], filter:s=>(s.startsWith('CUSB')||s.startsWith('LFSB'))&&s.includes('-UK'), excludeCV:true },
+  'cusb-au': { name:'Cushie AU', prefix:'MULTI', option1:['Category Killer - Cushie V2','Category Killer - Cushie V2 - Discontinued','Category Killer - Lifely Sofa'], filter:s=>s.startsWith('LFSB')&&!s.includes('-UK'), excludeCV:true },
+  'cusb-us': { name:'Cushie US', prefix:'MULTI', option1:['Category Killer - Cushie V2','Category Killer - Cushie V2 - Discontinued'], filter:s=>s.startsWith('V2-'), excludeCV:true },
+  'cusb-ca': { name:'Cushie CA', prefix:'MULTI', option1:['Category Killer - Cushie V2','Category Killer - Cushie V2 - Discontinued'], filter:s=>s.startsWith('V2-'), excludeCV:true },
+  'cusb-uk': { name:'Cushie UK', prefix:'MULTI', option1:['Category Killer - Cushie V2','Category Killer - Cushie V2 - Discontinued'], filter:s=>s.startsWith('LFSB')&&s.includes('-UK'), excludeCV:true },
+  'cusb-au-snuggle': { name:'Snuggle AU', prefix:'MULTI', option1:'Category Killer - Cushie V3 Snuggle', filter:s=>s.startsWith('CUSB')&&!s.includes('-UK')&&!s.includes('SGE'), excludeCV:true },
+  'cusb-us-snuggle': { name:'Snuggle US', prefix:'MULTI', option1:'Category Killer - Cushie V3 Snuggle', filter:s=>s.startsWith('V3-'), excludeCV:true },
+  'cusb-ca-snuggle': { name:'Snuggle CA', prefix:'MULTI', option1:'Category Killer - Cushie V3 Snuggle', filter:s=>s.startsWith('V3-'), excludeCV:true },
+  'cusb-uk-snuggle': { name:'Snuggle UK', prefix:'MULTI', option1:'Category Killer - Cushie V3 Snuggle', filter:s=>s.startsWith('CUSB')&&s.includes('-UK'), excludeCV:true },
   cmss: { name:'Cushie Modular Sleeper', prefix:'CMSS', option1:'Category Killer - Cushie V2' },
   'lifely-sofa': { name:'Modular Sofa', prefix:'LIFELY', option1:'Category Killer - Lifely Sofa' },
   'case-goods': { name:'Case Goods', prefix:'MULTI', option1:['Case goods - Active','Case goods - Discontinued'], filter:isCaseGoodsSku }
@@ -188,6 +192,7 @@ if (!refreshScriptSource.includes('us_units_30d')
 const personalisedCoverDefLine = serverSource.split('\n').find(line => line.includes("'ll-personalised-cover':")) || '';
 const littleLifelyNzDefLine = serverSource.split('\n').find(line => line.includes("'llnz':")) || '';
 const cushieUsDefLine = serverSource.split('\n').find(line => line.includes("'cusb-us':")) || '';
+const snuggleUsDefLine = serverSource.split('\n').find(line => line.includes("'cusb-us-snuggle':")) || '';
 const caseGoodsDefLine = serverSource.split('\n').find(line => line.includes("'case-goods':")) || '';
 if (!serverSource.includes('const LL_NZ_BRANCH_IDS = [48391, 68865];')) {
   blockers.push('New Zealand scope must include Malcove NZ 48391 and Pacificomm NZ 68865');
@@ -200,6 +205,9 @@ if (!littleLifelyNzDefLine.includes('stockBranches: LL_NZ_BRANCH_IDS')) {
 }
 if (!cushieUsDefLine.includes('stockBranches: LL_US_BRANCH_IDS')) {
   blockers.push('Cushie US must use the shared active CA + NJ warehouse scope');
+}
+if (!snuggleUsDefLine.includes('stockBranches: LL_US_BRANCH_IDS')) {
+  blockers.push('Snuggle US must use the shared active CA + NJ warehouse scope');
 }
 if (!caseGoodsDefLine.includes("poDestination: 'Australia'") || !caseGoodsDefLine.includes("salesCountry: 'AU'") || !caseGoodsDefLine.includes('stockBranches: LL_AU_BRANCH_IDS')) {
   blockers.push('Case Goods must use the AU Malcove + Capital warehouse scope rather than global Cin7 stock');
@@ -233,7 +241,11 @@ const cushieCoverageMeta = {
   'cusb-au': { label: 'AU', place: 'Australia' },
   'cusb-us': { label: 'US', place: 'United States' },
   'cusb-ca': { label: 'CA', place: 'Canada' },
-  'cusb-uk': { label: 'UK', place: 'United Kingdom' }
+  'cusb-uk': { label: 'UK', place: 'United Kingdom' },
+  'cusb-au-snuggle': { label: 'AU', place: 'Australia' },
+  'cusb-us-snuggle': { label: 'US', place: 'United States' },
+  'cusb-ca-snuggle': { label: 'CA', place: 'Canada' },
+  'cusb-uk-snuggle': { label: 'UK', place: 'United Kingdom' }
 };
 for (const [id, meta] of Object.entries(cushieCoverageMeta)) {
   const marker = `'${id}':{label:'${meta.label}', place:'${meta.place}'}`;
@@ -364,6 +376,10 @@ if (!/['\"]cusb-us['\"]:\s*\{[^\n]*poDestination:\s*['\"]United States['\"]/.tes
 }
 if (!/['\"]cusb-uk['\"]:\s*\{[^\n]*poDestination:\s*['\"]United Kingdom['\"]/.test(serverSource)) {
   blockers.push('Cushie UK must filter POs to United Kingdom');
+}
+for (const [id, destination] of [['cusb-au-snuggle', 'Australia'], ['cusb-us-snuggle', 'United States'], ['cusb-ca-snuggle', 'Canada'], ['cusb-uk-snuggle', 'United Kingdom']]) {
+  const pattern = new RegExp(`['\"]${id}['\"]:\\s*\\{[^\\n]*poDestination:\\s*['\"]${destination}['\"]`);
+  if (!pattern.test(serverSource)) blockers.push(`${id} must filter POs to ${destination}`);
 }
 const products = cache.cin7Products || {};
 const stockByBranch = cache.cin7StockByBranch || {};
