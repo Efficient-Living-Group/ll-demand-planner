@@ -269,10 +269,10 @@ th[data-tip],.card[data-tip]{position:relative;cursor:help}th[data-tip]:after{co
       <h3 style="font-size:14px;margin-bottom:12px">📦 Bundle ATP & Binding Constraints</h3>
       
     </div>
-    <div class="llna-grid-pilot-controls" id="llnaGridPilotControls" aria-label="LLNA table view"></div>
+    <div class="llna-grid-pilot-controls" id="llnaGridPilotControls" aria-label="Stock table view"></div>
     <div class="column-controls" id="stockColumnControls"></div>
     <div class="table-wrap" id="stockTableWrap"><table id="stockTable"><thead></thead><tbody></tbody></table></div>
-    <section class="llna-grid-pilot-shell" id="llnaGridPilotShell" aria-label="LLNA AG Grid pilot" hidden>
+    <section class="llna-grid-pilot-shell" id="llnaGridPilotShell" aria-label="AG Grid stock table" hidden>
       <div class="llna-grid-toolbar">
         <div class="llna-grid-segments" id="llnaGridSegments" role="tablist" aria-label="Filter LLNA SKU generation"></div>
         <label class="llna-grid-search-wrap" for="llnaGridSearch"><span aria-hidden="true">⌕</span><input class="llna-grid-search" id="llnaGridSearch" type="search" placeholder="Find SKU or any value" autocomplete="off" oninput="setLlnaGridSearch(this.value)"></label>
@@ -476,11 +476,11 @@ function getLlnaGridMode(){return localStorage.getItem(LLNA_GRID_PREF_KEY)==='ag
 function isLlnaGridDesktop(){return window.matchMedia('(min-width: 769px)').matches}
 function renderLlnaGridPilotControls(message=''){
   const controls=document.getElementById('llnaGridPilotControls');if(!controls)return;
-  const available=currentCK==='llna'&&isLlnaGridDesktop();
+  const available=Boolean(currentCK)&&isLlnaGridDesktop();
   controls.classList.toggle('visible',available);
   if(!available){controls.innerHTML='';return;}
   const mode=getLlnaGridMode();
-  controls.innerHTML=`<div class="llna-grid-pilot-copy"><span class="llna-grid-pilot-label">LLNA table pilot</span><span class="llna-grid-pilot-note">${escHtml(message||'Same planner figures, faster table controls')}</span></div><div class="llna-grid-switch" role="group" aria-label="Choose LLNA table view"><button type="button" class="${mode==='classic'?'active':''}" aria-pressed="${mode==='classic'}" onclick="setLlnaGridMode('classic')">Classic</button><button type="button" class="${mode==='ag'?'active':''}" aria-pressed="${mode==='ag'}" onclick="setLlnaGridMode('ag')">AG Grid pilot</button></div>`;
+  controls.innerHTML=`<div class="llna-grid-pilot-copy"><span class="llna-grid-pilot-label">Table view</span><span class="llna-grid-pilot-note">${escHtml(message||'Same planner figures, faster table controls')}</span></div><div class="llna-grid-switch" role="group" aria-label="Choose stock table view"><button type="button" class="${mode==='classic'?'active':''}" aria-pressed="${mode==='classic'}" onclick="setLlnaGridMode('classic')">Classic</button><button type="button" class="${mode==='ag'?'active':''}" aria-pressed="${mode==='ag'}" onclick="setLlnaGridMode('ag')">AG Grid</button></div>`;
 }
 function setLlnaGridStatus(message='',isError=false){
   const el=document.getElementById('llnaGridStatus');if(!el)return;
@@ -521,6 +521,8 @@ function llnaGridSegmentCounts(rows){
 }
 function renderLlnaGridSegments(rows){
   const root=document.getElementById('llnaGridSegments');if(!root)return;
+  const available=currentCK==='llna';root.hidden=!available;
+  if(!available){root.innerHTML='';return;}
   const counts=llnaGridSegmentCounts(rows);
   const tabs=[['all','All'],['legacy','Legacy SKUs'],['components','New FRM + CV']];
   root.innerHTML=tabs.map(([id,label])=>`<button type="button" class="llna-segment-tab ${llnaGridSegment===id?'active':''}" role="tab" aria-selected="${llnaGridSegment===id}" onclick="setLlnaGridSegment('${id}')">${label}<span class="llna-segment-count">${counts[id]}</span></button>`).join('');
@@ -594,13 +596,13 @@ function buildLlnaGridColumnDefs(snapshot){
 }
 async function syncLlnaGridPresentation(){
   renderLlnaGridPilotControls();
-  if(currentCK!=='llna'||getLlnaGridMode()!=='ag'||!isLlnaGridDesktop()){showLlnaClassicTable();return;}
+  if(!currentCK||getLlnaGridMode()!=='ag'||!isLlnaGridDesktop()){showLlnaClassicTable();return;}
   const wrap=document.getElementById('stockTableWrap'),shell=document.getElementById('llnaGridPilotShell'),grid=document.getElementById('llnaAgGrid'),loading=document.getElementById('llnaGridLoading');
   if(!wrap||!shell||!grid||!loading)return;
-  shell.hidden=false;grid.hidden=true;loading.hidden=false;setLlnaGridStatus('Loading the pilot table…');
+  shell.hidden=false;grid.hidden=true;loading.hidden=false;setLlnaGridStatus('Loading AG Grid…');
   try{
     await loadLlnaAgGrid();
-    if(currentCK!=='llna'||getLlnaGridMode()!=='ag'||!isLlnaGridDesktop()){showLlnaClassicTable();return;}
+    if(!currentCK||getLlnaGridMode()!=='ag'||!isLlnaGridDesktop()){showLlnaClassicTable();return;}
     const snapshot=captureLlnaClassicTable();
     if(!snapshot.columns.length)throw new Error('No visible table columns were found');
     if(llnaGridApi){try{llnaGridApi.destroy()}catch(e){}llnaGridApi=null;}
@@ -610,9 +612,9 @@ async function syncLlnaGridPresentation(){
       columnDefs:buildLlnaGridColumnDefs(snapshot),rowData:snapshot.rows,theme,
       defaultColDef:{suppressHeaderMenuButton:false},rowHeight:34,headerHeight:40,animateRows:false,ensureDomOrder:true,
       suppressCellFocus:false,suppressDragLeaveHidesColumns:true,quickFilterText:llnaGridSearch,
-      isExternalFilterPresent:()=>llnaGridSegment!=='all',
-      doesExternalFilterPass:node=>node.data?.__llnaSegment===llnaGridSegment,
-      overlayNoRowsTemplate:'<div class="llna-grid-state">No LLNA rows match the current filters.</div>',
+      isExternalFilterPresent:()=>currentCK==='llna'&&llnaGridSegment!=='all',
+      doesExternalFilterPass:node=>currentCK!=='llna'||node.data?.__llnaSegment===llnaGridSegment,
+      overlayNoRowsTemplate:'<div class="llna-grid-state">No rows match the current filters.</div>',
       onGridReady:params=>{document.getElementById('llnaGridRowCount').textContent=`${snapshot.rows.length} rows`;params.api.setGridOption('quickFilterText',llnaGridSearch);},
       onFilterChanged:params=>{let count=0;params.api.forEachNodeAfterFilter(()=>count++);document.getElementById('llnaGridRowCount').textContent=`${count} of ${snapshot.rows.length} rows`;}
     };
@@ -621,9 +623,9 @@ async function syncLlnaGridPresentation(){
     llnaGridApi=window.agGrid.createGrid(grid,options);
     window.__llnaAgGridParity={classicRows:snapshot.rows.length,gridRows:snapshot.rows.length,headers:snapshot.columns.map(c=>c.label),signature:snapshot.signature};
     wrap.hidden=true;
-    setLlnaGridStatus('Pilot view uses the exact rows already calculated by the classic table.');
+    setLlnaGridStatus('AG Grid uses the exact rows already calculated by the Classic table.');
   }catch(error){
-    console.error('LLNA AG Grid pilot failed:',error);showLlnaClassicTable('AG Grid unavailable — classic restored');setLlnaGridStatus(error.message||'AG Grid unavailable',true);
+    console.error('AG Grid table failed:',error);showLlnaClassicTable('AG Grid unavailable — Classic restored');setLlnaGridStatus(error.message||'AG Grid unavailable',true);
   }
 }
 async function setLlnaGridMode(mode){
@@ -673,7 +675,7 @@ function toggleIncomingDateColumns(event){
     const nextWrap=document.getElementById('stockTable')?.closest('.table-wrap');
     if(nextWrap){nextWrap.scrollLeft=viewState.tableLeft;nextWrap.scrollTop=viewState.tableTop;}
     window.scrollTo(viewState.windowX,viewState.windowY);
-    const gridEtaButton=typeof getLlnaGridMode==='function'&&typeof currentCK!=='undefined'&&getLlnaGridMode()==='ag'&&currentCK==='llna'?document.getElementById('llnaGridIncomingToggle'):null;
+    const gridEtaButton=typeof getLlnaGridMode==='function'&&typeof currentCK!=='undefined'&&getLlnaGridMode()==='ag'&&currentCK?document.getElementById('llnaGridIncomingToggle'):null;
     (gridEtaButton||document.querySelector('#stockTable .incoming-toggle'))?.focus({preventScroll:true});
   });
   return false;
@@ -1168,7 +1170,13 @@ async function selectCK(ckId){
   document.getElementById('allPOsView').style.display='none';document.querySelector('.main').style.display='block';
   document.getElementById('categoryTabs').style.display='flex';document.getElementById('exportExcelBtn').style.display='inline-block';
   document.getElementById('poNavItem').classList.remove('active');document.getElementById('executiveNavItem').classList.remove('active');
-  currentCK=ckId;document.querySelectorAll('.sidebar-item').forEach(el=>el.classList.toggle('active',el.dataset.ck===ckId));
+  const ckChanged=currentCK!==ckId;currentCK=ckId;
+  if(ckChanged){
+    llnaGridSearch='';llnaGridSegment='all';
+    const gridSearch=document.getElementById('llnaGridSearch');if(gridSearch)gridSearch.value='';
+    showLlnaClassicTable();
+  }
+  document.querySelectorAll('.sidebar-item').forEach(el=>el.classList.toggle('active',el.dataset.ck===ckId));
   const activeItem=document.querySelector(`.sidebar-item[data-ck="${ckId}"]`);const groupEl=activeItem?.closest('.sidebar-brand-group');if(groupEl){groupEl.classList.remove('collapsed');brandOpenState[groupEl.dataset.brandGroup]=true;const caret=groupEl.querySelector('.sidebar-brand-caret');if(caret)caret.textContent='▾';}const subgroupEl=activeItem?.closest('.sidebar-subgroup');if(subgroupEl){subgroupEl.classList.remove('collapsed');subgroupOpenState[subgroupEl.dataset.subgroup]=true;const subCaret=subgroupEl.querySelector('.sidebar-subgroup-caret');if(subCaret)subCaret.textContent='▾';}
   document.getElementById('loadingScreen').style.display='block';document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
   try{const d=await fetchJsonNoCache(`/api/ck/${ckId}`);if(!d)return;
