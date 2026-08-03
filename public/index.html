@@ -454,7 +454,6 @@ function toggleStockColumn(label,visible){
   saveHiddenStockColumns(hidden);applyStockColumnVisibility();
 }
 function showAllStockColumns(){saveHiddenStockColumns(new Set());applyStockColumnVisibility()}
-function hideStockColumnSet(labels){const hidden=getHiddenStockColumns();labels.forEach(l=>{if(!isLockedStockColumn(l))hidden.add(l)});saveHiddenStockColumns(hidden);applyStockColumnVisibility()}
 function renderStockColumnControls(){
   const el=document.getElementById('stockColumnControls'); if(!el)return;
   const labels=stockColumnLabels().filter(label=>!isTransientStockColumn(label));
@@ -464,7 +463,7 @@ function renderStockColumnControls(){
   el.innerHTML=`<div class="column-picker ${window._stockColumnPickerOpen?'open':''}" id="stockColumnPicker">
     <button class="filter-btn" onclick="window._stockColumnPickerOpen=!window._stockColumnPickerOpen;renderStockColumnControls()">Columns ${shown}/${labels.length} ▾</button>
     <div class="column-picker-menu" onclick="event.stopPropagation()">
-      <div class="column-picker-actions"><button onclick="showAllStockColumns()">Show all</button><button onclick="hideStockColumnSet(['FOB','Freight/u','Landed','Supplier','CBM'])">Hide cost/CBM</button></div>
+      <div class="column-picker-actions"><button onclick="showAllStockColumns()">Show all</button></div>
       ${labels.map(label=>`<label class="column-option"><input type="checkbox" ${(!hidden.has(label)||isLockedStockColumn(label))?'checked':''} ${isLockedStockColumn(label)?'disabled':''} onchange="toggleStockColumn('${label.replace(/'/g,"\\'")}',this.checked)"><span>${label}${isLockedStockColumn(label)?' <span style="color:var(--text-dim)">(fixed)</span>':''}</span></label>`).join('')}
     </div>
   </div>`;
