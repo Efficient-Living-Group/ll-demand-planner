@@ -25,6 +25,10 @@ assert(html.includes('aria-pressed="${mode===\'ag\'}"'), 'view switch accessibil
 assert(html.includes('id="stockTableWrap"') && html.includes('id="stockTable"'), 'classic table must remain intact');
 assert(html.includes("row[column.field]=text;row.__cells[column.field]="), 'grid values must remain searchable text');
 assert(html.includes("getQuickFilterText:params=>String(params.value||'')"), 'quick filter text adapter missing');
+assert(html.includes('.llna-grid-search-wrap:focus-within{border-color:#52766F;box-shadow:0 0 0 3px rgba(44,71,75,.10)}'), 'search wrapper focus ring missing');
+assert(html.includes('.llna-grid-search{width:100%;height:34px;border:0;outline:0;box-shadow:none;appearance:none;-webkit-appearance:none'), 'search input must not draw a second inner box');
+assert(!html.includes('.llna-grid-search:focus-visible'), 'search input must not receive a duplicate inner focus outline');
+assert(html.includes('enableCellTextSelection:true'), 'AG Grid cell text selection must remain enabled for copying SKUs');
 assert(html.includes("function classifyLlnaGridSku(sku)"), 'LLNA generation classifier missing');
 assert(html.includes("['all','All'],['legacy','Legacy SKUs'],['components','New FRM + CV']"), 'LLNA segment tabs missing');
 assert(html.includes("const available=currentCK==='llna'||currentCK==='dd';root.hidden=!available"), 'LLNA and Deep Dream segment visibility guard missing');
