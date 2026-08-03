@@ -12,7 +12,7 @@ const BOM_MASTER_DEMAND_PATH = path.join(ROOT, 'lib', 'bom-master-demand.js');
 const PACKAGE_PATH = path.join(ROOT, 'package.json');
 const REFRESH_SCRIPT_PATH = path.join(ROOT, 'scripts', 'refresh_live_cin7_cache.py');
 const WARN_STALE_HOURS = 6;
-const TRACKING_SCHEMA_VERSION = '2026-07-24-fail-closed-v2';
+const TRACKING_SCHEMA_VERSION = '2026-08-03-regional-3pl-v3';
 const MIN_PRODUCTS = 1000;
 const MIN_POS = 50;
 const EXPECTED_STORES = ['lifely', 'cushie', 'littlelifely'];
@@ -36,6 +36,7 @@ const {
   resolveTrackingDestination,
   warehouseSourceForDestination,
   selectLecangsRecords,
+  selectCartonCloudRecords,
   normalizeFindTeu,
   validateFindTeuDestination,
   normalizeWarehousePayload
@@ -345,6 +346,13 @@ if (!containerTrackingSource.includes('function warehouseSourceForDestination')
     || !serverSource.includes("warehouseSource.key === 'cirro'")) {
   blockers.push('Warehouse tracking must route US and Canada to isolated Lecangs clients and UK to Cirro');
 }
+if (!serverSource.includes("warehouseSource.key === 'pacificomm'")
+    || !serverSource.includes("warehouseSource.key === 'capital_logistics'")) {
+  blockers.push('Warehouse tracking must route NZ to CartonCloud/Pacificomm and AU to MachShip/Capital Logistics');
+}
+if (!serverSource.includes("'permission_blocked'") || !frontendSource.includes('Business access blocked')) {
+  blockers.push('MachShip permission failures must be surfaced explicitly without invented milestones');
+}
 for (const provider of ['Lecangs Canada', 'Cirro', 'Capital Logistics', 'Pacificomm']) {
   if (!containerTrackingSource.includes(provider)) blockers.push(`Warehouse routing is missing provider: ${provider}`);
 }
@@ -373,7 +381,7 @@ const expectedProviderRoutes = {
   Canada: ['lecangs_ca', 'ASN'],
   'United Kingdom': ['cirro', 'inbound'],
   Australia: ['capital_logistics', 'warehouse record'],
-  'New Zealand': ['pacificomm', 'warehouse record']
+  'New Zealand': ['pacificomm', 'inbound']
 };
 for (const [destination, [providerKey, recordLabel]] of Object.entries(expectedProviderRoutes)) {
   const route = warehouseSourceForDestination(destination);
@@ -388,6 +396,19 @@ if (selectLecangsRecords(
 ).length) {
   blockers.push('Lecangs reused-container fixture attached an ASN from the wrong PO');
 }
+if (selectCartonCloudRecords(
+  [{ id: 'CC-CONTAINER-ONLY', references: { customer: 'TSTU1234567' } }],
+  'PO-NZ-SAFETY', 'TSTU1234567', ['SUP-INV-SAFETY']
+).length) {
+  blockers.push('Pacificomm container-only fixture attached an inbound without a trusted PO-side reference');
+}
+if (selectCartonCloudRecords(
+  [{ id: 'CC-WRONG-PO', references: { customer: 'PO-OTHER / TSTU1234567' } }],
+  'PO-NZ-SAFETY', 'TSTU1234567', ['SUP-INV-SAFETY']
+).length) {
+  blockers.push('Pacificomm reused-container fixture attached an inbound from the wrong PO');
+}
+
 const wrongDestination = normalizeFindTeu({
   data: {
     container: { number: 'TSTU1234567' },

@@ -14,6 +14,8 @@ const {
   validateFindTeuDestination,
   normalizeLecangs,
   normalizeCirro,
+  selectCartonCloudRecords,
+  normalizeCartonCloud,
   buildContainerJourney
 } = require('../lib/container-tracking');
 
@@ -41,8 +43,12 @@ assert.deepStrictEqual(warehouseSourceForDestination('United Kingdom'), {
   connected: true,
   recordLabel: 'inbound'
 });
-assert.strictEqual(warehouseSourceForDestination('Australia').key, 'capital_logistics');
-assert.strictEqual(warehouseSourceForDestination('New Zealand').key, 'pacificomm');
+assert.deepStrictEqual(warehouseSourceForDestination('Australia'), {
+  key: 'capital_logistics', name: 'Capital Logistics', market: 'Australia', connected: true, recordLabel: 'warehouse record'
+});
+assert.deepStrictEqual(warehouseSourceForDestination('New Zealand'), {
+  key: 'pacificomm', name: 'Pacificomm', market: 'New Zealand', connected: true, recordLabel: 'inbound'
+});
 assert.strictEqual(warehouseSourceForDestination('Singapore').key, 'unsupported');
 assert.strictEqual(canonicalDestination('USA'), 'United States');
 assert.deepStrictEqual(
@@ -366,6 +372,55 @@ assert.strictEqual(cirroComplete.complete, true);
 assert.strictEqual(cirroComplete.progressPct, 100);
 assert.strictEqual(cirroComplete.timeline.at(-1).timestamp, null);
 assert.match(cirroComplete.timeline.at(-1).detail, /exact unload time is not provided/i);
+
+const cartonCloudRows = [
+  {
+    id: 'CC-INBOUND-ONE', status: 'ALLOCATED',
+    references: { customer: 'SUP-INV-778 / OOCU8815295' },
+    warehouse: { name: 'Pacificomm Auckland' },
+    details: { arrivalDate: '2026-07-24' },
+    timestamps: { verified: '2026-07-25T04:00:00Z', allocated: '2026-07-25T04:15:00Z' }
+  },
+  { id: 'CC-WRONG-PO', status: 'ALLOCATED', references: { customer: 'OTHER-PO / OOCU8815295' } },
+  { id: 'CC-CONTAINER-ONLY', status: 'ALLOCATED', references: { customer: 'OOCU8815295' } }
+];
+assert.deepStrictEqual(
+  selectCartonCloudRecords(cartonCloudRows, 'PO-NZ001', 'OOCU8815295', ['SUP-INV-778']).map(row => row.id),
+  ['CC-INBOUND-ONE'],
+  'Pacificomm must require the exact container plus a trusted PO-side reference'
+);
+assert.deepStrictEqual(
+  selectCartonCloudRecords(cartonCloudRows, 'PO-NZ001', 'OOCU8815295'), [],
+  'Pacificomm must reject container-only and wrong-PO records'
+);
+const normalizedPacificomm = normalizeCartonCloud(
+  cartonCloudRows, 'PO-NZ001', 'OOCU8815295', ['SUP-INV-778']
+);
+assert.strictEqual(normalizedPacificomm.recordLabel, 'inbound');
+assert.strictEqual(normalizedPacificomm.linkedAsnCount, 1);
+assert.strictEqual(normalizedPacificomm.unloaded.complete, true);
+const pacificommJourney = buildContainerJourney({
+  containerNumber: 'OOCU8815295', poReference: 'PO-NZ001', findTeuPayload: {},
+  warehousePayload: cartonCloudRows, sourceState: { findteu: 'archived', warehouse: 'live' },
+  warehouseSource: warehouseSourceForDestination('New Zealand'),
+  providerReferences: ['SUP-INV-778'], expectedDestination: 'New Zealand'
+});
+assert.strictEqual(pacificommJourney.complete, true);
+assert.strictEqual(pacificommJourney.progressPct, 100);
+assert.strictEqual(pacificommJourney.timeline.at(-1).source, 'Pacificomm');
+assert.deepStrictEqual(pacificommJourney.journeyLock, {
+  poReference: 'PO-NZ001', containerNumber: 'OOCU8815295', asnNumbers: [],
+  warehouseReferences: ['CC-INBOUND-ONE']
+});
+const capitalBlockedJourney = buildContainerJourney({
+  containerNumber: 'OOCU8815295', poReference: 'PO-AU001', findTeuPayload: {}, warehousePayload: {},
+  sourceState: { findteu: 'not_configured', warehouse: 'permission_blocked' },
+  warehouseSource: warehouseSourceForDestination('Australia'),
+  warehouseMessage: 'Capital Logistics business-read access is blocked in MachShip.',
+  expectedDestination: 'Australia'
+});
+assert.deepStrictEqual(capitalBlockedJourney.timeline.slice(3).map(row => row.state),
+  ['unavailable', 'unavailable', 'unavailable', 'unavailable']);
 
 const wrongDestinationJourney = buildContainerJourney({
   containerNumber: 'OOCU8815295',

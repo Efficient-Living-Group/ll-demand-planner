@@ -25,6 +25,7 @@ const {
   resolveTrackingDestination,
   warehouseSourceForDestination,
   selectLecangsRecords,
+  selectCartonCloudRecords,
   lecangsSignature,
   normalizeFindTeu,
   normalizeWarehousePayload,
@@ -60,8 +61,14 @@ const LECANG_CA_BASE_URL = (process.env.LECANG_CA_BASE_URL || 'https://app.lecan
 const CIRRO_UK_APP_KEY = process.env.CIRRO_UK_APP_KEY || '';
 const CIRRO_UK_APP_TOKEN = process.env.CIRRO_UK_APP_TOKEN || '';
 const CIRRO_UK_BASE_URL = (process.env.CIRRO_UK_BASE_URL || 'https://oms.elogistic.com/v1').replace(/\/$/, '');
+const CARTONCLOUD_CLIENT_ID = process.env.CARTONCLOUD_CLIENT_ID || '';
+const CARTONCLOUD_CLIENT_SECRET = process.env.CARTONCLOUD_CLIENT_SECRET || '';
+const CARTONCLOUD_CUSTOMER_ID = process.env.CARTONCLOUD_CUSTOMER_ID || '';
+const CARTONCLOUD_BASE_URL = (process.env.CARTONCLOUD_BASE_URL || 'https://api.cartoncloud.com').replace(/\/$/, '');
+const MACHSHIP_TOKEN = process.env.MACHSHIP_TOKEN || '';
+const MACHSHIP_BASE_URL = (process.env.MACHSHIP_BASE_URL || 'https://live.machship.com').replace(/\/$/, '');
 const CONTAINER_TRACKING_CACHE_MS = 15 * 60 * 1000;
-const CONTAINER_TRACKING_SCHEMA_VERSION = '2026-07-24-fail-closed-v2';
+const CONTAINER_TRACKING_SCHEMA_VERSION = '2026-08-03-regional-3pl-v3';
 const CIN7_REQUEST_SPACING_MS = 1500;
 const CIN7_REFRESH_INTERVAL_MS = 4 * 60 * 60 * 1000;
 const CIN7_MIN_REFRESH_INTERVAL_MS = CIN7_REFRESH_INTERVAL_MS;
@@ -4698,6 +4705,10 @@ const lecangsIndexCaches = new Map();
 const lecangsIndexPromises = new Map();
 let cirroUkTokenCache = { token: '', expiresAt: 0 };
 let cirroUkTokenPromise = null;
+let cartonCloudSessionCache = { token: '', tenantId: '', expiresAt: 0 };
+let cartonCloudSessionPromise = null;
+let machShipAccessCache = { checkedAt: 0, result: null };
+let machShipAccessPromise = null;
 
 function trackingRequestJson(method, requestUrl, headers = {}, body = null, timeoutMs = 75000) {
   return new Promise((resolve, reject) => {
@@ -4739,6 +4750,34 @@ function trackingRequestJson(method, requestUrl, headers = {}, body = null, time
     req.on('timeout', () => req.destroy(new Error('Tracking source timed out')));
     req.on('error', reject);
     if (payload) req.write(payload);
+    req.end();
+  });
+}
+
+function trackingRequestForm(requestUrl, headers, form, timeoutMs = 30000) {
+  return new Promise((resolve, reject) => {
+    const url = new URL(requestUrl);
+    const transport = url.protocol === 'http:' ? http : https;
+    const payload = new URLSearchParams(form).toString();
+    const req = transport.request({
+      protocol: url.protocol, hostname: url.hostname, port: url.port || undefined,
+      path: `${url.pathname}${url.search}`, method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Length': Buffer.byteLength(payload), ...headers }, timeout: timeoutMs
+    }, response => {
+      let raw = '';
+      response.setEncoding('utf8');
+      response.on('data', chunk => { raw += chunk; if (raw.length > 500000) req.destroy(new Error('Tracking response exceeded the safe size limit')); });
+      response.on('end', () => {
+        let parsed = {};
+        try { parsed = raw ? JSON.parse(raw) : {}; } catch (error) { return reject(new Error(`Tracking source returned invalid JSON (HTTP ${response.statusCode || 0})`)); }
+        if ((response.statusCode || 500) >= 400) return reject(new Error(`Tracking source returned HTTP ${response.statusCode}`));
+        resolve(parsed);
+      });
+    });
+    req.on('timeout', () => req.destroy(new Error('Tracking source timed out')));
+    req.on('error', reject);
+    req.write(payload);
     req.end();
   });
 }
@@ -4993,6 +5032,112 @@ async function fetchCirroInbounds(poReference, containerNumber) {
       message: 'Cirro warehouse milestones are temporarily unavailable.'
     };
   }
+}
+
+function sanitizeCartonCloudInbound(record) {
+  return {
+    id: String(record?.id || ''),
+    status: String(record?.status || ''),
+    reference: String(record?.references?.customer || record?.reference || ''),
+    references: { customer: String(record?.references?.customer || record?.reference || '') },
+    warehouse: record?.warehouse?.name ? { name: String(record.warehouse.name) } : {},
+    details: { arrivalDate: record?.details?.arrivalDate || null },
+    timestamps: {
+      received: record?.timestamps?.received || null,
+      verified: record?.timestamps?.verified || null,
+      allocated: record?.timestamps?.allocated || null
+    }
+  };
+}
+
+async function getCartonCloudSession() {
+  if (cartonCloudSessionCache.token && cartonCloudSessionCache.tenantId
+      && Date.now() < cartonCloudSessionCache.expiresAt - 300000) return cartonCloudSessionCache;
+  if (cartonCloudSessionPromise) return cartonCloudSessionPromise;
+  cartonCloudSessionPromise = (async () => {
+    const basic = Buffer.from(`${CARTONCLOUD_CLIENT_ID}:${CARTONCLOUD_CLIENT_SECRET}`).toString('base64');
+    const tokenPayload = await trackingRequestForm(
+      `${CARTONCLOUD_BASE_URL}/uaa/oauth/token`,
+      { 'Accept-Version': '1', Authorization: `Basic ${basic}` },
+      { grant_type: 'client_credentials' }
+    );
+    const token = String(tokenPayload?.access_token || '');
+    if (!token) throw new Error('CartonCloud did not return an access token');
+    const user = await trackingRequestJson('GET', `${CARTONCLOUD_BASE_URL}/uaa/userinfo`,
+      { 'Accept-Version': '1', Authorization: `Bearer ${token}` }, null, 30000);
+    const tenants = Array.isArray(user?.tenants) ? user.tenants : [];
+    if (tenants.length !== 1 || !tenants[0]?.id) throw new Error('CartonCloud tenant identity is ambiguous');
+    cartonCloudSessionCache = {
+      token, tenantId: String(tenants[0].id),
+      expiresAt: Date.now() + Math.max(600, Number(tokenPayload?.expires_in || 3600)) * 1000
+    };
+    return cartonCloudSessionCache;
+  })().finally(() => { cartonCloudSessionPromise = null; });
+  return cartonCloudSessionPromise;
+}
+
+async function fetchPacificommInbounds(poReference, containerNumber, providerReferences = []) {
+  if (!CARTONCLOUD_CLIENT_ID || !CARTONCLOUD_CLIENT_SECRET || !CARTONCLOUD_CUSTOMER_ID) {
+    return { state: 'not_configured', payload: [], message: 'Pacificomm warehouse milestones are awaiting a scoped read-only connection.' };
+  }
+  try {
+    const session = await getCartonCloudSession();
+    const condition = {
+      type: 'AndCondition',
+      conditions: [
+        { type: 'TextComparisonCondition', field: { type: 'JsonField', pointer: '/references/customer' },
+          value: { type: 'ValueField', value: containerNumber }, method: 'CONTAINS' },
+        { type: 'TextComparisonCondition', field: { type: 'JsonField', pointer: '/customer/id' },
+          value: { type: 'ValueField', value: CARTONCLOUD_CUSTOMER_ID }, method: 'EQUAL_TO' }
+      ]
+    };
+    const rows = await trackingRequestJson(
+      'POST',
+      `${CARTONCLOUD_BASE_URL}/tenants/${encodeURIComponent(session.tenantId)}/inbound-orders/search?page=1&size=100`,
+      { 'Accept-Version': '1', Authorization: `Bearer ${session.token}`, Prefer: 'return=no-items' },
+      { condition }, 30000
+    );
+    const candidates = Array.isArray(rows) ? rows : [];
+    if (candidates.length >= 100) throw new Error('CartonCloud inbound lookup exceeded the safe result limit');
+    const matching = selectCartonCloudRecords(candidates, poReference, containerNumber, providerReferences);
+    const sanitized = matching.map(sanitizeCartonCloudInbound);
+    return {
+      state: sanitized.length ? 'live' : 'no_data', payload: sanitized,
+      message: sanitized.length ? '' : 'No Pacificomm inbound matching this PO and container is available yet.'
+    };
+  } catch (error) {
+    console.warn(`[container-tracking] Pacificomm lookup failed for ${poReference}: ${error.message}`);
+    return { state: 'error', payload: [], message: 'Pacificomm warehouse milestones are temporarily unavailable.' };
+  }
+}
+
+async function fetchCapitalLogisticsAccess() {
+  if (!MACHSHIP_TOKEN) {
+    return { state: 'not_configured', payload: {}, message: 'Capital Logistics tracking is awaiting a scoped MachShip connection.' };
+  }
+  if (machShipAccessCache.result && Date.now() - machShipAccessCache.checkedAt < CONTAINER_TRACKING_CACHE_MS) return machShipAccessCache.result;
+  if (machShipAccessPromise) return machShipAccessPromise;
+  machShipAccessPromise = (async () => {
+    try {
+      await trackingRequestJson('POST', `${MACHSHIP_BASE_URL}/apiv2/authenticate/ping`, { token: MACHSHIP_TOKEN }, null, 30000);
+      await trackingRequestJson('GET', `${MACHSHIP_BASE_URL}/apiv2/companies/getAll`, { token: MACHSHIP_TOKEN }, null, 30000);
+      return {
+        state: 'scope_limited', payload: {},
+        message: 'MachShip provides outbound consignment data, not inbound warehouse receiving or unloading milestones.'
+      };
+    } catch (error) {
+      const blocked = /HTTP 401|HTTP 403/.test(error.message);
+      console.warn(`[container-tracking] Capital Logistics MachShip access check failed: ${error.message}`);
+      return {
+        state: blocked ? 'permission_blocked' : 'error', payload: {},
+        message: blocked
+          ? 'Capital Logistics business-read access is blocked in MachShip. The provider must enable the token role before records can be read.'
+          : 'Capital Logistics tracking is temporarily unavailable.'
+      };
+    }
+  })().then(result => { machShipAccessCache = { checkedAt: Date.now(), result }; return result; })
+    .finally(() => { machShipAccessPromise = null; });
+  return machShipAccessPromise;
 }
 
 function findTrackingPo(poReference, containerNumber) {
@@ -5289,7 +5434,8 @@ app.get('/api/container-tracking', requireAuth, async (req, res) => {
   }
   const destination = destinationResolution.destination;
   const warehouseSource = warehouseSourceForDestination(destination);
-  const cacheKey = `${CONTAINER_TRACKING_SCHEMA_VERSION}|${requestedContainer}|${poReference.toUpperCase()}|${destination}|${warehouseSource.key}`;
+  const providerReferences = [po?.supplierInvoiceReference].map(value => String(value || '').trim()).filter(Boolean);
+  const cacheKey = `${CONTAINER_TRACKING_SCHEMA_VERSION}|${requestedContainer}|${poReference.toUpperCase()}|${destination}|${warehouseSource.key}|${providerReferences.join('|').toUpperCase()}`;
   const force = String(req.query.refresh || '') === '1';
   const cached = containerTrackingCache.get(cacheKey);
   if (!force && cached && Date.now() - cached.cachedAt < CONTAINER_TRACKING_CACHE_MS) {
@@ -5302,6 +5448,10 @@ app.get('/api/container-tracking', requireAuth, async (req, res) => {
     warehouseResultPromise = fetchLecangsAsns(poReference, requestedContainer, warehouseSource.key);
   } else if (warehouseSource.key === 'cirro') {
     warehouseResultPromise = fetchCirroInbounds(poReference, requestedContainer);
+  } else if (warehouseSource.key === 'pacificomm') {
+    warehouseResultPromise = fetchPacificommInbounds(poReference, requestedContainer, providerReferences);
+  } else if (warehouseSource.key === 'capital_logistics') {
+    warehouseResultPromise = fetchCapitalLogisticsAccess();
   } else {
     warehouseResultPromise = Promise.resolve({
         state: warehouseSource.key === 'unsupported' ? 'unsupported' : 'not_connected',
@@ -5316,7 +5466,8 @@ app.get('/api/container-tracking', requireAuth, async (req, res) => {
     warehouseResult.payload,
     warehouseSource,
     requestedContainer,
-    poReference
+    poReference,
+    providerReferences
   );
   const warehouseComplete = warehouseResult.state === 'live' && normalizedWarehouse.unloaded.complete;
   const poReceived = String(po.stage || '').trim().toLowerCase() === 'received'
@@ -5343,6 +5494,7 @@ app.get('/api/container-tracking', requireAuth, async (req, res) => {
     warehouseSource,
     warehouseMessage: warehouseResult.message,
     expectedDestination: destination,
+    providerReferences,
     journeyClosed: poReceived
   });
   const normalizedFindTeu = normalizeFindTeu(findTeuResult.payload);
@@ -5408,6 +5560,12 @@ app.get('/api/container-tracking', requireAuth, async (req, res) => {
           message: warehouseResult.message,
           fetchedAt
         }
+      } : {}),
+      ...(warehouseSource.key === 'pacificomm' ? {
+        cartoncloud: { state: warehouseResult.state, message: warehouseResult.message, fetchedAt }
+      } : {}),
+      ...(warehouseSource.key === 'capital_logistics' ? {
+        machship: { state: warehouseResult.state, message: warehouseResult.message, fetchedAt }
       } : {})
     },
     warehouseSource,
