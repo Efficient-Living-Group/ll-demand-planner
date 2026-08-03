@@ -14,12 +14,23 @@ const {
 const {
   isShopifyVelocitySourceEligibleForPanel
 } = require('../lib/little-lifely-demand');
+const { DEEP_DREAM_DISCONTINUED_SKUS } = require('../lib/deep-dream-softness');
 
 const ROOT = path.resolve(__dirname, '..');
 const SNAPSHOT = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'cache-snapshot.json'), 'utf8'));
 const PORT = Number(process.env.BOM_RECONCILIATION_PORT || 3998);
 const SESSION_SECRET = 'demand-planner-bom-reconciliation-test';
-const KNOWN_BOM_MASTER_EXCLUSIONS = new Set();
+// Reviewed by Yun Kai on 2026-08-03: these sold Cocoon-with-mattress parents
+// still consume the two retired mattresses in BOM Master. The retired leaves
+// must stay out of automatic planning and must never be remapped by SKU inference.
+const KNOWN_BOM_MASTER_EXCLUSIONS = new Set([
+  'dd:COCOON-KMF-CRML:bom_master_has_no_visible_panel_component',
+  'dd:COCOON-KMF-IVR:bom_master_has_no_visible_panel_component',
+  'dd:COCOON-KMF-MSGRN:bom_master_has_no_visible_panel_component',
+  'dd:COCOON-QMF-CRML:bom_master_has_no_visible_panel_component',
+  'dd:COCOON-QMF-IVR:bom_master_has_no_visible_panel_component',
+  'dd:COCOON-QMF-MSGRN:bom_master_has_no_visible_panel_component'
+]);
 
 function normalizeSku(value) {
   return String(value || '').toUpperCase().trim();
@@ -221,6 +232,15 @@ async function reconcilePanel(row) {
       [...KNOWN_BOM_MASTER_EXCLUSIONS].sort(),
       `sold parent BOM Master exclusions changed:\n${JSON.stringify(missingBom, null, 2)}`
     );
+    for (const issue of missingBom) {
+      const resolved = resolveBomMasterLeaves(issue.parentSku, SNAPSHOT.cin7BOMs || {});
+      assert(resolved.ok, `${issue.parentSku} reviewed retirement exception lost its BOM Master record`);
+      const leaves = Object.keys(resolved.components || {}).map(normalizeSku);
+      assert(
+        leaves.some(sku => DEEP_DREAM_DISCONTINUED_SKUS.includes(sku)),
+        `${issue.parentSku} reviewed exception no longer terminates at an explicitly retired Deep Dream SKU`
+      );
+    }
     assert.deepStrictEqual(demandGaps, [], `sold parent/component demand reconciliation failures:\n${JSON.stringify(demandGaps, null, 2)}`);
 
     const visibleRows = panels.reduce((sum, panel) => sum + panel.visibleRows, 0);

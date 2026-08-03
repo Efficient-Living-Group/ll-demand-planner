@@ -6,11 +6,12 @@ const root = path.join(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'public', 'index.html'), 'utf8');
 const server = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
 const snapshot = JSON.parse(fs.readFileSync(path.join(root, 'data', 'cache-snapshot.json'), 'utf8'));
-const { DEEP_DREAM_SOFTNESS_BY_SKU } = require('../lib/deep-dream-softness');
+const { DEEP_DREAM_DISCONTINUED_SKUS, DEEP_DREAM_SOFTNESS_BY_SKU } = require('../lib/deep-dream-softness');
 
 const currentDeepDreamSkus = Object.entries(snapshot.cin7Products || {})
   .filter(([, product]) => product?.option1 === 'Category Killer - Deepdream')
   .map(([sku]) => sku)
+  .filter(sku => !DEEP_DREAM_DISCONTINUED_SKUS.includes(sku))
   .sort();
 const mappedSkus = Object.keys(DEEP_DREAM_SOFTNESS_BY_SKU).sort();
 
@@ -23,15 +24,19 @@ for (const [sku, softness] of Object.entries(DEEP_DREAM_SOFTNESS_BY_SKU)) {
   assert(allowed.has(softness), `${sku} has unsupported softness ${softness}`);
   counts[softness] += 1;
 }
-assert.deepStrictEqual(counts, { plush: 3, medium: 9, firm: 3 }, 'Deep Dream softness counts changed unexpectedly');
+assert.deepStrictEqual(counts, { plush: 3, medium: 7, firm: 3 }, 'Deep Dream softness counts changed unexpectedly');
 
 assert.strictEqual(DEEP_DREAM_SOFTNESS_BY_SKU['DD-137D-PLUSH'], 'plush');
-assert.strictEqual(DEEP_DREAM_SOFTNESS_BY_SKU['DD-153QMF'], 'medium');
 assert.strictEqual(DEEP_DREAM_SOFTNESS_BY_SKU['DD-21153CF'], 'medium');
 assert.strictEqual(DEEP_DREAM_SOFTNESS_BY_SKU['DD-36153SG'], 'medium');
 assert.strictEqual(DEEP_DREAM_SOFTNESS_BY_SKU['DD-34153Q-SFM'], 'firm');
+assert.deepStrictEqual(DEEP_DREAM_DISCONTINUED_SKUS, ['DD-153QMF', 'DD-183KMF'], 'reviewed Deep Dream exclusion set changed');
+for (const sku of DEEP_DREAM_DISCONTINUED_SKUS) {
+  assert(!Object.prototype.hasOwnProperty.call(DEEP_DREAM_SOFTNESS_BY_SKU, sku), `${sku} must not remain in active softness metadata`);
+}
 
 assert(server.includes("softnessBySku: ckId === 'dd' ? DEEP_DREAM_SOFTNESS_BY_SKU : {}"), 'Deep Dream softness metadata missing from CK payload');
+assert(server.includes('DEEP_DREAM_DISCONTINUED_SKUS.includes(normalized)'), 'Deep Dream discontinued SKUs must be excluded from planner payloads');
 assert(html.includes("[['all','All'],['plush','Plush'],['medium','Medium'],['firm','Firm']]"), 'Deep Dream softness tabs missing');
 assert(html.includes("if(currentCK==='dd'&&counts.unclassified>0)tabs.push(['unclassified','Unclassified'])"), 'unclassified safety tab missing');
 assert(html.includes("row.__ddSoftness=stockTableSoftnessBySku[sku]||'unclassified'"), 'rendered Deep Dream row must use explicit metadata');

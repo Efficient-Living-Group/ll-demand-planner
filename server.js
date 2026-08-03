@@ -34,7 +34,7 @@ const {
 } = require('./lib/container-tracking');
 const { exec } = require('child_process');
 const { validateCin7RefreshCandidate } = require('./lib/cin7-refresh-integrity');
-const { DEEP_DREAM_SOFTNESS_BY_SKU } = require('./lib/deep-dream-softness');
+const { DEEP_DREAM_DISCONTINUED_SKUS, DEEP_DREAM_SOFTNESS_BY_SKU } = require('./lib/deep-dream-softness');
 const WebSocket = require('ws');
 
 const app = express();
@@ -825,7 +825,8 @@ function skuMatchesOption1(sku, def, override = '') {
 }
 
 function isPlannerExcludedSku(sku) {
-  return /CSTM$/i.test(String(sku || '').trim());
+  const normalized = String(sku || '').trim().toUpperCase();
+  return /CSTM$/i.test(normalized) || DEEP_DREAM_DISCONTINUED_SKUS.includes(normalized);
 }
 
 function visiblePlannerSkuMap(map = {}) {

@@ -83,6 +83,7 @@ const CK_DEFS = {
   'lifely-sofa': { name:'Modular Sofa', prefix:'LIFELY', option1:'Category Killer - Lifely Sofa' },
   'case-goods': { name:'Case Goods', prefix:'MULTI', option1:['Case goods - Active','Case goods - Discontinued'], filter:isCaseGoodsSku }
 };
+const PLANNER_EXCLUDED_SKUS = new Set(['DD-153QMF', 'DD-183KMF']);
 function optionAllowed(actual, allowed) {
   if (!allowed) return true;
   const list = Array.isArray(allowed) ? allowed : [allowed];
@@ -90,7 +91,7 @@ function optionAllowed(actual, allowed) {
 }
 function matchesDef(sku, option1, def) {
   const s = String(sku || '').toUpperCase();
-  if (/CSTM$/i.test(s.trim())) return false;
+  if (/CSTM$/i.test(s.trim()) || PLANNER_EXCLUDED_SKUS.has(s.trim())) return false;
   const filter = def.filter || (() => true);
   if (def.prefix === 'MULTI') { if (!filter(s)) return false; }
   else if (!(s.startsWith(def.prefix) && filter(s))) return false;
