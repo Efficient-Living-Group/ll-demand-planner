@@ -68,7 +68,7 @@ const CARTONCLOUD_BASE_URL = (process.env.CARTONCLOUD_BASE_URL || 'https://api.c
 const MACHSHIP_TOKEN = process.env.MACHSHIP_TOKEN || '';
 const MACHSHIP_BASE_URL = (process.env.MACHSHIP_BASE_URL || 'https://live.machship.com').replace(/\/$/, '');
 const CONTAINER_TRACKING_CACHE_MS = 15 * 60 * 1000;
-const CONTAINER_TRACKING_SCHEMA_VERSION = '2026-08-03-regional-3pl-v3';
+const CONTAINER_TRACKING_SCHEMA_VERSION = '2026-08-03-regional-3pl-v4';
 const CIN7_REQUEST_SPACING_MS = 1500;
 const CIN7_REFRESH_INTERVAL_MS = 4 * 60 * 60 * 1000;
 const CIN7_MIN_REFRESH_INTERVAL_MS = CIN7_REFRESH_INTERVAL_MS;
@@ -4705,6 +4705,8 @@ const lecangsIndexCaches = new Map();
 const lecangsIndexPromises = new Map();
 let cirroUkTokenCache = { token: '', expiresAt: 0 };
 let cirroUkTokenPromise = null;
+let cirroUkBookingCache = { cachedAt: 0, rows: [] };
+let cirroUkBookingPromise = null;
 let cartonCloudSessionCache = { token: '', tenantId: '', expiresAt: 0 };
 let cartonCloudSessionPromise = null;
 let machShipAccessCache = { checkedAt: 0, result: null };
@@ -4957,6 +4959,42 @@ async function getCirroUkToken() {
   return cirroUkTokenPromise;
 }
 
+async function fetchCirroUkBookings(token) {
+  const pageSize = 200;
+  const maxPages = 50;
+  const now = Date.now();
+  if (cirroUkBookingCache.cachedAt && now - cirroUkBookingCache.cachedAt < CONTAINER_TRACKING_CACHE_MS) {
+    return cirroUkBookingCache.rows;
+  }
+  if (cirroUkBookingPromise) return cirroUkBookingPromise;
+  cirroUkBookingPromise = (async () => {
+    const rows = [];
+    for (let page = 1; page <= maxPages; page += 1) {
+      const payload = await trackingRequestJson(
+        'POST',
+        `${CIRRO_UK_BASE_URL}/inbound/get-booking-list`,
+        { Authorization: `Bearer ${token}` },
+        cirroEnvelope({ page, page_size: pageSize }),
+        30000
+      );
+      assertCirroSuccess(payload);
+      const pageRows = Array.isArray(payload?.data?.list) ? payload.data.list : [];
+      rows.push(...pageRows);
+      if (pageRows.length < pageSize) {
+        cirroUkBookingCache = { cachedAt: Date.now(), rows };
+        return rows;
+      }
+      if (page === maxPages) {
+        throw new Error('Cirro booking index exceeded the safe pagination limit');
+      }
+    }
+    return rows;
+  })().finally(() => {
+    cirroUkBookingPromise = null;
+  });
+  return cirroUkBookingPromise;
+}
+
 async function fetchCirroInbounds(poReference, containerNumber) {
   if (!CIRRO_UK_APP_KEY || !CIRRO_UK_APP_TOKEN) {
     return {
@@ -4992,6 +5030,22 @@ async function fetchCirroInbounds(poReference, containerNumber) {
       return !!row?.receiving_code && (!rowContainer || rowContainer === compactContainer);
     });
     if (matchedRows.length > 20) throw new Error('Cirro returned too many inbound matches for one container');
+    const bookingRows = matchedRows.length ? await fetchCirroUkBookings(token) : [];
+    const bookingByInboundCode = new Map();
+    bookingRows.forEach(booking => {
+      const code = String(booking?.inbound_order_code || '').trim().toUpperCase();
+      if (!code) return;
+      const existing = bookingByInboundCode.get(code);
+      const candidateTime = booking?.delivery_time_info?.arrive_time
+        || booking?.delivery_time_info?.warehouse_appointment_delivery_time
+        || '';
+      const existingTime = existing?.delivery_time_info?.arrive_time
+        || existing?.delivery_time_info?.warehouse_appointment_delivery_time
+        || '';
+      if (!existing || String(candidateTime).localeCompare(String(existingTime)) > 0) {
+        bookingByInboundCode.set(code, booking);
+      }
+    });
     const detailedRows = await Promise.all(matchedRows.map(async row => {
       if (!row?.receiving_code) return row;
       const detailPayload = await trackingRequestJson(
@@ -5007,14 +5061,18 @@ async function fetchCirroInbounds(poReference, containerNumber) {
       if (String(detailReference).trim().toUpperCase().replace(/[^A-Z0-9]/g, '') !== compactPo) {
         return null;
       }
+      const receivingCode = detail.receiving_code || row.receiving_code;
+      const booking = bookingByInboundCode.get(String(receivingCode || '').trim().toUpperCase());
       return {
-        receiving_code: detail.receiving_code || row.receiving_code,
+        receiving_code: receivingCode,
         reference_no: detailReference,
         query_container: containerNumber,
         container_number: detail.container_number || row.container_number || row.container_no || '',
         receiving_status: detail.receiving_status ?? row.receiving_status,
         warehouse_code: detail.warehouse_code || row.warehouse_code || '',
         eta_date: detail.eta_date || null,
+        appointment_date: booking?.delivery_time_info?.warehouse_appointment_delivery_time || null,
+        arrival_date: booking?.delivery_time_info?.arrive_time || null,
         update_at: detail.update_at || detail.udpate_at || row.update_at || null,
         create_at: detail.create_at || row.create_at || null
       };

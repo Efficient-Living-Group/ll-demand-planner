@@ -314,6 +314,8 @@ const cirroPayload = {
       receiving_status: 7,
       warehouse_code: 'UK01',
       eta_date: '2026-07-25T09:00:00+00:00',
+      appointment_date: '2026-07-25T09:30:00+00:00',
+      arrival_date: '2026-07-25T10:30:00+00:00',
       update_at: '2026-07-25T10:00:00+00:00'
     }]
   }
@@ -322,6 +324,8 @@ const normalizedCirro = normalizeCirro(cirroPayload, 'PO-UK-TEST', 'OOCU8815295'
 assert.strictEqual(normalizedCirro.recordLabel, 'inbound');
 assert.strictEqual(normalizedCirro.linkedAsnCount, 1);
 assert.strictEqual(normalizedCirro.warehouseArrival.complete, true);
+assert.strictEqual(normalizedCirro.appointment.timestamp, '2026-07-25T09:30:00+00:00');
+assert.strictEqual(normalizedCirro.warehouseArrival.timestamp, '2026-07-25T10:30:00+00:00');
 assert.strictEqual(normalizedCirro.handover.complete, false);
 assert.strictEqual(normalizedCirro.handover.current, true);
 assert.strictEqual(normalizedCirro.unloaded.complete, false);
@@ -345,6 +349,8 @@ const cirroJourney = buildContainerJourney({
 assert.strictEqual(cirroJourney.timeline[3].source, 'Cirro');
 assert.strictEqual(cirroJourney.timeline[3].state, 'archived');
 assert.strictEqual(cirroJourney.timeline[4].state, 'complete');
+assert.strictEqual(cirroJourney.timeline[4].timestamp, '2026-07-25T10:30:00+00:00');
+assert.match(cirroJourney.timeline[4].detail, /actual delivery time/i);
 assert.strictEqual(cirroJourney.timeline[5].state, 'current');
 assert.strictEqual(cirroJourney.timeline[6].state, 'pending');
 assert.strictEqual(cirroJourney.warehouse.providerKey, 'cirro');
