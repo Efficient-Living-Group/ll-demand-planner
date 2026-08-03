@@ -4,7 +4,7 @@ const http = require('http');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
-const { cartonAvailableQuantity } = require('./lib/inventory');
+const { cartonAvailableQuantity, aggregateCartonsByWarehouse } = require('./lib/inventory');
 const { summarizeSalesVolume } = require('./lib/executive-sales');
 const {
   littleLifelyCtpComponentsForDemandSku,
@@ -2088,7 +2088,7 @@ function normalizePoItemQuantities(items) {
   return result;
 }
 
-function normalizeCIN7(cin7Raw) {
+function normalizeCIN7(cin7Raw, options = {}) {
   const result = {};
   const boxPattern = /^(.+)-(\d)$/;
   const boxGroups = {};
@@ -2107,13 +2107,33 @@ function normalizeCIN7(cin7Raw) {
 
   // For box-split products, buildable = min across all boxes
   for (const [base, boxes] of Object.entries(boxGroups)) {
-    const soh = Math.min(...boxes.map(b => typeof b === 'object' ? b.soh : b));
-    const available = Math.min(...boxes.map(cartonAvailableQuantity));
+    const cartonSkus = Object.keys(cin7Raw).filter(sku => {
+      const match = sku.match(boxPattern);
+      return match && match[1] === base;
+    });
+    const warehouseAggregate = aggregateCartonsByWarehouse(
+      cartonSkus,
+      options.branchIds,
+      options.stockByBranch
+    );
+    const soh = warehouseAggregate
+      ? warehouseAggregate.soh
+      : Math.min(...boxes.map(b => typeof b === 'object' ? b.soh : b));
+    const available = warehouseAggregate
+      ? warehouseAggregate.available
+      : Math.min(...boxes.map(cartonAvailableQuantity));
     // Sum costs across all boxes (each box is a separate shipped piece)
     const costAUD = boxes.reduce((sum, b) => sum + (typeof b === 'object' ? (b.costAUD || 0) : 0), 0);
     const cbm = boxes.reduce((sum, b) => sum + (typeof b === 'object' ? (b.cbm || 0) : 0), 0);
     const option1 = boxes.map(b => typeof b === 'object' ? (b.option1 || '') : '').find(Boolean) || '';
-    result[base] = { soh, available, costAUD, cbm, option1 };
+    result[base] = {
+      soh,
+      available,
+      virtual: warehouseAggregate ? warehouseAggregate.virtual : soh,
+      costAUD,
+      cbm,
+      option1
+    };
   }
 
   return result;
@@ -2282,15 +2302,37 @@ function buildCKData(ckId) {
   }
 
   // Normalize: merge box-splits, map components to sets
-  let cin7Normalized = normalizeCIN7(cin7Raw);
+  let cin7Normalized = normalizeCIN7(cin7Raw, {
+    branchIds: stockBranches,
+    stockByBranch: dataCache.cin7StockByBranch
+  });
   if (ckId === 'case-goods') {
+    const cartonParentCounts = new Map();
+    for (const sku of Object.keys(cin7Raw)) {
+      const match = sku.match(/^(.+)-(\d)$/);
+      if (match) cartonParentCounts.set(match[1], Number(cartonParentCounts.get(match[1]) || 0) + 1);
+    }
+    const cartonParents = new Set([...cartonParentCounts.entries()].filter(([, count]) => count >= 2).map(([sku]) => sku));
     for (const sku of Object.keys(cin7Normalized)) {
       if (!dataCache.cin7BOMs?.[sku]) continue;
       const source = stockBranches
         ? (cin7Raw[sku] || cin7Normalized[sku] || {})
         : (dataCache.cin7Products?.[sku] || cin7Normalized[sku] || {});
-      const virtual = Number(source.virtual ?? source.soh ?? 0);
-      cin7Normalized[sku] = { ...(typeof cin7Normalized[sku] === 'object' ? cin7Normalized[sku] : {}), ...source, soh: virtual, virtual };
+      const normalized = typeof cin7Normalized[sku] === 'object' ? cin7Normalized[sku] : {};
+      if (cartonParents.has(sku)) {
+        // The zero-valued parent is a Cin7 placeholder. Preserve its metadata,
+        // but keep the warehouse-conserved limiting-carton stock quantities.
+        cin7Normalized[sku] = {
+          ...normalized,
+          ...source,
+          soh: Number(normalized.soh || 0),
+          available: Number(normalized.available || 0),
+          virtual: Number(normalized.soh || 0)
+        };
+      } else {
+        const virtual = Number(source.virtual ?? source.soh ?? 0);
+        cin7Normalized[sku] = { ...normalized, ...source, soh: virtual, virtual };
+      }
     }
   }
   // Lifely Sofa should show true physical component/carton SKUs. Do not merge
@@ -2844,7 +2886,10 @@ function buildCKData(ckId) {
           ? { ...data, soh: branchData.soh, virtual: branchData.virtual, available: branchData.available }
           : { ...data, soh: 0, virtual: 0, available: 0 };
       }
-      let normalized = normalizeCIN7(branchRaw);
+      let normalized = normalizeCIN7(branchRaw, {
+        branchIds: ids,
+        stockByBranch: dataCache.cin7StockByBranch
+      });
       if (ckId === 'llau') normalized = normalizeSwatchPack(normalized);
       if (ckId === 'llau') {
         for (const sku of ['DD-21915CF', 'DD-21107CF', 'DD-21137CF']) {
