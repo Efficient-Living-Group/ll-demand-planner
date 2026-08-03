@@ -1,0 +1,32 @@
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+
+const root = path.join(__dirname, '..');
+const html = fs.readFileSync(path.join(root, 'public', 'index.html'), 'utf8');
+const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+
+assert.strictEqual(pkg.dependencies['ag-grid-community'], '36.0.2', 'AG Grid Community must be pinned');
+assert.strictEqual(pkg.scripts.postinstall, 'node scripts/install_frontend_vendor.js', 'local browser bundle installer missing');
+assert(html.includes("const LLNA_GRID_PREF_KEY='dpLlnaGridMode:v1'"), 'LLNA pilot preference missing');
+assert(html.includes("function getLlnaGridMode(){return localStorage.getItem(LLNA_GRID_PREF_KEY)==='ag'?'ag':'classic'}"), 'classic must be the default');
+assert(html.includes("const available=currentCK==='llna'&&isLlnaGridDesktop()"), 'pilot controls must be LLNA desktop only');
+assert(html.includes("if(currentCK!=='llna'||getLlnaGridMode()!=='ag'||!isLlnaGridDesktop()){showLlnaClassicTable();return;}"), 'runtime must fail back outside LLNA desktop');
+assert(html.includes("script.src='/vendor/ag-grid-community.min.js?v=36.0.2'"), 'AG Grid must load from the pinned local bundle');
+assert(html.includes('function captureLlnaClassicTable()'), 'classic table adapter missing');
+assert(html.includes("const table=document.getElementById('stockTable')"), 'AG Grid must read the already-rendered classic table');
+assert(html.includes('window.__llnaAgGridParity='), 'runtime parity evidence missing');
+assert(html.includes("showLlnaClassicTable('AG Grid unavailable — classic restored')"), 'automatic classic fallback missing');
+assert(html.includes('@media(max-width:768px){.llna-grid-pilot-controls,.llna-grid-pilot-shell{display:none!important}}'), 'mobile must remain on the classic table');
+assert(html.includes('.llna-grid-state[hidden]{display:none}'), 'loading state must disappear after grid creation');
+assert(html.includes('aria-pressed="${mode===\'ag\'}"'), 'view switch accessibility state missing');
+assert(html.includes('id="stockTableWrap"') && html.includes('id="stockTable"'), 'classic table must remain intact');
+assert(html.includes("row[column.field]=text;row.__cells[column.field]="), 'grid values must remain searchable text');
+assert(html.includes("getQuickFilterText:params=>String(params.value||'')"), 'quick filter text adapter missing');
+
+const captureStart = html.indexOf('function captureLlnaClassicTable()');
+const captureEnd = html.indexOf('function llnaGridTheme()', captureStart);
+const captureBody = html.slice(captureStart, captureEnd);
+assert(!/\bDATA\b/.test(captureBody), 'presentation adapter must not recalculate from planner data');
+
+console.log('LLNA AG Grid pilot regression: PASS');

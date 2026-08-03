@@ -58,6 +58,9 @@ body.sidebar-collapsed .sidebar{overflow:hidden;opacity:0}
 table{width:100%;border-collapse:collapse;font-size:11px}table td,table th{padding:6px 8px}
 thead th{background:var(--bg-secondary);padding:6px 8px;text-align:left;font-weight:600;white-space:nowrap;border-bottom:2px solid var(--border);color:#F6F8F4;font-size:10px}
 tbody td{padding:5px 8px;border-bottom:1px solid var(--border);white-space:nowrap;font-size:11px}tbody tr:hover{background:rgba(44,71,75,0.05)}
+.llna-grid-pilot-controls{display:none;align-items:center;justify-content:space-between;gap:12px;margin:-4px 0 10px;padding:9px 10px;border:1px solid #CEDAD1;border-radius:12px;background:#EEF4F0}.llna-grid-pilot-controls.visible{display:flex}.llna-grid-pilot-copy{display:flex;align-items:center;gap:8px;min-width:0}.llna-grid-pilot-label{font-size:11px;font-weight:800;color:#29494C;white-space:nowrap}.llna-grid-pilot-note{font-size:10px;color:#66766D;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.llna-grid-switch{display:inline-flex;align-items:center;padding:2px;border:1px solid #C6D3C9;border-radius:9px;background:#FFF;box-shadow:0 1px 2px rgba(35,65,61,.06)}.llna-grid-switch button{min-height:32px;padding:6px 11px;border:0;border-radius:7px;background:transparent;color:#68766D;font:750 11px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;cursor:pointer}.llna-grid-switch button:hover{background:#F2F6F2;color:#29494C}.llna-grid-switch button.active{background:#2C474B;color:#FFF}.llna-grid-switch button:focus-visible,.llna-grid-toolbar button:focus-visible,.llna-grid-search:focus-visible{outline:3px solid rgba(44,71,75,.24);outline-offset:2px}.llna-grid-pilot-shell{margin-bottom:0;border:1px solid #CEDAD1;border-radius:12px;background:#FFF;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden}.llna-grid-pilot-shell[hidden]{display:none}.llna-grid-toolbar{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid #DCE5DE;background:#F7F9F6}.llna-grid-search-wrap{display:flex;align-items:center;gap:7px;min-width:min(360px,42vw);padding:0 10px;border:1px solid #C8D5CB;border-radius:9px;background:#FFF;color:#65736B}.llna-grid-search-wrap:focus-within{border-color:#52766F;box-shadow:0 0 0 3px rgba(44,71,75,.10)}.llna-grid-search{width:100%;height:34px;border:0;outline:0;background:transparent;color:#243F42;font-size:12px}.llna-grid-toolbar-spacer{flex:1}.llna-grid-toolbar button{min-height:34px;padding:6px 10px;border:1px solid #C8D5CB;border-radius:8px;background:#FFF;color:#315255;font:750 10px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;cursor:pointer;white-space:nowrap}.llna-grid-toolbar button:hover{background:#EAF1EC;border-color:#8FA89B}.llna-grid-row-count{font-size:10px;color:#6D7C73;white-space:nowrap}.llna-ag-grid{height:clamp(30rem,66vh,48rem);width:100%}.llna-grid-state{display:flex;min-height:240px;align-items:center;justify-content:center;padding:30px;text-align:center;color:#617168;font-size:12px}.llna-grid-state[hidden]{display:none}.llna-grid-status{min-height:20px;padding:5px 12px;border-top:1px solid #E4EAE5;background:#FBFCFA;color:#69776E;font-size:10px}.llna-grid-status.error{color:#9D2D49;background:#FFF5F7}.llna-grid-cell{display:flex;align-items:center;width:100%;height:100%;min-width:0;overflow:hidden;white-space:nowrap}.llna-grid-cell>*{max-width:100%}.llna-grid-pilot-shell .ag-root-wrapper{border:0;border-radius:0}.llna-grid-pilot-shell .ag-header{font-size:10px;font-weight:750}.llna-grid-pilot-shell .ag-cell{font-size:11px}.llna-grid-pilot-shell .ag-row-hover{background:#F1F6F2}.llna-grid-pilot-shell .ag-pinned-left-cols-container{box-shadow:5px 0 10px rgba(36,61,57,.06)}
+@media(max-width:768px){.llna-grid-pilot-controls,.llna-grid-pilot-shell{display:none!important}}
+@media(prefers-reduced-motion:reduce){.llna-grid-switch button,.llna-grid-toolbar button{transition:none}}
 thead th{cursor:pointer;user-select:none}thead th:hover{background:var(--bg-accent)}thead th .sort-arrow{font-size:8px;margin-left:3px;opacity:0.5}
 .badge{padding:2px 8px;border-radius:12px;font-size:10px;font-weight:600;display:inline-block}
 .badge.stockout{background:rgba(195,50,82,0.2);color:var(--alert)}.badge.critical{background:rgba(195,50,82,0.15);color:#C33252}
@@ -265,8 +268,22 @@ th[data-tip],.card[data-tip]{position:relative;cursor:help}th[data-tip]:after{co
       <h3 style="font-size:14px;margin-bottom:12px">📦 Bundle ATP & Binding Constraints</h3>
       
     </div>
+    <div class="llna-grid-pilot-controls" id="llnaGridPilotControls" aria-label="LLNA table view"></div>
     <div class="column-controls" id="stockColumnControls"></div>
-    <div class="table-wrap"><table id="stockTable"><thead></thead><tbody></tbody></table></div>
+    <div class="table-wrap" id="stockTableWrap"><table id="stockTable"><thead></thead><tbody></tbody></table></div>
+    <section class="llna-grid-pilot-shell" id="llnaGridPilotShell" aria-label="LLNA AG Grid pilot" hidden>
+      <div class="llna-grid-toolbar">
+        <label class="llna-grid-search-wrap" for="llnaGridSearch"><span aria-hidden="true">⌕</span><input class="llna-grid-search" id="llnaGridSearch" type="search" placeholder="Find SKU or any value" autocomplete="off" oninput="setLlnaGridSearch(this.value)"></label>
+        <span class="llna-grid-row-count" id="llnaGridRowCount"></span>
+        <span class="llna-grid-toolbar-spacer"></span>
+        <button type="button" id="llnaGridIncomingToggle" onclick="return toggleIncomingDateColumns(event)">Show ETA columns</button>
+        <button type="button" onclick="fitLlnaGridColumns()">Fit columns</button>
+        <button type="button" onclick="resetLlnaGridColumns()">Reset columns</button>
+      </div>
+      <div class="llna-grid-state" id="llnaGridLoading">Loading AG Grid…</div>
+      <div class="llna-ag-grid" id="llnaAgGrid" hidden></div>
+      <div class="llna-grid-status" id="llnaGridStatus" role="status" aria-live="polite"></div>
+    </section>
     <div id="auMarketingPanel" style="display:none;margin-top:24px"></div>
     </div>
     <div id="stockout" class="view">
@@ -426,6 +443,7 @@ function applyStockColumnVisibility(){
   const labels=stockColumnLabels(); const hidden=getHiddenStockColumns();
   [...table.querySelectorAll('tr')].forEach(row=>{[...row.children].forEach((cell,i)=>{const label=labels[i]||'';cell.style.display=hidden.has(label)&&!isLockedStockColumn(label)?'none':'';});});
   renderStockColumnControls();
+  queueMicrotask(syncLlnaGridPresentation);
 }
 function toggleStockColumn(label,visible){
   if(isLockedStockColumn(label))return;
@@ -450,6 +468,126 @@ function renderStockColumnControls(){
   </div>`;
 }
 document.addEventListener('click',e=>{if(window._stockColumnPickerOpen&&!e.target.closest?.('#stockColumnPicker')){window._stockColumnPickerOpen=false;renderStockColumnControls();}});
+
+const LLNA_GRID_PREF_KEY='dpLlnaGridMode:v1';
+let llnaGridApi=null,llnaGridLoadPromise=null,llnaGridSearch='',llnaGridResizeTimer=null;
+function getLlnaGridMode(){return localStorage.getItem(LLNA_GRID_PREF_KEY)==='ag'?'ag':'classic'}
+function isLlnaGridDesktop(){return window.matchMedia('(min-width: 769px)').matches}
+function renderLlnaGridPilotControls(message=''){
+  const controls=document.getElementById('llnaGridPilotControls');if(!controls)return;
+  const available=currentCK==='llna'&&isLlnaGridDesktop();
+  controls.classList.toggle('visible',available);
+  if(!available){controls.innerHTML='';return;}
+  const mode=getLlnaGridMode();
+  controls.innerHTML=`<div class="llna-grid-pilot-copy"><span class="llna-grid-pilot-label">LLNA table pilot</span><span class="llna-grid-pilot-note">${escHtml(message||'Same planner figures, faster table controls')}</span></div><div class="llna-grid-switch" role="group" aria-label="Choose LLNA table view"><button type="button" class="${mode==='classic'?'active':''}" aria-pressed="${mode==='classic'}" onclick="setLlnaGridMode('classic')">Classic</button><button type="button" class="${mode==='ag'?'active':''}" aria-pressed="${mode==='ag'}" onclick="setLlnaGridMode('ag')">AG Grid pilot</button></div>`;
+}
+function setLlnaGridStatus(message='',isError=false){
+  const el=document.getElementById('llnaGridStatus');if(!el)return;
+  el.textContent=message;el.classList.toggle('error',Boolean(isError));
+}
+function showLlnaClassicTable(message=''){
+  const wrap=document.getElementById('stockTableWrap'),shell=document.getElementById('llnaGridPilotShell');
+  if(wrap)wrap.hidden=false;if(shell)shell.hidden=true;
+  if(llnaGridApi){try{llnaGridApi.destroy()}catch(e){}llnaGridApi=null;}
+  renderLlnaGridPilotControls(message);
+}
+function loadLlnaAgGrid(){
+  if(window.agGrid?.createGrid)return Promise.resolve(window.agGrid);
+  if(llnaGridLoadPromise)return llnaGridLoadPromise;
+  llnaGridLoadPromise=new Promise((resolve,reject)=>{
+    const script=document.createElement('script');
+    script.src='/vendor/ag-grid-community.min.js?v=36.0.2';script.async=true;script.dataset.llnaAgGrid='1';
+    script.onload=()=>window.agGrid?.createGrid?resolve(window.agGrid):reject(new Error('AG Grid did not initialise'));
+    script.onerror=()=>reject(new Error('AG Grid bundle could not be loaded'));
+    document.head.appendChild(script);
+  }).catch(error=>{llnaGridLoadPromise=null;throw error});
+  return llnaGridLoadPromise;
+}
+function llnaGridSortValue(text){
+  const clean=String(text||'').replace(/,/g,'').replace(/A\$|\$/g,'').replace(/⚠️/g,'').trim();
+  if(!clean||clean==='—')return{kind:'empty',value:''};
+  const numberMatch=clean.match(/^-?\d+(?:\.\d+)?(?:\s*(?:wk|d|%))?/i);
+  if(numberMatch)return{kind:'number',value:Number.parseFloat(numberMatch[0])};
+  const date=Date.parse(clean);if(/\d/.test(clean)&&Number.isFinite(date))return{kind:'number',value:date};
+  return{kind:'text',value:clean.toLowerCase()};
+}
+function compareLlnaGridCells(left,right){
+  const a=left&&typeof left==='object'&&left.sort?left.sort:llnaGridSortValue(left),b=right&&typeof right==='object'&&right.sort?right.sort:llnaGridSortValue(right);
+  if(a.kind==='empty'&&b.kind!=='empty')return 1;if(b.kind==='empty'&&a.kind!=='empty')return-1;
+  if(a.kind==='number'&&b.kind==='number')return a.value-b.value;
+  return String(a.value).localeCompare(String(b.value),undefined,{numeric:true,sensitivity:'base'});
+}
+function captureLlnaClassicTable(){
+  const table=document.getElementById('stockTable'),head=[...table?.querySelectorAll('thead th')||[]];
+  const visible=head.map((th,index)=>({th,index})).filter(({th})=>th.style.display!=='none');
+  const columns=visible.map(({th,index},columnIndex)=>{
+    const tip=th.querySelector('.tip')?.textContent?.trim()||'';
+    return{field:`c${columnIndex}`,sourceIndex:index,label:stockColumnLabel(th),tip};
+  });
+  const rows=[...table?.querySelectorAll('tbody tr')||[]].map((tr,rowIndex)=>{
+    const cells=[...tr.children],row={__rowIndex:rowIndex,__cells:{}};
+    columns.forEach(column=>{const cell=cells[column.sourceIndex],text=(cell?.textContent||'').trim().replace(/\s+/g,' ');row[column.field]=text;row.__cells[column.field]={html:cell?.innerHTML||'',sort:llnaGridSortValue(text),align:cell?.style?.textAlign||''};});
+    return row;
+  });
+  return{columns,rows,signature:JSON.stringify({headers:columns.map(c=>c.label),rows:rows.map(row=>columns.map(c=>row[c.field]))})};
+}
+function llnaGridTheme(){
+  const base=window.agGrid?.themeQuartz;if(!base?.withParams)return undefined;
+  return base.withParams({accentColor:'#2C474B',backgroundColor:'#FFFFFF',borderColor:'#DDE3D5',browserColorScheme:'light',columnBorder:true,fontFamily:"-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",fontSize:11,foregroundColor:'#282828',headerBackgroundColor:'#2C474B',headerFontSize:10,headerTextColor:'#F6F8F4',oddRowBackgroundColor:'#FBFCFA',rowBorder:true,rowHoverColor:'#F1F6F2',spacing:6,wrapperBorder:false});
+}
+function buildLlnaGridColumnDefs(snapshot){
+  return snapshot.columns.map((column,index)=>({
+    field:column.field,headerName:column.label,headerTooltip:column.tip||column.label,
+    pinned:index===0?'left':null,lockPinned:index===0,minWidth:index===0?220:96,width:index===0?240:Math.max(105,Math.min(165,column.label.length*8+42)),
+    sortable:true,filter:'agTextColumnFilter',resizable:true,
+    comparator:compareLlnaGridCells,
+    getQuickFilterText:params=>String(params.value||''),
+    tooltipValueGetter:params=>String(params.value||''),
+    cellStyle:params=>params.data?.__cells?.[column.field]?.align?{textAlign:params.data.__cells[column.field].align}:null,
+    cellRenderer:params=>{const node=document.createElement('div');node.className='llna-grid-cell';node.innerHTML=params.data?.__cells?.[column.field]?.html||'';return node;}
+  }));
+}
+async function syncLlnaGridPresentation(){
+  renderLlnaGridPilotControls();
+  if(currentCK!=='llna'||getLlnaGridMode()!=='ag'||!isLlnaGridDesktop()){showLlnaClassicTable();return;}
+  const wrap=document.getElementById('stockTableWrap'),shell=document.getElementById('llnaGridPilotShell'),grid=document.getElementById('llnaAgGrid'),loading=document.getElementById('llnaGridLoading');
+  if(!wrap||!shell||!grid||!loading)return;
+  shell.hidden=false;grid.hidden=true;loading.hidden=false;setLlnaGridStatus('Loading the pilot table…');
+  try{
+    await loadLlnaAgGrid();
+    if(currentCK!=='llna'||getLlnaGridMode()!=='ag'||!isLlnaGridDesktop()){showLlnaClassicTable();return;}
+    const snapshot=captureLlnaClassicTable();
+    if(!snapshot.columns.length)throw new Error('No visible table columns were found');
+    if(llnaGridApi){try{llnaGridApi.destroy()}catch(e){}llnaGridApi=null;}
+    grid.replaceChildren();grid.hidden=false;loading.hidden=true;
+    const theme=llnaGridTheme();
+    const options={
+      columnDefs:buildLlnaGridColumnDefs(snapshot),rowData:snapshot.rows,theme,
+      defaultColDef:{suppressHeaderMenuButton:false},rowHeight:34,headerHeight:40,animateRows:false,ensureDomOrder:true,
+      suppressCellFocus:false,suppressDragLeaveHidesColumns:true,quickFilterText:llnaGridSearch,
+      overlayNoRowsTemplate:'<div class="llna-grid-state">No LLNA rows match the current filters.</div>',
+      onGridReady:params=>{document.getElementById('llnaGridRowCount').textContent=`${snapshot.rows.length} rows`;params.api.setGridOption('quickFilterText',llnaGridSearch);},
+      onFilterChanged:params=>{let count=0;params.api.forEachNodeAfterFilter(()=>count++);document.getElementById('llnaGridRowCount').textContent=`${count} of ${snapshot.rows.length} rows`;}
+    };
+    if(!theme)delete options.theme;
+    llnaGridApi=window.agGrid.createGrid(grid,options);
+    window.__llnaAgGridParity={classicRows:snapshot.rows.length,gridRows:snapshot.rows.length,headers:snapshot.columns.map(c=>c.label),signature:snapshot.signature};
+    wrap.hidden=true;
+    const incomingButton=document.getElementById('llnaGridIncomingToggle');if(incomingButton)incomingButton.textContent=window._incomingDateColumnsExpanded?'Hide ETA columns':'Show ETA columns';
+    setLlnaGridStatus('Pilot view uses the exact rows already calculated by the classic table.');
+  }catch(error){
+    console.error('LLNA AG Grid pilot failed:',error);showLlnaClassicTable('AG Grid unavailable — classic restored');setLlnaGridStatus(error.message||'AG Grid unavailable',true);
+  }
+}
+async function setLlnaGridMode(mode){
+  const normalized=mode==='ag'?'ag':'classic';localStorage.setItem(LLNA_GRID_PREF_KEY,normalized);renderLlnaGridPilotControls();
+  await syncLlnaGridPresentation();
+  if(normalized==='ag'&&getLlnaGridMode()==='ag'&&!document.getElementById('llnaGridPilotShell')?.hidden)document.getElementById('llnaGridSearch')?.focus({preventScroll:true});
+}
+function setLlnaGridSearch(value){llnaGridSearch=String(value||'');llnaGridApi?.setGridOption('quickFilterText',llnaGridSearch)}
+function fitLlnaGridColumns(){if(llnaGridApi)llnaGridApi.sizeColumnsToFit()}
+function resetLlnaGridColumns(){if(!llnaGridApi)return;llnaGridApi.resetColumnState();llnaGridApi.setFilterModel(null);llnaGridSearch='';const input=document.getElementById('llnaGridSearch');if(input)input.value='';llnaGridApi.setGridOption('quickFilterText','')}
+window.addEventListener('resize',()=>{clearTimeout(llnaGridResizeTimer);llnaGridResizeTimer=setTimeout(syncLlnaGridPresentation,180)});
 function getSkus(){return[...new Set([...Object.keys(DATA.cin7),...Object.keys(DATA.velocity)])].filter(s=>s&&!s.startsWith('_')&&!(s.includes('-CS-')&&!s.includes('PACK')))}
 function updateHeaderSub(){const el=document.getElementById('headerSub');if(el)el.textContent=`${Object.keys(DATA.cin7).length} CIN7 SKUs · ${Object.keys(DATA.velocity).filter(k=>!k.startsWith('_')).length} with velocity · ${uniquePoCount(DATA.pos)} open POs`;}
 function applyMattressRegion(){if(currentCK!=='ll-mattresses'||!DATA.mattressRegions)return;const base=DATA._base||{};const region=dashFilter.region||'All';const src=region==='All'?base:DATA.mattressRegions[region];if(!src)return;DATA.cin7=src.cin7||{};DATA.shopify=src.shopify||{};DATA.openOrders=src.openOrders||{};DATA.available=src.available||{};DATA.incoming=src.incoming||{};DATA.velocity=src.velocity||{};DATA.trendData=src.trendData||{};DATA.weeklyData=src.weeklyData||null;DATA.pos=src.pos||[];DATA.allPos=src.allPos||src.pos||[];updateHeaderSub();}
@@ -488,7 +626,8 @@ function toggleIncomingDateColumns(event){
     const nextWrap=document.getElementById('stockTable')?.closest('.table-wrap');
     if(nextWrap){nextWrap.scrollLeft=viewState.tableLeft;nextWrap.scrollTop=viewState.tableTop;}
     window.scrollTo(viewState.windowX,viewState.windowY);
-    document.querySelector('#stockTable .incoming-toggle')?.focus({preventScroll:true});
+    const gridEtaButton=typeof getLlnaGridMode==='function'&&typeof currentCK!=='undefined'&&getLlnaGridMode()==='ag'&&currentCK==='llna'?document.getElementById('llnaGridIncomingToggle'):null;
+    (gridEtaButton||document.querySelector('#stockTable .incoming-toggle'))?.focus({preventScroll:true});
   });
   return false;
 }
