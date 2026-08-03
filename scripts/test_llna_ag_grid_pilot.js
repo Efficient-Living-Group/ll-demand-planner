@@ -24,7 +24,7 @@ assert(html.includes('id="stockTableWrap"') && html.includes('id="stockTable"'),
 assert(html.includes("row[column.field]=text;row.__cells[column.field]="), 'grid values must remain searchable text');
 assert(html.includes("getQuickFilterText:params=>String(params.value||'')"), 'quick filter text adapter missing');
 assert(html.includes("function classifyLlnaGridSku(sku)"), 'LLNA generation classifier missing');
-assert(html.includes("['all','All'],['legacy','Legacy & Cocoon beds'],['components','New FRM + CV']"), 'LLNA segment tabs missing');
+assert(html.includes("['all','All'],['legacy','Legacy SKUs'],['components','New FRM + CV']"), 'LLNA segment tabs missing');
 assert(html.includes("isExternalFilterPresent:()=>llnaGridSegment!=='all'"), 'LLNA segment filter is not connected to AG Grid');
 assert(html.includes("row.__llnaSegment=classifyLlnaGridSku"), 'LLNA segment must derive from the rendered SKU cell');
 assert(html.includes("definition.headerComponent=LlnaIncomingHeaderComponent"), 'Incoming header ETA control missing');

@@ -522,7 +522,7 @@ function llnaGridSegmentCounts(rows){
 function renderLlnaGridSegments(rows){
   const root=document.getElementById('llnaGridSegments');if(!root)return;
   const counts=llnaGridSegmentCounts(rows);
-  const tabs=[['all','All'],['legacy','Legacy & Cocoon beds'],['components','New FRM + CV']];
+  const tabs=[['all','All'],['legacy','Legacy SKUs'],['components','New FRM + CV']];
   root.innerHTML=tabs.map(([id,label])=>`<button type="button" class="llna-segment-tab ${llnaGridSegment===id?'active':''}" role="tab" aria-selected="${llnaGridSegment===id}" onclick="setLlnaGridSegment('${id}')">${label}<span class="llna-segment-count">${counts[id]}</span></button>`).join('');
 }
 function setLlnaGridSegment(segment){
