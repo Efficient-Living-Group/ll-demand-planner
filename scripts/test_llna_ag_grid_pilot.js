@@ -23,6 +23,13 @@ assert(html.includes('aria-pressed="${mode===\'ag\'}"'), 'view switch accessibil
 assert(html.includes('id="stockTableWrap"') && html.includes('id="stockTable"'), 'classic table must remain intact');
 assert(html.includes("row[column.field]=text;row.__cells[column.field]="), 'grid values must remain searchable text');
 assert(html.includes("getQuickFilterText:params=>String(params.value||'')"), 'quick filter text adapter missing');
+assert(html.includes("function classifyLlnaGridSku(sku)"), 'LLNA generation classifier missing');
+assert(html.includes("['all','All'],['legacy','Legacy & Cocoon beds'],['components','New FRM + CV']"), 'LLNA segment tabs missing');
+assert(html.includes("isExternalFilterPresent:()=>llnaGridSegment!=='all'"), 'LLNA segment filter is not connected to AG Grid');
+assert(html.includes("row.__llnaSegment=classifyLlnaGridSku"), 'LLNA segment must derive from the rendered SKU cell');
+assert(html.includes("definition.headerComponent=LlnaIncomingHeaderComponent"), 'Incoming header ETA control missing');
+assert(html.includes("this.eta.id='llnaGridIncomingToggle'"), 'ETA header control must preserve focus restoration');
+assert(!html.includes('<button type="button" id="llnaGridIncomingToggle" onclick="return toggleIncomingDateColumns(event)">'), 'ETA control must not remain in the detached toolbar');
 
 const captureStart = html.indexOf('function captureLlnaClassicTable()');
 const captureEnd = html.indexOf('function llnaGridTheme()', captureStart);
