@@ -34,6 +34,7 @@ const {
 } = require('./lib/container-tracking');
 const { exec } = require('child_process');
 const { validateCin7RefreshCandidate } = require('./lib/cin7-refresh-integrity');
+const { DEEP_DREAM_SOFTNESS_BY_SKU } = require('./lib/deep-dream-softness');
 const WebSocket = require('ws');
 
 const app = express();
@@ -3804,6 +3805,7 @@ function buildCKData(ckId) {
     suppliers,
     landedCosts,
     productTypes,
+    softnessBySku: ckId === 'dd' ? DEEP_DREAM_SOFTNESS_BY_SKU : {},
     coverageAux,
     warehouseOptions,
     warehouseViews,

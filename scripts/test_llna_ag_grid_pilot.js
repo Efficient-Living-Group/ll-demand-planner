@@ -27,8 +27,9 @@ assert(html.includes("row[column.field]=text;row.__cells[column.field]="), 'grid
 assert(html.includes("getQuickFilterText:params=>String(params.value||'')"), 'quick filter text adapter missing');
 assert(html.includes("function classifyLlnaGridSku(sku)"), 'LLNA generation classifier missing');
 assert(html.includes("['all','All'],['legacy','Legacy SKUs'],['components','New FRM + CV']"), 'LLNA segment tabs missing');
-assert(html.includes("const available=currentCK==='llna';root.hidden=!available"), 'LLNA-only segment visibility guard missing');
-assert(html.includes("isExternalFilterPresent:()=>currentCK==='llna'&&llnaGridSegment!=='all'"), 'LLNA segment filter must not affect other CK tabs');
+assert(html.includes("const available=currentCK==='llna'||currentCK==='dd';root.hidden=!available"), 'LLNA and Deep Dream segment visibility guard missing');
+assert(html.includes("isExternalFilterPresent:()=>(currentCK==='llna'||currentCK==='dd')&&llnaGridSegment!=='all'"), 'segment filters must not affect other CK tabs');
+assert(html.includes('doesExternalFilterPass:node=>stockGridSegmentMatches(node.data)'), 'shared segment filter predicate missing');
 assert(html.includes("row.__llnaSegment=classifyLlnaGridSku"), 'LLNA segment must derive from the rendered SKU cell');
 assert(html.includes("definition.headerComponent=LlnaIncomingHeaderComponent"), 'Incoming header ETA control missing');
 assert(html.includes("this.eta.id='llnaGridIncomingToggle'"), 'ETA header control must preserve focus restoration');
