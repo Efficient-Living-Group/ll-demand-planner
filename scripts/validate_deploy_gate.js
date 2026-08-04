@@ -83,7 +83,7 @@ const CK_DEFS = {
   'lifely-sofa': { name:'Modular Sofa', prefix:'LIFELY', option1:'Category Killer - Lifely Sofa' },
   'case-goods': { name:'Case Goods', prefix:'MULTI', option1:['Case goods - Active','Case goods - Discontinued'], filter:isCaseGoodsSku }
 };
-const PLANNER_EXCLUDED_SKUS = new Set(['DD-153QMF', 'DD-183KMF']);
+const PLANNER_EXCLUDED_SKUS = new Set(['DD-21153CF', 'DD-21183CF']);
 function optionAllowed(actual, allowed) {
   if (!allowed) return true;
   const list = Array.isArray(allowed) ? allowed : [allowed];
@@ -498,7 +498,8 @@ const fixtures = [
   { sku: 'COCOON-DOUBLE-IVR', expected: 'Cocoon Bed' },
   { sku: 'RDNT-D-BASE', expected: 'Radiant' },
   { sku: 'LLAU-CB-S-MSM', expected: 'Little Lifely AU' },
-  { sku: 'DD-21153CF', expected: 'Deep Dream' },
+  { sku: 'DD-153QMF', expected: 'Deep Dream' },
+  { sku: 'DD-21153CF', expected: 'Uncategorised' },
   { sku: 'DD-34183K-SFM', expected: 'Deep Dream' },
   { sku: 'DDUK-2190CF', expected: 'LL Mattresses' },
   { sku: 'CAT-EDT-NAL', expected: 'Caterpillar Dining' },

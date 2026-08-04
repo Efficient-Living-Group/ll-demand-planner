@@ -20,17 +20,7 @@ const ROOT = path.resolve(__dirname, '..');
 const SNAPSHOT = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'cache-snapshot.json'), 'utf8'));
 const PORT = Number(process.env.BOM_RECONCILIATION_PORT || 3998);
 const SESSION_SECRET = 'demand-planner-bom-reconciliation-test';
-// Reviewed by Yun Kai on 2026-08-03: these sold Cocoon-with-mattress parents
-// still consume the two retired mattresses in BOM Master. The retired leaves
-// must stay out of automatic planning and must never be remapped by SKU inference.
-const KNOWN_BOM_MASTER_EXCLUSIONS = new Set([
-  'dd:COCOON-KMF-CRML:bom_master_has_no_visible_panel_component',
-  'dd:COCOON-KMF-IVR:bom_master_has_no_visible_panel_component',
-  'dd:COCOON-KMF-MSGRN:bom_master_has_no_visible_panel_component',
-  'dd:COCOON-QMF-CRML:bom_master_has_no_visible_panel_component',
-  'dd:COCOON-QMF-IVR:bom_master_has_no_visible_panel_component',
-  'dd:COCOON-QMF-MSGRN:bom_master_has_no_visible_panel_component'
-]);
+const KNOWN_BOM_MASTER_EXCLUSIONS = new Set();
 
 function normalizeSku(value) {
   return String(value || '').toUpperCase().trim();

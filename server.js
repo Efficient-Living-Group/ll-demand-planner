@@ -829,18 +829,10 @@ function isPlannerExcludedSku(sku) {
   return /CSTM$/i.test(normalized) || DEEP_DREAM_DISCONTINUED_SKUS.includes(normalized);
 }
 
-function visiblePlannerSkuMap(map = {}) {
-  return Object.fromEntries(Object.entries(map || {}).filter(([sku]) => !isPlannerExcludedSku(sku)));
-}
-
 function visiblePlannerPo(po) {
-  return {
-    ...po,
-    items: visiblePlannerSkuMap(po?.items),
-    analyticsItems: visiblePlannerSkuMap(po?.analyticsItems),
-    itemNames: visiblePlannerSkuMap(po?.itemNames),
-    itemOption1: visiblePlannerSkuMap(po?.itemOption1)
-  };
+  // Cin7 purchase orders are source facts. Planner catalogue visibility must
+  // never remove or rewrite PO SKUs, quantities, dates, stages, or statuses.
+  return po;
 }
 
 function sanitizePlannerSkuData(value) {
@@ -852,6 +844,12 @@ function sanitizePlannerSkuData(value) {
   if (isPlannerExcludedSku(identitySku)) return undefined;
   const clean = {};
   for (const [key, child] of Object.entries(value)) {
+    // Preserve PO-derived records exactly as Cin7 supplied them. The planner
+    // may hide inactive catalogue rows, but it must not alter purchase orders.
+    if (['pos', 'allPos', 'poRows', 'coveragePoRows'].includes(key)) {
+      clean[key] = child;
+      continue;
+    }
     if (isPlannerExcludedSku(key)) continue;
     const sanitized = sanitizePlannerSkuData(child);
     if (sanitized !== undefined) clean[key] = sanitized;
@@ -5727,7 +5725,8 @@ const HEALTH_ROUTE_FIXTURES = [
   { sku: 'COCOON-DOUBLE-IVR', expected: 'Cocoon Bed' },
   { sku: 'RDNT-D-BASE', expected: 'Radiant' },
   { sku: 'LLAU-CB-S-MSM', expected: 'Little Lifely AU' },
-  { sku: 'DD-21153CF', expected: 'Deep Dream' },
+  { sku: 'DD-153QMF', expected: 'Deep Dream' },
+  { sku: 'DD-21153CF', expected: 'Uncategorised' },
   { sku: 'DD-34183K-SFM', expected: 'Deep Dream' },
   { sku: 'DDUK-2190CF', expected: 'LL Mattresses' },
   { sku: 'CAT-EDT-NAL', expected: 'Caterpillar Dining' }
@@ -6005,7 +6004,7 @@ const DD_21CM_SKUS = new Set(['DD-21107CF','DD-21137CF','DD-21153CF','DD-21183CF
 
 function classifySKU(code, destCountry) {
   const c = (code || '').toUpperCase();
-  if (isPlannerExcludedSku(c)) return null;
+  if (/CSTM$/i.test(c.trim())) return null;
   // NZ uses LLAU- SKUs - check destination first
   if (destCountry === 'NZ' && c.startsWith('LLAU-') && !c.includes('-CV')) return 'LL Beds - NZ';
   if (destCountry === 'NZ' && c.startsWith('LLAU-') && c.includes('-CV')) return 'LL Covers - NZ';
