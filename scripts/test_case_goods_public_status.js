@@ -13,7 +13,7 @@ const CACHE_PATH = path.join(ROOT, 'data', 'cache-snapshot.json');
 const SNAPSHOT = JSON.parse(fs.readFileSync(CACHE_PATH, 'utf8'));
 const PORT = Number(process.env.CASE_GOODS_STATUS_PORT || 3996);
 const SESSION_SECRET = 'demand-planner-case-goods-status-test';
-const CASE_GOODS_OPTION1 = new Set(['case goods - active', 'case goods - discontinued']);
+const CASE_GOODS_OPTION1 = 'case goods - active';
 const KNOWN_DEMAND_ONLY_BUNDLES = new Set(['RKU-SOFA-SET']);
 
 function isCaseGoodsSku(sku) {
@@ -35,7 +35,7 @@ function isCaseGoodsSku(sku) {
 function caseGoodsSourceRows() {
   return Object.entries(SNAPSHOT.cin7Products || {}).filter(([sku, product]) => (
     isCaseGoodsSku(sku)
-    && CASE_GOODS_OPTION1.has(String(product?.option1 || '').trim().toLowerCase())
+    && String(product?.option1 || '').trim().toLowerCase() === CASE_GOODS_OPTION1
   ));
 }
 
@@ -84,8 +84,14 @@ async function waitForServer(child) {
   const sources = caseGoodsSourceRows();
   const publicSources = sources.filter(([, product]) => product?.status === 'Public').map(([sku]) => sku);
   const nonPublicSources = sources.filter(([, product]) => product?.status !== 'Public').map(([sku]) => sku);
-  assert(publicSources.length > 500, `expected a substantial Public Case Goods source set, got ${publicSources.length}`);
+  const publicLegacySources = Object.entries(SNAPSHOT.cin7Products || {}).filter(([sku, product]) => (
+    isCaseGoodsSku(sku)
+    && String(product?.option1 || '').trim().toLowerCase() === 'case goods - discontinued'
+    && product?.status === 'Public'
+  )).map(([sku]) => sku);
+  assert(publicSources.length > 0, `expected Public + Case goods - Active sources, got ${publicSources.length}`);
   assert(nonPublicSources.length > 0, 'fixture must include Non-Public Case Goods products to prove exclusion');
+  assert(publicLegacySources.length > 0, 'fixture must include Public legacy-category products to prove the Option1 intersection');
   assert.strictEqual(
     sources.filter(([, product]) => !String(product?.status || '').trim()).length,
     0,
@@ -116,15 +122,18 @@ async function waitForServer(child) {
       && !visible.has(sku.replace(/-\d+$/, ''))
     ));
     const unsupported = [...visible].filter(sku => !supported.has(sku));
+    const leakedLegacy = publicLegacySources.filter(sku => visible.has(sku) && !supported.has(sku));
 
     assert.deepStrictEqual(missing, [], `Public Cin7 Case Goods missing from panel: ${missing.slice(0, 20).join(', ')}`);
     assert.deepStrictEqual(unsupported, [], `panel rows without a Public Cin7 Case Goods source: ${unsupported.slice(0, 20).join(', ')}`);
-    assert(visible.size > 500, `expected normalized Public Case Goods panel above 500 rows, got ${visible.size}`);
+    assert.deepStrictEqual(leakedLegacy, [], `Public products outside Case goods - Active leaked into panel: ${leakedLegacy.slice(0, 20).join(', ')}`);
+    assert(visible.size > 0, `expected normalized Public + Active Case Goods rows, got ${visible.size}`);
 
     console.log(JSON.stringify({
       sourceProducts: sources.length,
       publicSourceSkus: publicSources.length,
       nonPublicSourceSkus: nonPublicSources.length,
+      publicLegacySourceSkusExcluded: publicLegacySources.length,
       normalizedVisibleRows: visible.size,
       demandOnlyBundles: [...KNOWN_DEMAND_ONLY_BUNDLES]
     }, null, 2));
