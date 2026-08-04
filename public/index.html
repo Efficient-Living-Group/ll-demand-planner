@@ -65,6 +65,7 @@ tbody td{padding:5px 8px;border-bottom:1px solid var(--border);white-space:nowra
 @media(max-width:768px){.sku-copy-button{flex-basis:40px;width:40px;height:40px}}
 .llna-grid-pilot-shell .llna-incoming-header-cell{padding-inline:7px}.llna-grid-pilot-shell .llna-incoming-header-cell .ag-header-cell-comp-wrapper{width:100%}
 @media(prefers-reduced-motion:reduce){.llna-grid-switch button,.llna-grid-toolbar button{transition:none}}
+.llna-grid-pilot-shell .ag-cell.llna-grid-coverage-status{overflow:hidden}.llna-grid-coverage-status .llna-grid-cell{white-space:normal}.llna-grid-coverage-status .badge{box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;max-width:100%;min-width:0;line-height:1.2;white-space:normal;overflow-wrap:anywhere;text-align:center}
 thead th{cursor:pointer;user-select:none}thead th:hover{background:var(--bg-accent)}thead th .sort-arrow{font-size:8px;margin-left:3px;opacity:0.5}
 .badge{padding:2px 8px;border-radius:12px;font-size:10px;font-weight:600;display:inline-block}
 .badge.stockout{background:rgba(195,50,82,0.2);color:var(--alert)}.badge.critical{background:rgba(195,50,82,0.15);color:#C33252}
@@ -607,6 +608,7 @@ function buildLlnaGridColumnDefs(snapshot){
     cellRenderer:params=>{const node=document.createElement('div');node.className='llna-grid-cell';node.innerHTML=params.data?.__cells?.[column.field]?.html||'';return node;}
     };
     if(column.label==='Incoming'){definition.headerComponent=LlnaIncomingHeaderComponent;definition.headerClass='llna-incoming-header-cell';definition.minWidth=178;definition.width=178}
+    if(column.label==='Coverage Status'){definition.cellClass='llna-grid-coverage-status';definition.minWidth=120}
     return definition;
   });
 }

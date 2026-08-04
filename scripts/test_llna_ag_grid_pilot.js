@@ -29,6 +29,9 @@ assert(html.includes('.llna-grid-search-wrap:focus-within{border-color:#52766F;b
 assert(html.includes('.llna-grid-search{width:100%;height:34px;border:0;outline:0;box-shadow:none;appearance:none;-webkit-appearance:none'), 'search input must not draw a second inner box');
 assert(!html.includes('.llna-grid-search:focus-visible'), 'search input must not receive a duplicate inner focus outline');
 assert(html.includes('enableCellTextSelection:true'), 'AG Grid cell text selection must remain enabled for copying SKUs');
+assert(html.includes("if(column.label==='Coverage Status'){definition.cellClass='llna-grid-coverage-status';definition.minWidth=120}"), 'Coverage Status cells need a dedicated containment class and safe minimum width');
+assert(html.includes('.llna-grid-pilot-shell .ag-cell.llna-grid-coverage-status{overflow:hidden}'), 'Coverage Status cells must clip their content');
+assert(html.includes('.llna-grid-coverage-status .badge{box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;max-width:100%;min-width:0;line-height:1.2;white-space:normal;overflow-wrap:anywhere;text-align:center}'), 'Coverage Status badges must remain inside narrow cells');
 assert(!html.includes('Hide cost/CBM'), 'legacy Hide cost/CBM shortcut must be removed from every shared column picker');
 assert(!html.includes('function hideStockColumnSet('), 'unused cost/CBM bulk-hide helper must be removed');
 assert(html.includes("function classifyLlnaGridSku(sku)"), 'LLNA generation classifier missing');
