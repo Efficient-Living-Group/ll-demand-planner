@@ -2289,26 +2289,22 @@ function buildCKData(ckId) {
   let costs = {};
   // CIN7 stock - first collect raw, then normalize
   const cin7Raw = {};
-  const caseGoodsPublicCartonParents = new Set();
+  const caseGoodsAlwaysVisible = new Set();
   if (ckId === 'case-goods') {
     for (const [sourceSku, sourceProduct] of Object.entries(dataCache.cin7Products || {})) {
-      const carton = String(sourceSku).match(/^(.+)-(\d)$/);
-      if (!carton) continue;
       if (String(sourceProduct?.status || '').trim().toLowerCase() !== 'public') continue;
       if (!skuMatchesOption1(sourceSku, def) || !isCaseGoodsSku(sourceSku)) continue;
-      caseGoodsPublicCartonParents.add(carton[1]);
+      caseGoodsAlwaysVisible.add(String(sourceSku).replace(/-\d+$/, ''));
     }
   }
   for (const [sku, data] of Object.entries(dataCache.cin7Products)) {
     if (ckId === 'cocoon' && isCocoonComboSku(sku)) continue;
-    const caseGoodsCarton = ckId === 'case-goods' ? String(sku).match(/^(.+)-(\d)$/) : null;
-    const requiredCaseGoodsCartonSibling = !!(
-      caseGoodsCarton
-      && caseGoodsPublicCartonParents.has(caseGoodsCarton[1])
-      && skuMatchesOption1(sku, def)
+    const caseGoodsStockCandidate = !!(
+      ckId === 'case-goods'
       && isCaseGoodsSku(sku)
+      && ['case goods - active', 'case goods - discontinued'].includes(String(data?.option1 || '').trim().toLowerCase())
     );
-    if (skuMatchesDef(sku, def) || requiredCaseGoodsCartonSibling) {
+    if (skuMatchesDef(sku, def) || caseGoodsStockCandidate) {
       if (stockBranches && Array.isArray(stockBranches)) {
         const branchRows = dataCache.cin7StockByBranch?.[sku] || {};
         const branchData = stockBranches.reduce((acc, branchId) => {
@@ -2366,6 +2362,11 @@ function buildCKData(ckId) {
         const virtual = Number(source.virtual ?? source.soh ?? 0);
         cin7Normalized[sku] = { ...normalized, ...source, soh: virtual, virtual };
       }
+    }
+    for (const [sku, row] of Object.entries(cin7Normalized)) {
+      if (caseGoodsAlwaysVisible.has(sku)) continue;
+      if (Number(row?.soh || 0) > 0) continue;
+      delete cin7Normalized[sku];
     }
   }
   // Lifely Sofa should show true physical component/carton SKUs. Do not merge

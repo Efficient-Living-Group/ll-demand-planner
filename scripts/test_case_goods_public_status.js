@@ -121,20 +121,20 @@ async function waitForServer(child) {
       && !visible.has(sku)
       && !visible.has(sku.replace(/-\d+$/, ''))
     ));
-    const unsupported = [...visible].filter(sku => !supported.has(sku));
-    const leakedLegacy = publicLegacySources.filter(sku => visible.has(sku) && !supported.has(sku));
+    const stockOnlyRows = [...visible].filter(sku => !supported.has(sku));
+    const unsupported = stockOnlyRows.filter(sku => Number(data.cin7?.[sku] || 0) <= 0);
 
     assert.deepStrictEqual(missing, [], `Public Cin7 Case Goods missing from panel: ${missing.slice(0, 20).join(', ')}`);
-    assert.deepStrictEqual(unsupported, [], `panel rows without a Public Cin7 Case Goods source: ${unsupported.slice(0, 20).join(', ')}`);
-    assert.deepStrictEqual(leakedLegacy, [], `Public products outside Case goods - Active leaked into panel: ${leakedLegacy.slice(0, 20).join(', ')}`);
-    assert(visible.size > 0, `expected normalized Public + Active Case Goods rows, got ${visible.size}`);
+    assert.deepStrictEqual(unsupported, [], `panel rows outside Public + Active without positive SOH: ${unsupported.slice(0, 20).join(', ')}`);
+    assert(stockOnlyRows.length > 0, 'fixture must include additional Case Goods rows retained only because SOH is positive');
 
     console.log(JSON.stringify({
       sourceProducts: sources.length,
       publicSourceSkus: publicSources.length,
       nonPublicSourceSkus: nonPublicSources.length,
-      publicLegacySourceSkusExcluded: publicLegacySources.length,
+      publicLegacySourceSkusAudited: publicLegacySources.length,
       normalizedVisibleRows: visible.size,
+      positiveSohRowsAdded: stockOnlyRows.length,
       demandOnlyBundles: [...KNOWN_DEMAND_ONLY_BUNDLES]
     }, null, 2));
     console.log('Case Goods Cin7 Public-status tests passed');
