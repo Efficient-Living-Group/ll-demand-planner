@@ -81,7 +81,7 @@ const CK_DEFS = {
   'cusb-uk-snuggle': { name:'Snuggle UK', prefix:'MULTI', option1:'Category Killer - Cushie V3 Snuggle', filter:s=>s.startsWith('CUSB')&&s.includes('-UK'), excludeCV:true },
   cmss: { name:'Cushie Modular Sleeper', prefix:'CMSS', option1:'Category Killer - Cushie V2' },
   'lifely-sofa': { name:'Modular Sofa', prefix:'LIFELY', option1:'Category Killer - Lifely Sofa' },
-  'case-goods': { name:'Case Goods', prefix:'MULTI', option1:['Case goods - Active','Case goods - Discontinued'], filter:isCaseGoodsSku }
+  'case-goods': { name:'Case Goods', prefix:'MULTI', option1:['Case goods - Active','Case goods - Discontinued'], productStatus:'Public', filter:isCaseGoodsSku }
 };
 const PLANNER_EXCLUDED_SKUS = new Set(['DD-21153CF', 'DD-21183CF']);
 function optionAllowed(actual, allowed) {
@@ -97,7 +97,12 @@ function matchesDef(sku, option1, def) {
   else if (!(s.startsWith(def.prefix) && filter(s))) return false;
   if (def.excludeCV && s.includes('-CV')) return false;
   if (def.option1Bypass && def.option1Bypass(s)) return true;
-  return optionAllowed(option1, def.option1);
+  if (!optionAllowed(option1, def.option1)) return false;
+  if (def.productStatus) {
+    const actualStatus = String(products[sku]?.status || '').trim().toLowerCase();
+    if (actualStatus !== String(def.productStatus).trim().toLowerCase()) return false;
+  }
+  return true;
 }
 function routeSku(sku, products) {
   const option1 = products[sku]?.option1 || products[String(sku).toUpperCase()]?.option1 || '';

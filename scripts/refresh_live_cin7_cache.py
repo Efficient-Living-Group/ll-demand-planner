@@ -549,6 +549,7 @@ def build_products_and_stock(products_raw: list[dict[str, Any]], product_options
                 "costAUD": cost_aud,
                 "cbm": cbm,
                 "option1": variant.get("option1") or product.get("option1") or "",
+                "status": product.get("status") or "",
             }
         style_code = product.get("styleCode")
         if style_code and (product.get("stockOnHand") or 0) > 0:
@@ -557,6 +558,7 @@ def build_products_and_stock(products_raw: list[dict[str, Any]], product_options
                 "available": product.get("stockAvailable") or 0,
                 "cbm": cbm,
                 "option1": product.get("option1") or "",
+                "status": product.get("status") or "",
             }
 
     for option in product_options_raw:
@@ -573,6 +575,7 @@ def build_products_and_stock(products_raw: list[dict[str, Any]], product_options
             "costAUD": existing.get("costAUD") or cost_aud or 0,
             "cbm": existing.get("cbm") or 0,
             "option1": option.get("option1") or existing.get("option1") or "",
+            "status": existing.get("status") or "",
         }
 
     for row in stock_raw:

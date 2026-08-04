@@ -143,7 +143,7 @@ const CK_DEFS = {
 
   'cmss':     { name: 'Cushie Modular Sleeper', prefix: 'CMSS',   logo: 'cushie.png',        store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: 'Category Killer - Cushie V2', sizes: {'-S-':'Single','-D-':'Double','-Q-':'Queen','-K-':'King'} },
   'lifely-sofa': { name: 'Lifely Sofa',         prefix: 'MULTI',  logo: 'lifely-sofa.png',   store: 'lifely', stockBranches: LL_AU_BRANCH_IDS, option1: ['Category Killer - Lifely Sofa', 'Category Killer - Lifely Sofa - Discontinued'], filter: isLifelySofaComponentSku, sizes: {} },
-  'case-goods': { name: 'Case Goods',           prefix: 'MULTI',  logo: null,                mark: 'CASE', store: 'lifely', poDestination: 'Australia', salesCountry: 'AU', stockBranches: LL_AU_BRANCH_IDS, option1: 'Case goods - Active', filter: isCaseGoodsSku, sizes: {} }
+  'case-goods': { name: 'Case Goods',           prefix: 'MULTI',  logo: null,                mark: 'CASE', store: 'lifely', poDestination: 'Australia', salesCountry: 'AU', stockBranches: LL_AU_BRANCH_IDS, option1: ['Case goods - Active', 'Case goods - Discontinued'], productStatus: 'Public', filter: isCaseGoodsSku, sizes: {} }
 };
 
 // ===== COMBO BOM (Bill of Materials) =====
@@ -824,6 +824,12 @@ function skuMatchesOption1(sku, def, override = '') {
   return allowed.some(value => normalizeOption1(value) === actual);
 }
 
+function skuMatchesProductStatus(sku, def, override = '') {
+  if (!def.productStatus) return true;
+  const actual = String(dataCache.cin7Products?.[sku]?.status || override || '').trim().toLowerCase();
+  return actual === String(def.productStatus).trim().toLowerCase();
+}
+
 function isPlannerExcludedSku(sku) {
   const normalized = String(sku || '').trim().toUpperCase();
   return /CSTM$/i.test(normalized) || DEEP_DREAM_DISCONTINUED_SKUS.includes(normalized);
@@ -868,6 +874,7 @@ function skuMatchesDef(sku, def, option1Override = '') {
   }
   if (def.excludeCV && sku.includes('-CV')) return false;
   if (!skuMatchesOption1(sku, def, option1Override)) return false;
+  if (!skuMatchesProductStatus(sku, def)) return false;
   return true;
 }
 
@@ -1469,11 +1476,11 @@ async function fetchCin7AllProducts() {
           if (v.code) {
             const pc = v.priceColumns || {};
             const costAUD = pc.costAUD || (pc.costUSD ? pc.costUSD * fxRate.USDAUD : 0);
-            products[v.code] = { soh: v.stockOnHand || 0, available: v.stockAvailable || 0, costAUD, cbm, option1: v.option1 || product.option1 || '' };
+            products[v.code] = { soh: v.stockOnHand || 0, available: v.stockAvailable || 0, costAUD, cbm, option1: v.option1 || product.option1 || '', status: product.status || '' };
           }
         }
         if (product.styleCode && product.stockOnHand > 0) {
-          products[product.styleCode] = { soh: product.stockOnHand, available: product.stockAvailable || 0, cbm, option1: product.option1 || '' };
+          products[product.styleCode] = { soh: product.stockOnHand, available: product.stockAvailable || 0, cbm, option1: product.option1 || '', status: product.status || '' };
         }
       }
     } catch (e) { console.error(`CIN7 Products page ${page} error:`, e.message); continue; }
@@ -1515,7 +1522,8 @@ async function fetchCin7AllProducts() {
           available: existing.available ?? (option.stockAvailable || 0),
           costAUD: existing.costAUD || costAUD || 0,
           cbm: existing.cbm || 0,
-          option1: option.option1 || existing.option1 || ''
+          option1: option.option1 || existing.option1 || '',
+          status: existing.status || ''
         };
       }
     } catch (e) { console.error(`CIN7 ProductOptions page ${page} error:`, e.message); continue; }
@@ -2281,9 +2289,26 @@ function buildCKData(ckId) {
   let costs = {};
   // CIN7 stock - first collect raw, then normalize
   const cin7Raw = {};
+  const caseGoodsPublicCartonParents = new Set();
+  if (ckId === 'case-goods') {
+    for (const [sourceSku, sourceProduct] of Object.entries(dataCache.cin7Products || {})) {
+      const carton = String(sourceSku).match(/^(.+)-(\d)$/);
+      if (!carton) continue;
+      if (String(sourceProduct?.status || '').trim().toLowerCase() !== 'public') continue;
+      if (!skuMatchesOption1(sourceSku, def) || !isCaseGoodsSku(sourceSku)) continue;
+      caseGoodsPublicCartonParents.add(carton[1]);
+    }
+  }
   for (const [sku, data] of Object.entries(dataCache.cin7Products)) {
     if (ckId === 'cocoon' && isCocoonComboSku(sku)) continue;
-    if (skuMatchesDef(sku, def)) {
+    const caseGoodsCarton = ckId === 'case-goods' ? String(sku).match(/^(.+)-(\d)$/) : null;
+    const requiredCaseGoodsCartonSibling = !!(
+      caseGoodsCarton
+      && caseGoodsPublicCartonParents.has(caseGoodsCarton[1])
+      && skuMatchesOption1(sku, def)
+      && isCaseGoodsSku(sku)
+    );
+    if (skuMatchesDef(sku, def) || requiredCaseGoodsCartonSibling) {
       if (stockBranches && Array.isArray(stockBranches)) {
         const branchRows = dataCache.cin7StockByBranch?.[sku] || {};
         const branchData = stockBranches.reduce((acc, branchId) => {
@@ -3438,7 +3463,7 @@ function buildCKData(ckId) {
 
   // Remove inactive Shopify SKUs (draft/archived)
   const inactiveSet = new Set(relatedStores.flatMap(sourceStore => dataCache.shopifyInventory?.[sourceStore]?.['__inactive__'] || []));
-  const keepInactiveForPanel = ckId === 'll-mattresses' || ckId === 'dd' || ckId === 'lifely-sofa' || ckId === 'airflow-pad' || ckId === 'llau' || ckId === 'llna' || ckId === 'llca';
+  const keepInactiveForPanel = ckId === 'case-goods' || ckId === 'll-mattresses' || ckId === 'dd' || ckId === 'lifely-sofa' || ckId === 'airflow-pad' || ckId === 'llau' || ckId === 'llna' || ckId === 'llca';
   for (const sku of Object.keys(cin7)) {
     if (!keepInactiveForPanel && inactiveSet.has(sku)) { delete cin7[sku]; delete velocity[sku]; delete sellableVelocity[sku]; delete shopify[sku]; }
   }
